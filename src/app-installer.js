@@ -34,6 +34,7 @@ export function installApp({ home = os.homedir(), open = true } = {}) {
 
   const destination = installedAppPath(home);
   fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o755 });
+  fs.rmSync(destination, { recursive: true, force: true });
   fs.cpSync(staging, destination, { recursive: true, force: true });
   run("xattr", ["-dr", "com.apple.quarantine", destination], { allowFailure: true });
   if (open) run("open", [destination]);
