@@ -1,12 +1,14 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { installApp } from "./app-installer.js";
 import { createBroker } from "./broker.js";
 import { installConfig, installRuntime, readConfig } from "./config.js";
 import {
   braveCookiePaths,
   codexCookiePaths,
   configPath,
+  installedAppPath,
   installedExtensionDir,
   launchAgentPath,
 } from "./paths.js";
@@ -18,6 +20,7 @@ Cookie-only local synchronization from Brave to Codex's built-in browser.
 
 Commands:
   setup [--hour 9] [--minute 0] [--no-schedule]
+  install-app [--no-open]
   sync [--timeout 300]
   doctor
   remove-schedule
@@ -31,6 +34,8 @@ export async function main(argv) {
       return setup(args);
     case "sync":
       return sync(args);
+    case "install-app":
+      return installDesktopApp(args);
     case "doctor":
       return doctor();
     case "remove-schedule":
@@ -43,6 +48,20 @@ export async function main(argv) {
     default:
       throw new Error(`Unknown command: ${command}\n\n${HELP}`);
   }
+}
+
+function installDesktopApp(args) {
+  assertMacOS();
+  installRuntime();
+  const existing = fs.existsSync(configPath()) ? readConfig() : null;
+  installConfig({
+    hour: existing?.schedule?.hour ?? 9,
+    minute: existing?.schedule?.minute ?? 0,
+  });
+  console.log("Building the native macOS app…");
+  const destination = installApp({ open: !args.includes("--no-open") });
+  console.log(`Installed: ${destination}`);
+  console.log("The app is available in your user Applications folder and Spotlight.");
 }
 
 function setup(args) {
@@ -105,6 +124,7 @@ function doctor() {
   console.log(`Brave extension: ${status(installedExtensionDir(home, "brave"))}`);
   console.log(`Codex extension: ${status(installedExtensionDir(home, "codex"))}`);
   console.log(`Daily schedule: ${status(launchAgentPath(home))}`);
+  console.log(`Desktop app: ${status(installedAppPath(home))}`);
   console.log(`Brave cookie stores detected: ${brave.length}`);
   console.log(`Codex cookie stores detected: ${codex.length}`);
   for (const file of brave) console.log(`  Brave: ${file}`);

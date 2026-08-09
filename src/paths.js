@@ -27,6 +27,10 @@ export function launchAgentPath(home = os.homedir()) {
   return path.join(home, "Library", "LaunchAgents", `${APP_ID}.plist`);
 }
 
+export function installedAppPath(home = os.homedir()) {
+  return path.join(home, "Applications", "Brave Codex Sync.app");
+}
+
 export function braveCookiePaths(home = os.homedir()) {
   const root = path.join(
     home,

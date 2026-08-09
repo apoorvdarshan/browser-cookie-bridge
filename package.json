@@ -1,6 +1,6 @@
 {
   "name": "brave-codex-cookie-sync",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local, cookie-only Brave to Codex browser sync for macOS",
   "type": "module",
   "bin": {
@@ -8,7 +8,8 @@
   },
   "scripts": {
     "test": "node --test",
-    "check": "node --check bin/brave-codex-cookie-sync.js && node --check src/broker.js && node --check src/cli.js && node --check extension-template/background.js"
+    "check": "node --check bin/brave-codex-cookie-sync.js && node --check src/app-installer.js && node --check src/broker.js && node --check src/cli.js && node --check extension-template/background.js",
+    "build:app": "node bin/brave-codex-cookie-sync.js install-app --no-open"
   },
   "engines": {
     "node": ">=20"
@@ -18,6 +19,10 @@
     "bin",
     "src",
     "extension-template",
+    "macos-app/Package.swift",
+    "macos-app/Info.plist",
+    "macos-app/Resources",
+    "macos-app/Sources",
     "README.md",
     "LICENSE"
   ]

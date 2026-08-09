@@ -34,6 +34,7 @@ export function installConfig({ home, hour = 9, minute = 0 }) {
     version: 1,
     token: existing.token || crypto.randomBytes(32).toString("base64url"),
     port: existing.port || DEFAULT_PORT,
+    nodePath: process.execPath,
     schedule: { hour, minute },
     createdAt: existing.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -53,6 +54,16 @@ export function installRuntime(home) {
   fs.mkdirSync(target, { recursive: true, mode: 0o700 });
   for (const name of ["bin", "src", "extension-template"]) {
     fs.cpSync(path.join(source, name), path.join(target, name), { recursive: true, force: true });
+  }
+  const appSource = path.join(source, "macos-app");
+  const appTarget = path.join(target, "macos-app");
+  fs.rmSync(appTarget, { recursive: true, force: true });
+  fs.mkdirSync(appTarget, { recursive: true, mode: 0o700 });
+  for (const name of ["Sources", "Resources"]) {
+    fs.cpSync(path.join(appSource, name), path.join(appTarget, name), { recursive: true, force: true });
+  }
+  for (const name of ["Package.swift", "Info.plist"]) {
+    fs.copyFileSync(path.join(appSource, name), path.join(appTarget, name));
   }
   for (const name of ["package.json", "README.md", "LICENSE"]) {
     fs.copyFileSync(path.join(source, name), path.join(target, name));

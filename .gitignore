@@ -2,3 +2,5 @@ node_modules/
 *.tgz
 *.log
 .DS_Store
+macos-app/.build/
+work/

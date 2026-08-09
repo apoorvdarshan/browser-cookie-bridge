@@ -1,6 +1,6 @@
 # Brave → Codex Cookie Sync
 
-An experimental, local-only macOS utility that transfers **cookies only** from Brave into Codex's built-in browser. Passwords, browsing history, bookmarks, autofill data, and payment information are never requested.
+An experimental, local-only macOS utility with a small native control window. It transfers **cookies only** from Brave into Codex's built-in browser. Passwords, browsing history, bookmarks, autofill data, and payment information are never requested.
 
 The utility deliberately does not edit either browser's cookie database. A small unpacked extension, installed once in both browsers, uses the supported Chromium cookies API. During a sync, cookie values pass through an authenticated `127.0.0.1` broker in memory and are cleared immediately after Codex acknowledges the import.
 
@@ -12,33 +12,27 @@ Requirements: macOS and Node.js 20 or newer.
 cd /Users/apoorvdarshan/brave-codex-cookie-sync
 npm test
 npm run check
-npm link
-brave-codex-cookie-sync setup --no-schedule
-brave-codex-cookie-sync doctor
-```
-
-To exercise the same package flow that a future npm release will use:
-
-```bash
 npm pack
-npx ./brave-codex-cookie-sync-0.1.0.tgz doctor
+npx --yes ./brave-codex-cookie-sync-0.2.0.tgz install-app
 ```
 
-The setup command prints two generated extension folders. Each has a fixed role so data cannot accidentally flow in reverse:
+The command builds and installs `Brave Codex Sync.app` into your user Applications folder, generates two extension folders, and opens the app. Each extension has a fixed role so data cannot accidentally flow in reverse:
+
+The native window provides Sync now, daily scheduling, extension shortcuts, and an Open at login switch. Closing the window leaves a menu-bar helper running; use its menu to reopen the window, sync, or quit completely.
 
 1. Brave: open `brave://extensions`, enable Developer mode, choose **Load unpacked**, and select `extension-brave`.
 2. Codex: open its built-in browser, choose **Extensions → Manage extensions**, enable Developer mode, choose **Load unpacked**, and select `extension-codex`.
 
-Keep both browsers open, then test:
+Keep both browsers open, then press **Sync now** in the app. You can also test the engine directly:
 
 ```bash
-brave-codex-cookie-sync sync --timeout 300
+npx --yes ./brave-codex-cookie-sync-0.2.0.tgz sync --timeout 300
 ```
 
 After confirming the manual sync works, enable the daily schedule:
 
 ```bash
-brave-codex-cookie-sync setup --hour 9 --minute 0
+npx --yes ./brave-codex-cookie-sync-0.2.0.tgz setup --hour 9 --minute 0
 ```
 
 The scheduled sync does not launch or force-quit either browser. It waits up to five minutes for both installed extensions; if a browser is closed, the run times out without changing data.
@@ -48,6 +42,7 @@ The scheduled sync does not launch or force-quit either browser. It waits up to 
 ## Commands
 
 ```text
+install-app [--no-open]
 setup [--hour 9] [--minute 0] [--no-schedule]
 sync [--timeout 300]
 doctor
