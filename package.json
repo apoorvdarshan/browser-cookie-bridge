@@ -1,0 +1,24 @@
+{
+  "name": "brave-codex-cookie-sync",
+  "version": "0.1.0",
+  "description": "Local, cookie-only Brave to Codex browser sync for macOS",
+  "type": "module",
+  "bin": {
+    "brave-codex-cookie-sync": "./bin/brave-codex-cookie-sync.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check bin/brave-codex-cookie-sync.js && node --check src/broker.js && node --check src/cli.js && node --check extension-template/background.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "files": [
+    "bin",
+    "src",
+    "extension-template",
+    "README.md",
+    "LICENSE"
+  ]
+}
