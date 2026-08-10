@@ -14,6 +14,7 @@
   <img src="https://img.shields.io/badge/Node.js-22.5%2B-3C873A?logo=nodedotjs&logoColor=white" alt="Node.js 22.5+" />
   <img src="https://img.shields.io/badge/local--first-no%20cloud-C68B3C" alt="Local-first, no cloud" />
   <img src="https://img.shields.io/github/stars/apoorvdarshan/browser-cookie-bridge?logo=github&color=C68B3C" alt="GitHub stars" />
+  <a href="https://www.producthunt.com/products/browser-cookie-bridge"><img src="https://img.shields.io/badge/Product%20Hunt-View%20launch-DA552F?logo=producthunt&logoColor=white" alt="Browser Cookie Bridge on Product Hunt" /></a>
   <img src="https://img.shields.io/badge/license-MIT-3DA639" alt="MIT License" />
 </p>
 
@@ -23,6 +24,7 @@
   <a href="#security--privacy">Security</a> ·
   <a href="CONTRIBUTING.md">Contribute</a> ·
   <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a> ·
+  <a href="https://www.producthunt.com/products/browser-cookie-bridge">Product Hunt</a> ·
   <a href="#support">Support</a>
 </p>
 
@@ -200,7 +202,7 @@ If Browser Cookie Bridge is useful to you:
 - 🐛 **[Report a bug](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml)** — never include cookie values or tokens
 - ☕ **[Support on Ko-fi](https://ko-fi.com/apoorvdarshan)**
 - 𝕏 **Follow [@apoorvdarshan](https://x.com/apoorvdarshan)**
-- 🚀 Product Hunt link coming soon
+- 🚀 **[View on Product Hunt](https://www.producthunt.com/products/browser-cookie-bridge)**
 
 Product screenshots, the transparent cookie logo, and launch artwork live in [`marketing/`](marketing/).
 
