@@ -1,66 +1,181 @@
-# Browser Cookie Bridge
+<div align="center">
 
-Local cookie and session transfer for macOS. This compact native utility transfers selected browser data between Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Perplexity Comet, or into ChatGPT Codex's built-in browser. ChatGPT Codex is import-only.
+<img src="marketing/app-icon.png" width="156" alt="Browser Cookie Bridge cookie logo" />
 
-- **Cookies** are enabled by default and preserve supported cookie attributes.
-- **History URLs** are optional. Chromium's extension API can add URLs, but it cannot preserve the original visit times or page titles.
-- **Passwords** are shown as unavailable because browser extensions cannot read Chromium's password store. Bookmarks, autofill, payment data, and iCloud Keychain are not accessed.
+<h1>Browser Cookie Bridge</h1>
 
-Browser-to-browser transfers use unpacked extensions and supported Chromium APIs. For ChatGPT Codex, the utility reads the selected local Chromium profile directly and merges the selected data into Codex's local browser partition while Codex is closed. Before changing anything it creates a consistent SQLite backup, works on a separate copy, runs integrity checks, and restores the backup if replacement fails.
+<strong>Move cookies and signed-in sessions between browsers—locally on your Mac.</strong>
 
-## Local test
+<p>Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Comet · browser-to-browser transfer · import into ChatGPT Codex.</p>
 
-Requirements: macOS 13 or newer and Node.js 22.5 or newer.
+<p>
+  <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple&logoColor=white" alt="macOS 13+" />
+  <img src="https://img.shields.io/badge/Swift-6-8E2735?logo=swift&logoColor=white" alt="Swift 6" />
+  <img src="https://img.shields.io/badge/Node.js-22.5%2B-3C873A?logo=nodedotjs&logoColor=white" alt="Node.js 22.5+" />
+  <img src="https://img.shields.io/badge/local--first-no%20cloud-C68B3C" alt="Local-first, no cloud" />
+  <img src="https://img.shields.io/github/stars/apoorvdarshan/browser-cookie-bridge?logo=github&color=C68B3C" alt="GitHub stars" />
+  <img src="https://img.shields.io/badge/license-MIT-3DA639" alt="MIT License" />
+</p>
+
+<p>
+  <a href="#installation"><b>Install</b></a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#security--privacy">Security</a> ·
+  <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a> ·
+  <a href="#support">Support</a>
+</p>
+
+<p><code>npm run build:app</code></p>
+
+<br />
+
+<img src="marketing/product-hunt/01-overview.png" width="840" alt="Browser Cookie Bridge app preview" />
+
+</div>
+
+---
+
+> **Status — local beta.** The native app and transfer engine work locally; the first public npm release has not been published yet. Importing into ChatGPT Codex is an intentionally unsupported direct integration and requires Codex to be completely closed.
+
+## Why Browser Cookie Bridge
+
+Signing into the same sites across several browsers is repetitive. Export files are awkward, password managers do not move active sessions, and ChatGPT Codex does not currently offer a Brave import button.
+
+Browser Cookie Bridge gives those local browser profiles a small, native control panel. Pick where data comes from, pick where it goes, choose cookies or history, and sync. Transfers stay on the Mac you are using.
+
+## Features
+
+- 🍪 **Cookie and session transfer** — cookies are enabled by default, including supported domain, path, expiry, security, `SameSite`, and partition attributes.
+- 🌐 **Seven Chromium browsers** — Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Perplexity Comet can be sources or destinations.
+- ✨ **ChatGPT Codex import** — merge selected local browser data into Codex's built-in browser; Codex is destination-only.
+- 🕘 **Background automation** — sync when you sign in, at a fixed daily time, or whenever you choose.
+- ◉ **Native menu-bar app** — closing the window removes the Dock icon while the helper continues running.
+- 🧯 **Backup and rollback** — Codex's database is backed up, modified on a separate copy, integrity-checked, and restored if replacement fails.
+- ⬆️ **Built-in updates** — automatically checks npm release metadata and can install an update and relaunch the app.
+- 🔒 **Local-first** — no account, analytics, cloud service, cookie logs, or remote relay.
+
+## What it transfers
+
+| Data | Support | Notes |
+|---|---:|---|
+| **Cookies and sessions** | ✅ Default | Transfers supported cookie values and attributes |
+| **History URLs** | ◐ Optional | Original visit times and page titles cannot be preserved |
+| **Passwords** | — Never | Chromium extensions cannot read the browser password store |
+| **Bookmarks, autofill, payments** | — Never | Not requested or accessed |
+| **iCloud Keychain** | — Never | Remains completely separate |
+
+Some websites bind sessions to a specific device or browser and may ask you to sign in again after a transfer.
+
+## Requirements
+
+- **macOS 13 (Ventura)+**
+- **Node.js 22.5+**
+- **Xcode Command Line Tools** — install with `xcode-select --install`
+- A supported Chromium browser, or ChatGPT Codex as the destination
+
+## Installation
+
+### From source
 
 ```bash
-cd /Users/apoorvdarshan/browser-cookie-bridge
+git clone https://github.com/apoorvdarshan/browser-cookie-bridge.git
+cd browser-cookie-bridge
 npm test
-npm run check
-npm pack
-npx --yes ./browser-cookie-bridge-1.0.0.tgz install-app
+npm run build:app
 ```
 
-This builds and installs `Browser Cookie Bridge.app` into your user Applications folder. The app provides:
+The final command compiles the native SwiftUI app, installs it as `~/Applications/Browser Cookie Bridge.app`, enables **Open at login**, **Sync at login**, and the **menu-bar helper**, then launches it. Daily sync stays off until you enable it.
 
-- Separate **Export from** and **Import into** pickers with large browser icons
-- ChatGPT Codex available only as an import destination, represented by a paired OpenAI and Codex mark
-- Persistent Cookies and History URL choices
-- Manual, login, and optional daily direct sync
-- Automatic daily update checks, plus one-click install and relaunch
-- Daily sync, disabled by default, with a fixed local time when enabled
-- Sync when you sign in, enabled by default on a fresh installation
-- Open at login, enabled by default
-- A menu-bar helper, enabled by default; closing the window keeps the app running but removes it from the Dock
-- Native menu-bar alerts for blocked, successful, partial, and failed sync attempts
-- A live Codex-running warning that disables direct sync until Codex is completely closed
-- Endpoint-aware errors that identify what did not connect or which app must be closed
-- A distinct partial-sync warning when individual cookies or history URLs fail
+### Via npm
 
-The installer generates an extension folder for every supported Chromium browser. In the app, select both endpoints, then:
-
-1. For browser-to-browser transfers, enable Developer mode in both browsers, choose **Load unpacked**, and select each generated `extension-<browser>` folder.
-2. For ChatGPT Codex, no extension is used on either side. Quit Codex completely, then press **Sync now**. Reopen Codex after the direct merge completes.
-
-Only the selected endpoints respond to a transfer. The source browser may remain open, but Codex must be closed for a Codex destination so Chromium cannot overwrite or ignore the offline database change.
-
-You can also control preferences and sync from the packed CLI:
+The package will be installable after the first tagged release:
 
 ```bash
-npx --yes ./browser-cookie-bridge-1.0.0.tgz preferences --source brave --target codex --cookies on --history off --menu-bar on --auto-check-updates on
-npx --yes ./browser-cookie-bridge-1.0.0.tgz sync --timeout 300
-npx --yes ./browser-cookie-bridge-1.0.0.tgz setup --hour 9 --minute 0
-npx --yes ./browser-cookie-bridge-1.0.0.tgz enable-login-sync
+npx browser-cookie-bridge install-app
 ```
 
-The fixed daily sync and login sync are independent controls. Login sync runs once when you sign in, not every rolling 24 hours; the fixed daily time therefore never drifts after restarts or sleep. Neither option launches or force-quits a browser. A scheduled Codex sync exits without changing data when Codex is open; close Codex and run **Sync now**, or leave it closed at the next scheduled time.
+No administrator password is needed. The app is built from source on your Mac and installed in your user Applications folder.
 
-`setup` copies a pinned runtime into the utility's Application Support folder. The daily job runs that copy, so an `npx` cache cleanup cannot silently replace or remove the scheduled code.
+## Setup
 
-Automatic update checks are enabled by default and query the public npm release metadata once when the app starts and then every 24 hours while it remains running. Installing an available update is always an explicit action. The detached updater closes Browser Cookie Bridge, installs the selected release locally, relaunches it in the background, and preserves the previous installed bundle if replacement fails.
+### Browser → ChatGPT Codex
+
+No browser extension is needed for this path.
+
+1. Select a source browser and **ChatGPT Codex** as the destination.
+2. Quit Codex completely. Closing only its browser panel is not enough.
+3. Choose **Cookies** and, optionally, **History URLs**.
+4. Press **Sync now** and reopen Codex after the success message.
+
+If Codex is open, the app blocks the transfer and tells you what to close. It never force-quits Codex.
+
+### Browser → browser
+
+Browser-to-browser transfers use a small unpacked extension at each selected endpoint.
+
+1. Run `browser-cookie-bridge setup --no-schedule` or use the app's extension setup action.
+2. Open the extensions page in both browsers and enable **Developer mode**.
+3. Choose **Load unpacked** and select the generated `extension-<browser>` folder for each endpoint.
+4. Keep both browsers open, select the same endpoints in the app, then press **Sync now**.
+
+Generated extensions live under `~/Library/Application Support/BraveCodexCookieSync/` and contain a random, user-only local broker token. Do not share those folders.
+
+## Usage
+
+| Control | What it does |
+|---|---|
+| **Export from** | Selects the browser whose data will be read |
+| **Import into** | Selects a different browser or ChatGPT Codex |
+| **Cookies** | Moves cookies and supported session attributes; on by default |
+| **History URLs** | Adds visited URLs without their original timestamps or titles |
+| **Daily sync** | Runs at one fixed local time; off by default |
+| **Sync at login** | Runs once whenever you sign in; on by default |
+| **Open at login** | Starts the background app after macOS login; on by default |
+| **Show in menu bar** | Keeps sync, status, updates, and support actions close at hand |
+| **Check for updates** | Finds a newer npm release and offers install + relaunch |
+
+Automation always uses the source, destination, and data choices currently saved in the app. A scheduled Codex sync safely exits without making changes when Codex is open.
+
+## CLI
+
+```bash
+browser-cookie-bridge install-app [--no-open]
+browser-cookie-bridge setup [--hour 9] [--minute 0] [--no-schedule]
+browser-cookie-bridge preferences --source brave --target codex --cookies on --history off
+browser-cookie-bridge sync [--timeout 300]
+browser-cookie-bridge doctor
+browser-cookie-bridge enable-login-sync
+browser-cookie-bridge disable-login-sync
+browser-cookie-bridge enable-app-login
+browser-cookie-bridge disable-app-login
+browser-cookie-bridge remove-schedule
+```
+
+Supported source IDs are `brave`, `chrome`, `edge`, `arc`, `vivaldi`, `opera`, and `comet`. Target IDs are the same plus `codex`. The same browser cannot be both endpoints.
+
+## How it works
+
+| Path | Transfer method |
+|---|---|
+| **Browser → browser** | Unpacked extensions connect to a short-lived broker on IPv4 loopback. Selected data stays in memory and is never written to logs. |
+| **Browser → Codex** | The app reads the selected local Chromium profile, creates a consistent Codex SQLite backup, merges into a working copy, validates it, then replaces the destination atomically. |
+
+The broker validates a random token and extension origin, limits payload size, and normally exits after five minutes. Only the endpoints selected in the app respond to a transfer.
+
+## Security & privacy
+
+- Cookie values and history URLs are never logged.
+- Browser-to-browser data is held only in broker memory.
+- Codex backups are stored with user-only permissions under `~/Library/Application Support/BraveCodexCookieSync/backups/codex`; the newest 14 are retained.
+- The app refuses unknown Codex database schemas instead of guessing.
+- Imported Codex rows use an empty `encrypted_value` because OpenAI's Safe Storage key is protected by a private macOS Keychain access group. Those imported rows can therefore remain readable to software running as your macOS user until the website refreshes them.
+- Anyone who can use your logged-in macOS account or modify a generated extension may be able to access transferred browser sessions.
+
+Cookies are credentials. Review the source, protect your macOS account, and transfer only between profiles you trust.
 
 ## Releases
 
-Pushing a semantic version tag runs the release workflow. The tag must match the version in `package.json`, `extension-template/manifest.json`, and the macOS app's `Info.plist`.
+Pushing a semantic version tag runs tests, validates that package and app versions match, publishes to npm, and creates a GitHub Release with the tarball attached.
 
 ```bash
 npm run release:check
@@ -68,49 +183,22 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-After the tests pass, GitHub Actions publishes the package to npm and creates a GitHub Release with generated notes and the npm tarball attached. Pushing a normal branch or commit does not publish anything.
+A normal branch push does not publish anything.
 
-## Commands
+## Support
 
-```text
-install-app [--no-open]
-setup [--hour 9] [--minute 0] [--no-schedule]
-preferences --source brave --target codex --cookies on --history off --menu-bar off
-sync [--timeout 300]
-doctor
-enable-login-sync
-disable-login-sync
-enable-app-login
-disable-app-login
-remove-schedule
-help
-```
+If Browser Cookie Bridge is useful to you:
 
-Supported source IDs: `brave`, `chrome`, `edge`, `arc`, `vivaldi`, `opera`, and `comet`. Supported target IDs are the same plus `codex`. A browser cannot be both endpoints for one transfer.
+- ⭐ **Star** the repository
+- 🐛 **[Report a bug](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml)** — never include cookie values or tokens
+- ☕ **[Support on Ko-fi](https://ko-fi.com/apoorvdarshan)**
+- 𝕏 **Follow [@apoorvdarshan](https://x.com/apoorvdarshan)**
+- 🚀 Product Hunt link coming soon
 
-## Security notes
-
-- Generated extensions contain a random local broker token and are created with user-only filesystem permissions. Do not share those folders.
-- Cookie values and history URLs are never logged. Browser-to-browser transfers hold them only in broker memory.
-- Codex's Safe Storage key is protected by OpenAI's private macOS Keychain access group, which third-party apps cannot access. Directly merged cookie values are therefore written to Codex's user-only SQLite database with an empty `encrypted_value`; Chromium accepts this representation, but those imported rows remain readable to software running as your macOS user until a site refreshes them.
-- Each Codex sync keeps a pre-change backup under `~/Library/Application Support/BraveCodexCookieSync/backups/codex`. The newest 14 backups are retained.
-- The broker listens only on IPv4 loopback, validates the token and extension origin, limits payload size, and normally runs for at most five minutes.
-- Cookie import requires access to cookies for all sites. History import requests Chromium's history permission. Review the source before loading it.
-- Anyone able to use your logged-in macOS account or modify a generated extension can potentially access browser sessions or selected history.
-- Some sites bind sessions to a device or browser and may reject transferred cookies.
-
-The Codex destination is an intentionally unsupported direct integration. Codex updates can change its database locations or schemas; the app refuses unknown schemas and keeps the original backup.
-
-## Project links
-
-- [Open-source repository](https://github.com/apoorvdarshan/browser-cookie-bridge)
-- [Report a bug](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml)
-- [Support on Ko-fi](https://ko-fi.com/apoorvdarshan)
-- [Follow @apoorvdarshan on X](https://x.com/apoorvdarshan)
-- Product Hunt voting link coming soon
-
-Product screenshots, the app icon, and Product Hunt gallery artwork are available in the [`marketing/`](marketing/) folder.
+Product screenshots, the transparent cookie logo, and launch artwork live in [`marketing/`](marketing/).
 
 ## License
 
-Browser Cookie Bridge is open-source software available under the [MIT License](LICENSE). Copyright © 2026 Apoorv Darshan.
+[MIT](LICENSE) © 2026 [Apoorv Darshan](https://github.com/apoorvdarshan)
+
+<sub>Not affiliated with Brave, Google, Microsoft, The Browser Company, Vivaldi, Opera, Perplexity, or OpenAI. Their names and marks belong to their respective owners.</sub>
