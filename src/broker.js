@@ -11,6 +11,7 @@ export function createBroker({
   host = "127.0.0.1",
   imports = { cookies: true, history: false },
   sourceBrowser = "brave",
+  targetBrowser = "codex",
   onEvent = () => {},
 }) {
   const state = {
@@ -50,6 +51,7 @@ export function createBroker({
           targetNeeded: state.payload !== null && !state.completed,
           imports,
           sourceBrowser,
+          targetBrowser,
         });
         return;
       }
@@ -105,7 +107,7 @@ export function createBroker({
 
   const timer = setTimeout(() => {
     const error = new Error(
-      `Timed out waiting for both browser extensions. Keep ${sourceBrowser} and Codex open and verify the extension is installed in both.`,
+      `Timed out waiting for both browser extensions. Keep ${sourceBrowser} and ${targetBrowser} open and verify the extension is installed in both.`,
     );
     rejectCompletion(error);
     server.close();

@@ -26,10 +26,10 @@ async function runSync() {
   running = true;
   try {
     const status = await request("/v1/status");
-    if (SYNC_ROLE === "source" && SYNC_BROWSER === status.sourceBrowser && status.sourceNeeded) {
+    if (SYNC_ROLE === "browser" && SYNC_BROWSER === status.sourceBrowser && status.sourceNeeded) {
       await sendSourceData(status.imports);
     }
-    if (SYNC_ROLE === "target" && status.targetNeeded) await importIntoCodex();
+    if (SYNC_BROWSER === status.targetBrowser && status.targetNeeded) await importIntoTarget();
   } catch {
     // The broker normally exists only during a scheduled or manual sync.
   } finally {
@@ -70,7 +70,7 @@ async function sendSourceData(imports) {
   });
 }
 
-async function importIntoCodex() {
+async function importIntoTarget() {
   const payload = await request("/v1/payload");
   if (!payload || !Array.isArray(payload.cookies) || !Array.isArray(payload.history)) return;
 

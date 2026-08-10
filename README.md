@@ -1,12 +1,12 @@
 # Browser → ChatGPT Sync
 
-An experimental, local-only macOS utility with a compact native control window. It transfers selected browser data from Brave, Chrome, Edge, Arc, Vivaldi, or Opera into Codex's built-in browser.
+An experimental, local-only macOS utility with a compact native control window. It transfers selected browser data between Brave, Chrome, Edge, Arc, Vivaldi, and Opera, or into ChatGPT Codex's built-in browser. ChatGPT Codex is import-only.
 
 - **Cookies** are enabled by default and preserve supported cookie attributes.
 - **History URLs** are optional. Chromium's extension API can add URLs, but it cannot preserve the original visit times or page titles.
 - **Passwords** are shown as unavailable because browser extensions cannot read Chromium's password store. Bookmarks, autofill, payment data, and iCloud Keychain are not accessed.
 
-The utility does not edit either browser's databases. Unpacked extensions installed once in the selected source browser and Codex use supported Chromium APIs. During a sync, selected data passes through an authenticated `127.0.0.1` broker in memory and is cleared after Codex acknowledges the import.
+The utility does not edit browser databases directly. Unpacked extensions use supported Chromium APIs. During a transfer, selected data passes through an authenticated `127.0.0.1` broker in memory and is cleared after the destination acknowledges the import.
 
 ## Local test
 
@@ -17,32 +17,33 @@ cd /Users/apoorvdarshan/brave-codex-cookie-sync
 npm test
 npm run check
 npm pack
-npx --yes ./brave-codex-cookie-sync-0.6.0.tgz install-app
+npx --yes ./brave-codex-cookie-sync-0.7.0.tgz install-app
 ```
 
 This builds and installs `Browser ChatGPT Sync.app` into your user Applications folder. The app provides:
 
-- A source picker with installed browser icons and the Codex/OpenAI app icon
+- Separate **Export from** and **Import into** pickers with large browser icons
+- ChatGPT Codex available only as an import destination, represented by one Codex icon
 - Persistent Cookies and History URL choices
 - Manual and daily sync
 - Optional sync when you sign in to the Mac
 - Open at login, enabled by default
 - An optional menu-bar helper, off by default; closing the window does not quit the app
 
-The installer generates a source extension folder for every supported browser plus one Codex target folder. In the app, select your source browser, then:
+The installer generates an extension folder for every supported browser plus one import-only Codex folder. In the app, select both endpoints, then:
 
-1. Open that browser's Extensions page, enable Developer mode, choose **Load unpacked**, and select its generated `extension-<browser>` folder.
-2. In Codex's built-in browser, choose **Extensions → Manage extensions**, enable Developer mode, choose **Load unpacked**, and select `extension-codex`.
+1. In the export browser, enable Developer mode, choose **Load unpacked**, and select its generated `extension-<browser>` folder.
+2. Do the same in the import browser. If the destination is ChatGPT Codex, select `extension-codex` from its built-in browser's extension manager.
 
-Only the source selected in the app responds to a sync. Keep the selected browser and Codex open, then press **Sync now**.
+Only the two endpoints selected in the app respond to a transfer. Keep both open, then press **Sync now**.
 
 You can also control preferences and sync from the packed CLI:
 
 ```bash
-npx --yes ./brave-codex-cookie-sync-0.6.0.tgz preferences --source brave --cookies on --history off --menu-bar off
-npx --yes ./brave-codex-cookie-sync-0.6.0.tgz sync --timeout 300
-npx --yes ./brave-codex-cookie-sync-0.6.0.tgz setup --hour 9 --minute 0
-npx --yes ./brave-codex-cookie-sync-0.6.0.tgz enable-login-sync
+npx --yes ./brave-codex-cookie-sync-0.7.0.tgz preferences --source brave --target codex --cookies on --history off --menu-bar off
+npx --yes ./brave-codex-cookie-sync-0.7.0.tgz sync --timeout 300
+npx --yes ./brave-codex-cookie-sync-0.7.0.tgz setup --hour 9 --minute 0
+npx --yes ./brave-codex-cookie-sync-0.7.0.tgz enable-login-sync
 ```
 
 The fixed daily sync and login sync are independent controls. Login sync runs once when you sign in, not every rolling 24 hours; the fixed daily time therefore never drifts after restarts or sleep. Neither option launches or force-quits a browser. Each run waits up to five minutes for both installed extensions; if a browser is closed, it times out without transferring data.
@@ -54,7 +55,7 @@ The fixed daily sync and login sync are independent controls. Login sync runs on
 ```text
 install-app [--no-open]
 setup [--hour 9] [--minute 0] [--no-schedule]
-preferences --source brave --cookies on --history off --menu-bar off
+preferences --source brave --target codex --cookies on --history off --menu-bar off
 sync [--timeout 300]
 doctor
 enable-login-sync
@@ -65,7 +66,7 @@ remove-schedule
 help
 ```
 
-Supported source IDs: `brave`, `chrome`, `edge`, `arc`, `vivaldi`, and `opera`.
+Supported source IDs: `brave`, `chrome`, `edge`, `arc`, `vivaldi`, and `opera`. Supported target IDs are the same plus `codex`. A browser cannot be both endpoints for one transfer.
 
 ## Security notes
 

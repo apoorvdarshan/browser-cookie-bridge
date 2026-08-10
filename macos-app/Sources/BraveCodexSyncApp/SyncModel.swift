@@ -38,8 +38,9 @@ final class SyncModel: ObservableObject {
   @Published var cookiesEnabled = true
   @Published var historyEnabled = false
   @Published var selectedSourceID = "brave"
+  @Published var selectedTargetID = "codex"
   @Published var primaryStatus = "Ready to sync"
-  @Published var secondaryStatus = "Choose what to import, then start a transfer"
+  @Published var secondaryStatus = "Choose what to move, then start a transfer"
 
   private let home = FileManager.default.homeDirectoryForCurrentUser
   private var support: URL { home.appending(path: "Library/Application Support/BraveCodexCookieSync") }
@@ -52,8 +53,13 @@ final class SyncModel: ObservableObject {
     browsers.first(where: { $0.id == selectedSourceID }) ?? browsers[0]
   }
 
+  var selectedTargetBrowser: BrowserChoice? {
+    browsers.first(where: { $0.id == selectedTargetID })
+  }
+
+  var targetName: String { selectedTargetBrowser?.name ?? "ChatGPT Codex" }
   var sourceIcon: NSImage { browserIcon(selectedBrowser) }
-  var chatGPTIcon: NSImage { chatGPTResource("electron.icns") ?? appIcon(bundleIdentifier: "com.openai.codex", fallbackSymbol: "sparkles") }
+  var targetIcon: NSImage { selectedTargetBrowser.map(browserIcon) ?? codexIcon }
   var codexIcon: NSImage { chatGPTResource("app.icns") ?? appIcon(bundleIdentifier: "com.openai.codex", fallbackSymbol: "terminal") }
 
   func browserIcon(_ browser: BrowserChoice) -> NSImage {
@@ -86,20 +92,32 @@ final class SyncModel: ObservableObject {
       ) ?? scheduleTime
       let configuredSource = config.sourceBrowser ?? "brave"
       selectedSourceID = browsers.contains(where: { $0.id == configuredSource }) ? configuredSource : "brave"
+      let configuredTarget = config.targetBrowser ?? "codex"
+      selectedTargetID = configuredTarget == "codex" || browsers.contains(where: { $0.id == configuredTarget })
+        ? configuredTarget
+        : "codex"
+      if selectedTargetID == selectedSourceID { selectedTargetID = "codex" }
       cookiesEnabled = config.imports?.cookies ?? true
       historyEnabled = config.imports?.history ?? false
       menuBarEnabled = config.ui?.menuBar ?? false
     }
     NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: menuBarEnabled)
-    extensionsReady = [selectedSourceID, "codex"].allSatisfy {
+    extensionsReady = [selectedSourceID, selectedTargetID].allSatisfy {
       FileManager.default.fileExists(atPath: support.appending(path: "extension-\($0)/manifest.json").path)
     }
   }
 
   func selectSource(_ id: String) {
-    guard browsers.contains(where: { $0.id == id }), id != selectedSourceID else { return }
+    guard browsers.contains(where: { $0.id == id }), id != selectedSourceID, id != selectedTargetID else { return }
     selectedSourceID = id
-    persistPreferences(successMessage: "Source changed to \(selectedBrowser.name)")
+    persistPreferences(successMessage: "Export source changed to \(selectedBrowser.name)")
+  }
+
+  func selectTarget(_ id: String) {
+    let validTarget = id == "codex" || browsers.contains(where: { $0.id == id })
+    guard validTarget, id != selectedTargetID, id != selectedSourceID else { return }
+    selectedTargetID = id
+    persistPreferences(successMessage: "Import destination changed to \(targetName)")
   }
 
   func setCookiesEnabled(_ enabled: Bool) {
@@ -123,14 +141,14 @@ final class SyncModel: ObservableObject {
     isSyncing = true
     state = .syncing
     primaryStatus = "Transferring selected data"
-    secondaryStatus = "Waiting for \(selectedBrowser.name) and ChatGPT Codex…"
+    secondaryStatus = "Waiting for \(selectedBrowser.name) and \(targetName)…"
     runCLI(["sync", "--timeout", "300"]) { [weak self] success, output in
       guard let self else { return }
       self.isSyncing = false
       if success {
         self.state = .success
-        self.primaryStatus = "Browser sync complete"
-        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and ChatGPT Codex are up to date"
+        self.primaryStatus = "Transfer complete"
+        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and \(self.targetName) are up to date"
       } else {
         self.state = .error
         self.primaryStatus = "Sync did not finish"
@@ -190,10 +208,11 @@ final class SyncModel: ObservableObject {
     }
   }
 
-  func openSourceExtensions() {
+  func openExtensions(for browserID: String) {
+    guard let browser = browsers.first(where: { $0.id == browserID }) else { return }
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-    process.arguments = ["-a", selectedBrowser.applicationName, selectedBrowser.extensionURL]
+    process.arguments = ["-a", browser.applicationName, browser.extensionURL]
     try? process.run()
   }
 
@@ -207,6 +226,7 @@ final class SyncModel: ObservableObject {
     let arguments = [
       "preferences",
       "--source", selectedSourceID,
+      "--target", selectedTargetID,
       "--cookies", cookiesEnabled ? "on" : "off",
       "--history", historyEnabled ? "on" : "off",
       "--menu-bar", menuBarEnabled ? "on" : "off"
@@ -224,7 +244,7 @@ final class SyncModel: ObservableObject {
         self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Run install-app again from the CLI"
         self.refresh()
       }
-      self.extensionsReady = [self.selectedSourceID, "codex"].allSatisfy {
+      self.extensionsReady = [self.selectedSourceID, self.selectedTargetID].allSatisfy {
         FileManager.default.fileExists(atPath: self.support.appending(path: "extension-\($0)/manifest.json").path)
       }
     }
@@ -309,6 +329,7 @@ private struct AppConfig: Decodable {
   let nodePath: String
   let schedule: Schedule
   let sourceBrowser: String?
+  let targetBrowser: String?
   let imports: Imports?
   let ui: UISettings?
 

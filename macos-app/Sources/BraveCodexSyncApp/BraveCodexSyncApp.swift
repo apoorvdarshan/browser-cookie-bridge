@@ -10,7 +10,7 @@ struct BraveCodexSyncApp: App {
     Window("Browser ChatGPT Sync", id: "main") {
       ContentView(appDelegate: appDelegate)
         .environmentObject(model)
-        .frame(width: 590, height: 646)
+        .frame(width: 620, height: 682)
         .background(AppBackground())
     }
     .windowResizability(.contentSize)
@@ -121,9 +121,9 @@ struct ContentView: View {
         .frame(width: 36, height: 36)
         .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
       VStack(alignment: .leading, spacing: 1) {
-        Text("Browser → ChatGPT")
+        Text("Browser Data Relay")
           .font(.system(size: 19, weight: .bold, design: .rounded))
-        Text("Local browser data sync")
+        Text("Private, local browser sync")
           .font(.system(size: 11.5, weight: .medium))
           .foregroundStyle(.secondary)
       }
@@ -161,9 +161,9 @@ struct SyncPanel: View {
     Surface {
       VStack(spacing: 14) {
         HStack(spacing: 12) {
-          BrowserRail()
+          SourcePicker()
           RelayPath(active: model.isSyncing)
-          DestinationBadge(chatGPTIcon: model.chatGPTIcon, codexIcon: model.codexIcon)
+          TargetPicker()
         }
         Divider().opacity(0.65)
         HStack(spacing: 12) {
@@ -197,13 +197,13 @@ struct SyncPanel: View {
 
 }
 
-struct BrowserRail: View {
+struct SourcePicker: View {
   @EnvironmentObject private var model: SyncModel
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack {
-        Text("SOURCE BROWSER")
+        Text("EXPORT FROM")
           .tracking(0.65)
           .foregroundStyle(.tertiary)
         Spacer()
@@ -211,71 +211,85 @@ struct BrowserRail: View {
           .foregroundStyle(Theme.accent)
       }
       .font(.system(size: 8, weight: .bold))
-      .frame(width: 236)
-      HStack(spacing: 4) {
+      LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 5), count: 3), spacing: 5) {
         ForEach(model.browsers) { browser in
-          Button {
-            model.selectSource(browser.id)
-          } label: {
-            Image(nsImage: model.browserIcon(browser))
-              .resizable()
-              .scaledToFit()
-              .frame(width: 29, height: 29)
-              .frame(width: 36, height: 36)
-              .background(
-                model.selectedSourceID == browser.id ? Theme.accent.opacity(0.12) : Color.clear,
-                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-              )
-              .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                  .stroke(model.selectedSourceID == browser.id ? Theme.accent.opacity(0.75) : Color.primary.opacity(0.06), lineWidth: 1)
-              )
-          }
-          .buttonStyle(.plain)
-          .disabled(model.isWorking || model.isSyncing)
-          .help(browser.name)
-          .accessibilityLabel(browser.name)
-          .accessibilityAddTraits(model.selectedSourceID == browser.id ? .isSelected : [])
+          EndpointButton(
+            icon: model.browserIcon(browser),
+            name: browser.name,
+            selected: model.selectedSourceID == browser.id,
+            disabled: model.isWorking || model.isSyncing || model.selectedTargetID == browser.id
+          ) { model.selectSource(browser.id) }
         }
       }
     }
+    .frame(width: 130)
   }
 }
 
-struct DestinationBadge: View {
-  let chatGPTIcon: NSImage
-  let codexIcon: NSImage
+struct TargetPicker: View {
+  @EnvironmentObject private var model: SyncModel
 
   var body: some View {
-    HStack(spacing: 8) {
-      HStack(spacing: -9) {
-        AppLogo(icon: chatGPTIcon)
-        AppLogo(icon: codexIcon)
-      }
-      VStack(alignment: .leading, spacing: 0) {
-        Text("DESTINATION")
-          .font(.system(size: 8, weight: .bold))
+    VStack(alignment: .leading, spacing: 6) {
+      HStack {
+        Text("IMPORT INTO")
           .tracking(0.65)
           .foregroundStyle(.tertiary)
-        Text("ChatGPT Codex")
-          .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-          .lineLimit(1)
+        Spacer()
+        Text(model.targetName)
+          .foregroundStyle(Theme.accent)
+      }
+      .font(.system(size: 8, weight: .bold))
+      LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 5), count: 4), spacing: 5) {
+        ForEach(model.browsers) { browser in
+          EndpointButton(
+            icon: model.browserIcon(browser),
+            name: browser.name,
+            selected: model.selectedTargetID == browser.id,
+            disabled: model.isWorking || model.isSyncing || model.selectedSourceID == browser.id
+          ) { model.selectTarget(browser.id) }
+        }
+        EndpointButton(
+          icon: model.codexIcon,
+          name: "ChatGPT Codex",
+          selected: model.selectedTargetID == "codex",
+          disabled: model.isWorking || model.isSyncing
+        ) { model.selectTarget("codex") }
       }
     }
-    .fixedSize()
+    .frame(width: 175)
   }
 }
 
-struct AppLogo: View {
+struct EndpointButton: View {
   let icon: NSImage
+  let name: String
+  let selected: Bool
+  let disabled: Bool
+  let action: () -> Void
 
   var body: some View {
-    Image(nsImage: icon)
-      .resizable()
-      .scaledToFit()
-      .frame(width: 38, height: 38)
-      .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-      .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.primary.opacity(0.09)))
+    Button(action: action) {
+      Image(nsImage: icon)
+        .resizable()
+        .scaledToFit()
+        .frame(width: 31, height: 31)
+        .frame(width: 40, height: 40)
+        .background(
+          selected ? Theme.accent.opacity(0.13) : Color.primary.opacity(0.025),
+          in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .stroke(selected ? Theme.accent.opacity(0.85) : Color.primary.opacity(0.07), lineWidth: selected ? 1.25 : 1)
+        )
+    }
+    .buttonStyle(.plain)
+    .disabled(disabled)
+    .opacity(disabled && !selected ? 0.52 : 1)
+    .help(disabled && !selected ? "Already selected on the other side" : name)
+    .accessibilityLabel(name)
+    .accessibilityAddTraits(selected ? .isSelected : [])
   }
 }
 
@@ -352,7 +366,7 @@ struct ExtensionSetupSheet: View {
           .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         VStack(alignment: .leading, spacing: 3) {
           Text("Extension setup").font(.system(size: 18, weight: .bold, design: .rounded))
-          Text("Load each folder once. The app handles syncing after that.")
+          Text("Load the folders for the two selected endpoints once.")
             .font(.system(size: 11.5)).foregroundStyle(.secondary)
         }
         Spacer()
@@ -361,18 +375,21 @@ struct ExtensionSetupSheet: View {
 
       VStack(spacing: 0) {
         SetupEndpointRow(icon: model.sourceIcon, title: model.selectedBrowser.name, detail: "Load the source extension") {
-          Button("Open page") { model.openSourceExtensions() }
+          Button("Open page") { model.openExtensions(for: model.selectedSourceID) }
           Button("Show folder") { model.revealExtension(model.selectedSourceID) }
         }
         Divider().padding(.leading, 58)
-        SetupEndpointRow(icon: model.codexIcon, title: "ChatGPT Codex", detail: "Load the destination extension") {
-          Button("Show folder") { model.revealExtension("codex") }
+        SetupEndpointRow(icon: model.targetIcon, title: model.targetName, detail: "Load the destination extension") {
+          if model.selectedTargetID != "codex" {
+            Button("Open page") { model.openExtensions(for: model.selectedTargetID) }
+          }
+          Button("Show folder") { model.revealExtension(model.selectedTargetID) }
         }
       }
       .background(Color(nsColor: .controlBackgroundColor).opacity(0.65), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
       .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.07)))
 
-      Text("In each browser, enable Developer mode and choose Load unpacked. Password access is never requested.")
+      Text("In both endpoints, enable Developer mode and choose Load unpacked. Password access is never requested.")
         .font(.system(size: 10.5))
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
@@ -431,7 +448,7 @@ struct RelayPath: View {
         .shadow(color: Theme.accent.opacity(0.22), radius: 5, y: 2)
     }
     .frame(maxWidth: .infinity)
-    .accessibilityLabel(active ? "Sync in progress" : "Syncs to ChatGPT Codex")
+    .accessibilityLabel(active ? "Transfer in progress" : "Transfers from the selected source to the selected destination")
   }
 }
 

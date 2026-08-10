@@ -11,6 +11,7 @@ test("preferences default to cookies and persist source and history choices", ()
   try {
     const installed = installConfig({ home, hour: 9, minute: 15 });
     assert.equal(installed.sourceBrowser, "brave");
+    assert.equal(installed.targetBrowser, "codex");
     assert.deepEqual(installed.imports, { cookies: true, passwords: false, history: false });
     assert.deepEqual(installed.ui, { menuBar: false, openAtLogin: true });
     for (const browser of [...SOURCE_BROWSERS, "codex"]) {
@@ -20,6 +21,7 @@ test("preferences default to cookies and persist source and history choices", ()
     updatePreferences({
       home,
       sourceBrowser: "edge",
+      targetBrowser: "chrome",
       cookies: false,
       history: true,
       menuBar: true,
@@ -27,8 +29,27 @@ test("preferences default to cookies and persist source and history choices", ()
     });
     const updated = readConfig(home);
     assert.equal(updated.sourceBrowser, "edge");
+    assert.equal(updated.targetBrowser, "chrome");
     assert.deepEqual(updated.imports, { cookies: false, passwords: false, history: true });
     assert.deepEqual(updated.ui, { menuBar: true, openAtLogin: false });
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("a browser cannot import into itself", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-codex-sync-"));
+  try {
+    installConfig({ home, hour: 9, minute: 15 });
+    assert.throws(() => updatePreferences({
+      home,
+      sourceBrowser: "brave",
+      targetBrowser: "brave",
+      cookies: true,
+      history: false,
+      menuBar: false,
+      openAtLogin: true,
+    }), /must be different/);
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
   }

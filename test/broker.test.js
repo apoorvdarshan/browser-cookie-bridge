@@ -5,12 +5,14 @@ import { createBroker } from "../src/broker.js";
 test("broker transfers an in-memory payload and clears it after completion", async () => {
   const token = "test-token";
   const port = 43291;
-  const broker = createBroker({ token, port, timeoutMs: 5_000 });
+  const broker = createBroker({ token, port, sourceBrowser: "brave", targetBrowser: "chrome", timeoutMs: 5_000 });
   await broker.listen();
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
   const status = await fetch(`http://127.0.0.1:${port}/v1/status`, { headers }).then((response) => response.json());
   assert.equal(status.sourceNeeded, true);
+  assert.equal(status.sourceBrowser, "brave");
+  assert.equal(status.targetBrowser, "chrome");
 
   const secretCookie = { name: "session", value: "secret", domain: "example.test" };
   const sourceResponse = await fetch(`http://127.0.0.1:${port}/v1/source`, {

@@ -7,6 +7,7 @@ import {
   installedExtensionDir,
   projectRoot,
   SOURCE_BROWSERS,
+  TARGET_BROWSERS,
 } from "./paths.js";
 
 export function readConfig(home) {
@@ -31,12 +32,15 @@ export function installConfig({ home, hour = 9, minute = 0 }) {
     existing = JSON.parse(fs.readFileSync(target, "utf8"));
   }
 
+  const sourceBrowser = SOURCE_BROWSERS.includes(existing.sourceBrowser) ? existing.sourceBrowser : "brave";
+  const configuredTarget = TARGET_BROWSERS.includes(existing.targetBrowser) ? existing.targetBrowser : "codex";
   const config = {
     version: 1,
     token: existing.token || crypto.randomBytes(32).toString("base64url"),
     port: existing.port || DEFAULT_PORT,
     nodePath: process.execPath,
-    sourceBrowser: SOURCE_BROWSERS.includes(existing.sourceBrowser) ? existing.sourceBrowser : "brave",
+    sourceBrowser,
+    targetBrowser: configuredTarget === sourceBrowser ? "codex" : configuredTarget,
     imports: {
       cookies: existing.imports?.cookies !== false,
       passwords: false,
@@ -52,17 +56,24 @@ export function installConfig({ home, hour = 9, minute = 0 }) {
   };
 
   writePrivateJson(target, config);
-  for (const browser of SOURCE_BROWSERS) installExtension(config, home, browser, "source");
+  for (const browser of SOURCE_BROWSERS) installExtension(config, home, browser, "browser");
   installExtension(config, home, "codex", "target");
   return config;
 }
 
-export function updatePreferences({ home, cookies, history, sourceBrowser, menuBar, openAtLogin }) {
+export function updatePreferences({ home, cookies, history, sourceBrowser, targetBrowser, menuBar, openAtLogin }) {
   const config = readConfig(home);
   if (!SOURCE_BROWSERS.includes(sourceBrowser)) {
     throw new Error(`Unsupported source browser: ${sourceBrowser}`);
   }
+  if (!TARGET_BROWSERS.includes(targetBrowser)) {
+    throw new Error(`Unsupported target browser: ${targetBrowser}`);
+  }
+  if (sourceBrowser === targetBrowser) {
+    throw new Error("Source and target browsers must be different");
+  }
   config.sourceBrowser = sourceBrowser;
+  config.targetBrowser = targetBrowser;
   config.imports = { cookies: Boolean(cookies), passwords: false, history: Boolean(history) };
   config.ui = { menuBar: Boolean(menuBar), openAtLogin: Boolean(openAtLogin) };
   config.updatedAt = new Date().toISOString();

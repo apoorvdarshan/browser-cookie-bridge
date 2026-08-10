@@ -14,6 +14,7 @@ import {
   launchAgentPath,
   loginSyncLaunchAgentPath,
   SOURCE_BROWSERS,
+  TARGET_BROWSERS,
 } from "./paths.js";
 import {
   installAppLogin,
@@ -26,12 +27,12 @@ import {
 
 const HELP = `brave-codex-cookie-sync
 
-Local browser-data synchronization from Chromium browsers to Codex's built-in browser.
+Local browser-data relay between Chromium browsers and into ChatGPT Codex.
 
 Commands:
   setup [--hour 9] [--minute 0] [--no-schedule]
   install-app [--no-open]
-  preferences --source brave --cookies on --history off --menu-bar off
+  preferences --source brave --target codex --cookies on --history off --menu-bar off
   sync [--timeout 300]
   doctor
   enable-login-sync
@@ -81,11 +82,12 @@ function preferences(args) {
     cookies: booleanFlag(args, "--cookies", existing.imports?.cookies !== false),
     history: booleanFlag(args, "--history", existing.imports?.history === true),
     sourceBrowser: stringFlag(args, "--source", existing.sourceBrowser || "brave"),
+    targetBrowser: stringFlag(args, "--target", existing.targetBrowser || "codex"),
     menuBar: booleanFlag(args, "--menu-bar", existing.ui?.menuBar === true),
     openAtLogin: booleanFlag(args, "--open-at-login", existing.ui?.openAtLogin !== false),
   });
   console.log(
-    `Saved: source=${config.sourceBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}`,
+    `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}`,
   );
 }
 
@@ -128,9 +130,9 @@ function setup(args) {
   console.log("Setup complete.");
   console.log(`Pinned runtime: ${runtime}`);
   console.log(`Source extension (${config.sourceBrowser}): ${installedExtensionDir(undefined, config.sourceBrowser)}`);
-  console.log(`Codex extension: ${installedExtensionDir(undefined, "codex")}`);
+  console.log(`Target extension (${config.targetBrowser}): ${installedExtensionDir(undefined, config.targetBrowser)}`);
   console.log("Source browser: open its Extensions page → Developer mode → Load unpacked → choose its generated extension folder");
-  console.log("Codex: built-in browser → Extensions → Manage extensions → Developer mode → Load unpacked → choose the Codex extension folder");
+  console.log("Target browser: open its Extensions page → Developer mode → Load unpacked → choose its generated extension folder");
   if (plist) console.log(`Daily schedule: ${pad(hour)}:${pad(minute)} (${plist})`);
   console.log(`Broker port: 127.0.0.1:${config.port}`);
   console.log("Cookie values are transferred in memory and are not written to logs or disk.");
@@ -145,10 +147,11 @@ async function sync(args) {
     port: config.port,
     imports: config.imports || { cookies: true, history: false },
     sourceBrowser: config.sourceBrowser || "brave",
+    targetBrowser: config.targetBrowser || "codex",
     timeoutMs: seconds * 1000,
     onEvent(event) {
       if (event.type === "listening") {
-        console.log(`Waiting for ${config.sourceBrowser || "brave"} and Codex extensions on 127.0.0.1:${event.port}…`);
+        console.log(`Waiting for ${config.sourceBrowser || "brave"} and ${config.targetBrowser || "codex"} extensions on 127.0.0.1:${event.port}…`);
       } else if (event.type === "source") {
         console.log(`Received ${event.cookies} cookies and ${event.history} history URLs in memory.`);
       } else if (event.type === "complete") {
@@ -171,9 +174,11 @@ function doctor() {
   console.log(`Configuration: ${status(configPath(home))}`);
   const config = fs.existsSync(configPath(home)) ? readConfig(home) : null;
   const source = config?.sourceBrowser || "brave";
+  const target = config?.targetBrowser || "codex";
   console.log(`Selected source: ${source}`);
+  console.log(`Selected target: ${target}`);
   console.log(`Source extension: ${status(installedExtensionDir(home, source))}`);
-  console.log(`Codex extension: ${status(installedExtensionDir(home, "codex"))}`);
+  console.log(`Target extension: ${status(installedExtensionDir(home, target))}`);
   console.log(`Daily schedule: ${status(launchAgentPath(home))}`);
   console.log(`Sync at login: ${status(loginSyncLaunchAgentPath(home))}`);
   console.log(`Open app at login: ${status(appLoginLaunchAgentPath(home))}`);
@@ -205,6 +210,7 @@ function setAppLogin(enabled) {
   const existing = readConfig();
   updatePreferences({
     sourceBrowser: existing.sourceBrowser || "brave",
+    targetBrowser: existing.targetBrowser || "codex",
     cookies: existing.imports?.cookies !== false,
     history: existing.imports?.history === true,
     menuBar: existing.ui?.menuBar === true,
@@ -251,6 +257,9 @@ function stringFlag(args, name, fallback) {
   if (!value || value.startsWith("--")) throw new Error(`${name} requires a value`);
   if (name === "--source" && !SOURCE_BROWSERS.includes(value)) {
     throw new Error(`${name} must be one of: ${SOURCE_BROWSERS.join(", ")}`);
+  }
+  if (name === "--target" && !TARGET_BROWSERS.includes(value)) {
+    throw new Error(`${name} must be one of: ${TARGET_BROWSERS.join(", ")}`);
   }
   return value;
 }

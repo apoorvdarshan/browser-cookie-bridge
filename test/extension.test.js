@@ -17,3 +17,14 @@ test("manifest key produces the pinned extension ID", () => {
   assert.equal(manifest.background.service_worker, "background.js");
   assert.equal(projectRoot().endsWith("brave-codex-cookie-sync"), true);
 });
+
+test("browser extension routing is selected dynamically by the broker", () => {
+  const background = fs.readFileSync(
+    new URL("../extension-template/background.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(background, /SYNC_ROLE === "browser"/);
+  assert.match(background, /SYNC_BROWSER === status\.sourceBrowser/);
+  assert.match(background, /SYNC_BROWSER === status\.targetBrowser/);
+  assert.doesNotMatch(background, /importIntoCodex/);
+});
