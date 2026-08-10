@@ -1,6 +1,9 @@
 import AppKit
 import Foundation
-import ServiceManagement
+
+extension Notification.Name {
+  static let menuBarVisibilityChanged = Notification.Name("BraveCodexSync.menuBarVisibilityChanged")
+}
 
 struct BrowserChoice: Identifiable, Hashable {
   let id: String
@@ -29,6 +32,7 @@ final class SyncModel: ObservableObject {
   @Published var dailyEnabled = false
   @Published var loginSyncEnabled = false
   @Published var openAtLogin = false
+  @Published var menuBarEnabled = false
   @Published var scheduleTime = Date()
   @Published var extensionsReady = false
   @Published var cookiesEnabled = true
@@ -42,6 +46,7 @@ final class SyncModel: ObservableObject {
   private var runtimeCLI: URL { support.appending(path: "runtime/bin/brave-codex-cookie-sync.js") }
   private var launchAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.plist") }
   private var loginSyncAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.login-sync.plist") }
+  private var appLoginAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.app-login.plist") }
 
   var selectedBrowser: BrowserChoice {
     browsers.first(where: { $0.id == selectedSourceID }) ?? browsers[0]
@@ -62,7 +67,7 @@ final class SyncModel: ObservableObject {
   func refresh() {
     dailyEnabled = FileManager.default.fileExists(atPath: launchAgent.path)
     loginSyncEnabled = FileManager.default.fileExists(atPath: loginSyncAgent.path)
-    openAtLogin = SMAppService.mainApp.status == .enabled
+    openAtLogin = FileManager.default.fileExists(atPath: appLoginAgent.path)
     if let config = loadConfig() {
       let calendar = Calendar.current
       scheduleTime = calendar.date(
@@ -75,7 +80,9 @@ final class SyncModel: ObservableObject {
       selectedSourceID = browsers.contains(where: { $0.id == configuredSource }) ? configuredSource : "brave"
       cookiesEnabled = config.imports?.cookies ?? true
       historyEnabled = config.imports?.history ?? false
+      menuBarEnabled = config.ui?.menuBar ?? false
     }
+    NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: menuBarEnabled)
     extensionsReady = [selectedSourceID, "codex"].allSatisfy {
       FileManager.default.fileExists(atPath: support.appending(path: "extension-\($0)/manifest.json").path)
     }
@@ -95,6 +102,12 @@ final class SyncModel: ObservableObject {
   func setHistoryEnabled(_ enabled: Bool) {
     historyEnabled = enabled
     persistPreferences(successMessage: enabled ? "History URL import enabled" : "History import disabled")
+  }
+
+  func setMenuBarEnabled(_ enabled: Bool) {
+    menuBarEnabled = enabled
+    NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: enabled)
+    persistPreferences(successMessage: enabled ? "Menu-bar icon enabled" : "Menu-bar icon hidden")
   }
 
   func syncNow() {
@@ -150,24 +163,23 @@ final class SyncModel: ObservableObject {
   }
 
   func setOpenAtLogin(_ enabled: Bool) {
+    openAtLogin = enabled
     isWorking = true
-    do {
-      if enabled {
-        if SMAppService.mainApp.status != .enabled { try SMAppService.mainApp.register() }
-      } else if SMAppService.mainApp.status != .notRegistered {
-        try SMAppService.mainApp.unregister()
+    runCLI([enabled ? "enable-app-login" : "disable-app-login"]) { [weak self] success, output in
+      guard let self else { return }
+      self.isWorking = false
+      if success {
+        self.state = .ready
+        self.primaryStatus = enabled ? "Opens at login" : "Login launch disabled"
+        self.secondaryStatus = enabled ? "The app starts automatically after sign-in" : "Open the app manually when you need it"
+      } else {
+        self.openAtLogin.toggle()
+        self.state = .error
+        self.primaryStatus = "Could not update login launch"
+        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Run install-app again from the CLI"
       }
-      openAtLogin = SMAppService.mainApp.status == .enabled
-      state = .ready
-      primaryStatus = openAtLogin ? "Opens at login" : "Login launch disabled"
-      secondaryStatus = openAtLogin ? "Closing the window leaves the menu-bar helper running" : "Open the app manually when you need it"
-    } catch {
-      openAtLogin = SMAppService.mainApp.status == .enabled
-      state = .error
-      primaryStatus = "Could not update Login Items"
-      secondaryStatus = error.localizedDescription
+      self.refresh()
     }
-    isWorking = false
   }
 
   func openSourceExtensions() {
@@ -188,7 +200,8 @@ final class SyncModel: ObservableObject {
       "preferences",
       "--source", selectedSourceID,
       "--cookies", cookiesEnabled ? "on" : "off",
-      "--history", historyEnabled ? "on" : "off"
+      "--history", historyEnabled ? "on" : "off",
+      "--menu-bar", menuBarEnabled ? "on" : "off"
     ]
     runCLI(arguments) { [weak self] success, output in
       guard let self else { return }
@@ -284,6 +297,7 @@ private struct AppConfig: Decodable {
   let schedule: Schedule
   let sourceBrowser: String?
   let imports: Imports?
+  let ui: UISettings?
 
   struct Schedule: Decodable {
     let hour: Int
@@ -293,5 +307,10 @@ private struct AppConfig: Decodable {
   struct Imports: Decodable {
     let cookies: Bool
     let history: Bool
+  }
+
+  struct UISettings: Decodable {
+    let menuBar: Bool?
+    let openAtLogin: Bool?
   }
 }

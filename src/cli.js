@@ -6,6 +6,7 @@ import { createBroker } from "./broker.js";
 import { installConfig, installRuntime, readConfig, updatePreferences } from "./config.js";
 import {
   braveCookiePaths,
+  appLoginLaunchAgentPath,
   codexCookiePaths,
   configPath,
   installedAppPath,
@@ -14,7 +15,14 @@ import {
   loginSyncLaunchAgentPath,
   SOURCE_BROWSERS,
 } from "./paths.js";
-import { installLoginSync, installSchedule, removeLoginSync, removeSchedule } from "./scheduler.js";
+import {
+  installAppLogin,
+  installLoginSync,
+  installSchedule,
+  removeAppLogin,
+  removeLoginSync,
+  removeSchedule,
+} from "./scheduler.js";
 
 const HELP = `brave-codex-cookie-sync
 
@@ -23,11 +31,13 @@ Local browser-data synchronization from Chromium browsers to Codex's built-in br
 Commands:
   setup [--hour 9] [--minute 0] [--no-schedule]
   install-app [--no-open]
-  preferences --source brave --cookies on --history off
+  preferences --source brave --cookies on --history off --menu-bar off
   sync [--timeout 300]
   doctor
   enable-login-sync
   disable-login-sync
+  enable-app-login
+  disable-app-login
   remove-schedule
   help
 `;
@@ -49,6 +59,10 @@ export async function main(argv) {
       return enableLoginSync();
     case "disable-login-sync":
       return disableLoginSync();
+    case "enable-app-login":
+      return setAppLogin(true);
+    case "disable-app-login":
+      return setAppLogin(false);
     case "remove-schedule":
       return remove();
     case "help":
@@ -67,9 +81,11 @@ function preferences(args) {
     cookies: booleanFlag(args, "--cookies", existing.imports?.cookies !== false),
     history: booleanFlag(args, "--history", existing.imports?.history === true),
     sourceBrowser: stringFlag(args, "--source", existing.sourceBrowser || "brave"),
+    menuBar: booleanFlag(args, "--menu-bar", existing.ui?.menuBar === true),
+    openAtLogin: booleanFlag(args, "--open-at-login", existing.ui?.openAtLogin !== false),
   });
   console.log(
-    `Saved: source=${config.sourceBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}`,
+    `Saved: source=${config.sourceBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}`,
   );
 }
 
@@ -77,12 +93,17 @@ function installDesktopApp(args) {
   assertMacOS();
   installRuntime();
   const existing = fs.existsSync(configPath()) ? readConfig() : null;
-  installConfig({
+  const config = installConfig({
     hour: existing?.schedule?.hour ?? 9,
     minute: existing?.schedule?.minute ?? 0,
   });
   console.log("Building the native macOS app…");
   const destination = installApp({ open: !args.includes("--no-open") });
+  if (config.ui.openAtLogin) {
+    installAppLogin({ appPath: destination, bootstrapNow: false });
+  } else {
+    removeAppLogin();
+  }
   console.log(`Installed: ${destination}`);
   console.log("The app is available in your user Applications folder and Spotlight.");
 }
@@ -155,6 +176,7 @@ function doctor() {
   console.log(`Codex extension: ${status(installedExtensionDir(home, "codex"))}`);
   console.log(`Daily schedule: ${status(launchAgentPath(home))}`);
   console.log(`Sync at login: ${status(loginSyncLaunchAgentPath(home))}`);
+  console.log(`Open app at login: ${status(appLoginLaunchAgentPath(home))}`);
   console.log(`Desktop app: ${status(installedAppPath(home))}`);
   console.log(`Brave cookie stores detected: ${brave.length}`);
   console.log(`Codex cookie stores detected: ${codex.length}`);
@@ -176,6 +198,26 @@ function enableLoginSync() {
 
 function disableLoginSync() {
   console.log(removeLoginSync() ? "Login sync disabled." : "Login sync was not enabled.");
+}
+
+function setAppLogin(enabled) {
+  assertMacOS();
+  const existing = readConfig();
+  updatePreferences({
+    sourceBrowser: existing.sourceBrowser || "brave",
+    cookies: existing.imports?.cookies !== false,
+    history: existing.imports?.history === true,
+    menuBar: existing.ui?.menuBar === true,
+    openAtLogin: enabled,
+  });
+  if (enabled) {
+    const appPath = installedAppPath();
+    if (!fs.existsSync(appPath)) throw new Error("Desktop app is not installed. Run install-app first.");
+    console.log(`App login enabled: ${installAppLogin({ appPath })}`);
+  } else {
+    removeAppLogin();
+    console.log("App login disabled.");
+  }
 }
 
 function remove() {

@@ -1,6 +1,6 @@
 {
   "name": "brave-codex-cookie-sync",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Local Chromium-browser to Codex data sync for macOS",
   "type": "module",
   "bin": {

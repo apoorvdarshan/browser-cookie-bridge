@@ -12,14 +12,23 @@ test("preferences default to cookies and persist source and history choices", ()
     const installed = installConfig({ home, hour: 9, minute: 15 });
     assert.equal(installed.sourceBrowser, "brave");
     assert.deepEqual(installed.imports, { cookies: true, passwords: false, history: false });
+    assert.deepEqual(installed.ui, { menuBar: false, openAtLogin: true });
     for (const browser of [...SOURCE_BROWSERS, "codex"]) {
       assert.equal(fs.existsSync(path.join(installedExtensionDir(home, browser), "manifest.json")), true);
     }
 
-    updatePreferences({ home, sourceBrowser: "edge", cookies: false, history: true });
+    updatePreferences({
+      home,
+      sourceBrowser: "edge",
+      cookies: false,
+      history: true,
+      menuBar: true,
+      openAtLogin: false,
+    });
     const updated = readConfig(home);
     assert.equal(updated.sourceBrowser, "edge");
     assert.deepEqual(updated.imports, { cookies: false, passwords: false, history: true });
+    assert.deepEqual(updated.ui, { menuBar: true, openAtLogin: false });
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
   }

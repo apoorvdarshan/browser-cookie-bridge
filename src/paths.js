@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 export const APP_ID = "com.apoorvdarshan.brave-codex-cookie-sync";
 export const LOGIN_SYNC_APP_ID = `${APP_ID}.login-sync`;
+export const APP_LOGIN_APP_ID = `${APP_ID}.app-login`;
 export const DEFAULT_PORT = 43128;
 export const EXTENSION_ID = "ihanfnkcipmlhmokbcinlkdfcfheofjb";
 export const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}`;
@@ -31,6 +32,10 @@ export function launchAgentPath(home = os.homedir()) {
 
 export function loginSyncLaunchAgentPath(home = os.homedir()) {
   return path.join(home, "Library", "LaunchAgents", `${LOGIN_SYNC_APP_ID}.plist`);
+}
+
+export function appLoginLaunchAgentPath(home = os.homedir()) {
+  return path.join(home, "Library", "LaunchAgents", `${APP_LOGIN_APP_ID}.plist`);
 }
 
 export function installedAppPath(home = os.homedir()) {

@@ -17,7 +17,7 @@ cd /Users/apoorvdarshan/brave-codex-cookie-sync
 npm test
 npm run check
 npm pack
-npx --yes ./brave-codex-cookie-sync-0.4.0.tgz install-app
+npx --yes ./brave-codex-cookie-sync-0.5.0.tgz install-app
 ```
 
 This builds and installs `Brave Codex Sync.app` into your user Applications folder. The app provides:
@@ -26,8 +26,8 @@ This builds and installs `Brave Codex Sync.app` into your user Applications fold
 - Persistent Cookies and History URL choices
 - Manual and daily sync
 - Optional sync when you sign in to the Mac
-- Open at login
-- A background menu-bar helper; closing the window does not quit it
+- Open at login, enabled by default
+- An optional menu-bar helper, off by default; closing the window does not quit the app
 
 The installer generates a source extension folder for every supported browser plus one Codex target folder. In the app, select your source browser, then:
 
@@ -39,10 +39,10 @@ Only the source selected in the app responds to a sync. Keep the selected browse
 You can also control preferences and sync from the packed CLI:
 
 ```bash
-npx --yes ./brave-codex-cookie-sync-0.4.0.tgz preferences --source brave --cookies on --history off
-npx --yes ./brave-codex-cookie-sync-0.4.0.tgz sync --timeout 300
-npx --yes ./brave-codex-cookie-sync-0.4.0.tgz setup --hour 9 --minute 0
-npx --yes ./brave-codex-cookie-sync-0.4.0.tgz enable-login-sync
+npx --yes ./brave-codex-cookie-sync-0.5.0.tgz preferences --source brave --cookies on --history off --menu-bar off
+npx --yes ./brave-codex-cookie-sync-0.5.0.tgz sync --timeout 300
+npx --yes ./brave-codex-cookie-sync-0.5.0.tgz setup --hour 9 --minute 0
+npx --yes ./brave-codex-cookie-sync-0.5.0.tgz enable-login-sync
 ```
 
 The fixed daily sync and login sync are independent controls. Login sync runs once when you sign in, not every rolling 24 hours; the fixed daily time therefore never drifts after restarts or sleep. Neither option launches or force-quits a browser. Each run waits up to five minutes for both installed extensions; if a browser is closed, it times out without transferring data.
@@ -54,11 +54,13 @@ The fixed daily sync and login sync are independent controls. Login sync runs on
 ```text
 install-app [--no-open]
 setup [--hour 9] [--minute 0] [--no-schedule]
-preferences --source brave --cookies on --history off
+preferences --source brave --cookies on --history off --menu-bar off
 sync [--timeout 300]
 doctor
 enable-login-sync
 disable-login-sync
+enable-app-login
+disable-app-login
 remove-schedule
 help
 ```

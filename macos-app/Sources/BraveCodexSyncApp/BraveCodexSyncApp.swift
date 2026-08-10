@@ -7,113 +7,171 @@ struct BraveCodexSyncApp: App {
   @StateObject private var model = SyncModel()
 
   var body: some Scene {
-    WindowGroup("Brave Codex Sync", id: "main") {
-      ContentView()
+    Window("Brave Codex Sync", id: "main") {
+      ContentView(appDelegate: appDelegate)
         .environmentObject(model)
-        .frame(width: 548, height: 706)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .frame(width: 560, height: 682)
+        .background(AppBackground())
     }
     .windowResizability(.contentSize)
     .commands { CommandGroup(replacing: .newItem) {} }
 
-    MenuBarExtra("Brave Codex Sync", systemImage: "arrow.left.arrow.right.circle.fill") {
-      MenuBarContent()
-        .environmentObject(model)
-    }
   }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+  weak var model: SyncModel?
+  private weak var mainWindow: NSWindow?
+  private var statusItem: NSStatusItem?
+
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(menuBarVisibilityChanged(_:)),
+      name: .menuBarVisibilityChanged,
+      object: nil
+    )
+  }
+
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
-}
 
-struct MenuBarContent: View {
-  @EnvironmentObject private var model: SyncModel
-  @Environment(\.openWindow) private var openWindow
+  func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+    if !flag { showMainWindow() }
+    return true
+  }
 
-  var body: some View {
-    Button("Show Brave Codex Sync") {
-      openWindow(id: "main")
-      NSApp.activate(ignoringOtherApps: true)
+  func windowShouldClose(_ sender: NSWindow) -> Bool {
+    sender.orderOut(nil)
+    return false
+  }
+
+  func attach(model: SyncModel) {
+    self.model = model
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      let candidate = NSApp.windows.first(where: { $0.canBecomeMain }) ?? NSApp.windows.first
+      self.mainWindow = candidate
+      candidate?.delegate = self
     }
-    Button(model.isSyncing ? "Syncing…" : "Sync now") { model.syncNow() }
-      .disabled(model.isSyncing)
-    Divider()
-    Text(model.primaryStatus)
-    Divider()
-    Button("Quit") { NSApp.terminate(nil) }
+  }
+
+  func updateMenuBar(enabled: Bool) {
+    if enabled {
+      guard statusItem == nil else { return }
+      let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+      item.button?.image = NSImage(systemSymbolName: "arrow.left.arrow.right.circle.fill", accessibilityDescription: "Browser to Codex")
+      let menu = NSMenu()
+      menu.addItem(withTitle: "Show Browser → Codex", action: #selector(showMainWindowAction), keyEquivalent: "")
+      menu.addItem(withTitle: "Sync now", action: #selector(syncNowAction), keyEquivalent: "")
+      menu.addItem(.separator())
+      menu.addItem(withTitle: "Quit", action: #selector(quitAction), keyEquivalent: "q")
+      for menuItem in menu.items { menuItem.target = self }
+      item.menu = menu
+      statusItem = item
+    } else if let statusItem {
+      NSStatusBar.system.removeStatusItem(statusItem)
+      self.statusItem = nil
+    }
+  }
+
+  @objc private func menuBarVisibilityChanged(_ notification: Notification) {
+    guard let enabled = notification.object as? Bool else { return }
+    updateMenuBar(enabled: enabled)
+  }
+
+  @objc private func showMainWindowAction() { showMainWindow() }
+  @objc private func syncNowAction() { model?.syncNow() }
+  @objc private func quitAction() { NSApp.terminate(nil) }
+
+  private func showMainWindow() {
+    mainWindow?.makeKeyAndOrderFront(nil)
+    NSApp.activate(ignoringOtherApps: true)
   }
 }
 
 struct ContentView: View {
   @EnvironmentObject private var model: SyncModel
+  @State private var showingSetup = false
+  let appDelegate: AppDelegate
 
   var body: some View {
     VStack(spacing: 14) {
       header
-      relayCard
-      importCard
-      scheduleCard
-      setupCard
+      SyncPanel()
+      PreferencesPanel()
       footer
     }
-    .padding(22)
-    .onAppear { model.refresh() }
+    .padding(20)
+    .onAppear {
+      appDelegate.attach(model: model)
+      model.refresh()
+      appDelegate.updateMenuBar(enabled: model.menuBarEnabled)
+    }
+    .sheet(isPresented: $showingSetup) {
+      ExtensionSetupSheet().environmentObject(model)
+    }
   }
 
   private var header: some View {
-    HStack(spacing: 12) {
-      Image(systemName: "arrow.left.arrow.right.circle.fill")
-        .font(.system(size: 30, weight: .semibold))
-        .symbolRenderingMode(.palette)
-        .foregroundStyle(Theme.relayBlue, Theme.relayBlue.opacity(0.16))
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Brave Codex Sync")
-          .font(.system(size: 21, weight: .bold, design: .rounded))
-        Text("Browser data relay · local to this Mac")
-          .font(.system(size: 12, weight: .medium))
+    HStack(spacing: 11) {
+      Image(nsImage: NSApp.applicationIconImage)
+        .resizable()
+        .scaledToFit()
+        .frame(width: 36, height: 36)
+        .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Browser → Codex")
+          .font(.system(size: 19, weight: .bold, design: .rounded))
+        Text("Local browser data sync")
+          .font(.system(size: 11.5, weight: .medium))
           .foregroundStyle(.secondary)
       }
       Spacer()
-      StatusPill(state: model.state)
+      StatusIndicator(state: model.state)
     }
+    .padding(.horizontal, 2)
   }
 
-  private var relayCard: some View {
-    Card {
+  private var footer: some View {
+    HStack(spacing: 10) {
+      Label("Data stays on this Mac", systemImage: "lock.shield.fill")
+        .foregroundStyle(.secondary)
+      Spacer()
+      Button {
+        model.refresh()
+      } label: {
+        Image(systemName: "arrow.clockwise")
+      }
+      .buttonStyle(.plain)
+      .foregroundStyle(.secondary)
+      .help("Refresh status")
+      Button("Extension setup…") { showingSetup = true }
+        .controlSize(.small)
+    }
+    .font(.system(size: 10.5, weight: .medium))
+    .padding(.horizontal, 3)
+  }
+}
+
+struct SyncPanel: View {
+  @EnvironmentObject private var model: SyncModel
+
+  var body: some View {
+    Surface {
       VStack(spacing: 14) {
-        HStack(spacing: 12) {
-          Menu {
-            ForEach(model.browsers) { browser in
-              Button {
-                model.selectSource(browser.id)
-              } label: {
-                HStack {
-                  Image(nsImage: model.browserIcon(browser))
-                  Text(browser.name)
-                  if browser.id == model.selectedSourceID {
-                    Image(systemName: "checkmark")
-                  }
-                }
-              }
-            }
-          } label: {
-            LogoBadge(icon: model.sourceIcon, label: model.selectedBrowser.name, showsChevron: true)
-          }
-          .menuStyle(.borderlessButton)
-          .fixedSize()
-          .disabled(model.isWorking || model.isSyncing)
-
-          RelayRail(active: model.isSyncing)
-          LogoBadge(icon: model.codexIcon, label: "Codex")
+        HStack(spacing: 14) {
+          sourcePicker
+          RelayPath(active: model.isSyncing)
+          EndpointBadge(icon: model.codexIcon, eyebrow: "DESTINATION", title: "Codex")
         }
-
+        Divider().opacity(0.65)
         HStack(spacing: 12) {
-          VStack(alignment: .leading, spacing: 3) {
+          VStack(alignment: .leading, spacing: 2) {
             Text(model.primaryStatus)
               .font(.system(size: 13, weight: .semibold))
             Text(model.secondaryStatus)
-              .font(.system(size: 11))
+              .font(.system(size: 10.5))
               .foregroundStyle(.secondary)
               .lineLimit(1)
           }
@@ -129,7 +187,7 @@ struct ContentView: View {
             .frame(minWidth: 92)
           }
           .buttonStyle(.borderedProminent)
-          .tint(Theme.relayBlue)
+          .tint(Theme.blue)
           .disabled(model.isSyncing)
           .keyboardShortcut(.return, modifiers: .command)
         }
@@ -137,242 +195,323 @@ struct ContentView: View {
     }
   }
 
-  private var importCard: some View {
-    Card {
-      VStack(spacing: 9) {
-        HStack {
-          Label("Import into Codex", systemImage: "square.and.arrow.down")
-            .font(.system(size: 13, weight: .semibold))
-          Spacer()
-          Text("Preferences are saved")
-            .font(.system(size: 10.5, weight: .medium))
-            .foregroundStyle(.secondary)
-        }
-        Divider()
-        ImportRow(
-          icon: "network",
-          title: "Cookies",
-          detail: "Site sessions and sign-ins",
-          isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }),
-          tint: Theme.relayBlue,
-          disabled: model.isWorking
-        )
-        ImportRow(
-          icon: "clock.arrow.circlepath",
-          title: "History URLs",
-          detail: "Visit times and titles are not preserved",
-          isOn: Binding(get: { model.historyEnabled }, set: { model.setHistoryEnabled($0) }),
-          tint: Theme.codexTeal,
-          disabled: model.isWorking
-        )
-        HStack(spacing: 12) {
-          Image(systemName: "key.slash")
-            .foregroundStyle(.tertiary)
-            .frame(width: 22)
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Passwords")
-              .font(.system(size: 12.5, weight: .semibold))
-              .foregroundStyle(.secondary)
-            Text("Unavailable to browser extensions")
-              .font(.system(size: 10.5))
-              .foregroundStyle(.tertiary)
+  private var sourcePicker: some View {
+    Menu {
+      ForEach(model.browsers) { browser in
+        Button {
+          model.selectSource(browser.id)
+        } label: {
+          HStack {
+            Image(nsImage: model.browserIcon(browser))
+            Text(browser.name)
+            if browser.id == model.selectedSourceID { Image(systemName: "checkmark") }
           }
-          Spacer()
-          Text("Unavailable")
-            .font(.system(size: 10.5, weight: .semibold))
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.secondary.opacity(0.08), in: Capsule())
         }
       }
+    } label: {
+      EndpointBadge(
+        icon: model.sourceIcon,
+        eyebrow: "SOURCE",
+        title: model.selectedBrowser.name,
+        showsChevron: true
+      )
     }
-  }
-
-  private var scheduleCard: some View {
-    Card {
-      VStack(spacing: 10) {
-        HStack(spacing: 12) {
-          Image(systemName: "clock.badge.checkmark")
-            .font(.system(size: 19, weight: .medium))
-            .foregroundStyle(Theme.relayBlue)
-            .frame(width: 24)
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Daily sync").font(.system(size: 13, weight: .semibold))
-            Text(model.dailyEnabled ? "Runs when both apps are open" : "Manual sync only")
-              .font(.system(size: 10.5)).foregroundStyle(.secondary)
-          }
-          Spacer()
-          DatePicker("", selection: $model.scheduleTime, displayedComponents: .hourAndMinute)
-            .labelsHidden().disabled(!model.dailyEnabled || model.isWorking).frame(width: 82)
-          Button("Save") { model.saveSchedule() }
-            .controlSize(.small).disabled(!model.dailyEnabled || model.isWorking)
-          Toggle("", isOn: Binding(get: { model.dailyEnabled }, set: { model.setDailyEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.codexTeal).disabled(model.isWorking)
-        }
-        Divider()
-        HStack(spacing: 12) {
-          Image(systemName: "sunrise.fill")
-            .font(.system(size: 18, weight: .medium))
-            .foregroundStyle(Theme.braveCoral)
-            .frame(width: 24)
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Sync at login").font(.system(size: 13, weight: .semibold))
-            Text(model.loginSyncEnabled ? "Runs now, then once whenever you sign in" : "No automatic startup transfer")
-              .font(.system(size: 10.5)).foregroundStyle(.secondary)
-          }
-          Spacer()
-          Toggle("", isOn: Binding(get: { model.loginSyncEnabled }, set: { model.setLoginSyncEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.braveCoral).disabled(model.isWorking)
-        }
-        Divider()
-        HStack(spacing: 12) {
-          Image(systemName: "power")
-            .font(.system(size: 18, weight: .medium))
-            .foregroundStyle(Theme.codexTeal)
-            .frame(width: 24)
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Open at login").font(.system(size: 13, weight: .semibold))
-            Text("Keep the menu-bar helper running in the background")
-              .font(.system(size: 10.5)).foregroundStyle(.secondary)
-          }
-          Spacer()
-          Toggle("", isOn: Binding(get: { model.openAtLogin }, set: { model.setOpenAtLogin($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.codexTeal).disabled(model.isWorking)
-        }
-      }
-    }
-  }
-
-  private var setupCard: some View {
-    Card {
-      VStack(spacing: 9) {
-        HStack {
-          Label("Browser extensions", systemImage: "puzzlepiece.extension")
-            .font(.system(size: 13, weight: .semibold))
-          Spacer()
-          Text(model.extensionsReady ? "Folders ready" : "Setup required")
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(model.extensionsReady ? Theme.codexTeal : .secondary)
-        }
-        Divider()
-        HStack(spacing: 8) {
-          Button("Open \(model.selectedBrowser.name) Extensions") { model.openSourceExtensions() }
-          Button("Show source folder") { model.revealExtension(model.selectedSourceID) }
-          Button("Show Codex folder") { model.revealExtension("codex") }
-          Spacer()
-        }
-        .controlSize(.small)
-      }
-    }
-  }
-
-  private var footer: some View {
-    HStack {
-      Image(systemName: "lock.shield")
-      Text("Selected data stays local. Password access is unavailable.")
-      Spacer()
-      Button("Refresh") { model.refresh() }
-        .buttonStyle(.plain)
-        .foregroundStyle(Theme.relayBlue)
-    }
-    .font(.system(size: 10.5, weight: .medium))
-    .foregroundStyle(.secondary)
+    .menuStyle(.borderlessButton)
+    .fixedSize()
+    .disabled(model.isWorking || model.isSyncing)
   }
 }
 
-struct ImportRow: View {
-  let icon: String
-  let title: String
-  let detail: String
-  @Binding var isOn: Bool
-  let tint: Color
-  let disabled: Bool
+struct PreferencesPanel: View {
+  @EnvironmentObject private var model: SyncModel
 
   var body: some View {
-    HStack(spacing: 12) {
-      Image(systemName: icon).foregroundStyle(tint).frame(width: 22)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(title).font(.system(size: 12.5, weight: .semibold))
-        Text(detail).font(.system(size: 10.5)).foregroundStyle(.secondary)
+    Surface(padding: 0) {
+      VStack(spacing: 0) {
+        SectionLabel(title: "Sync data", detail: "Saved automatically")
+        PreferenceRow(icon: "network", color: Theme.blue, title: "Cookies", detail: "Site sessions and sign-ins") {
+          Toggle("", isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }))
+            .labelsHidden().toggleStyle(.switch).tint(Theme.blue).disabled(model.isWorking)
+        }
+        RowDivider()
+        PreferenceRow(icon: "clock.arrow.circlepath", color: Theme.teal, title: "History URLs", detail: "Original visit times are not preserved") {
+          Toggle("", isOn: Binding(get: { model.historyEnabled }, set: { model.setHistoryEnabled($0) }))
+            .labelsHidden().toggleStyle(.switch).tint(Theme.teal).disabled(model.isWorking)
+        }
+        RowDivider()
+        PreferenceRow(icon: "key.slash", color: .secondary, title: "Passwords", detail: "Browser extensions cannot access passwords", muted: true) {
+          Text("Unavailable")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Color.secondary.opacity(0.08), in: Capsule())
+        }
+
+        SectionLabel(title: "Automation", detail: "Runs in the background", separated: true)
+        PreferenceRow(icon: "clock.badge.checkmark", color: Theme.blue, title: "Daily sync", detail: model.dailyEnabled ? "At the selected local time" : "Off") {
+          HStack(spacing: 8) {
+            DatePicker("", selection: $model.scheduleTime, displayedComponents: .hourAndMinute)
+              .labelsHidden()
+              .disabled(!model.dailyEnabled || model.isWorking)
+              .frame(width: 82)
+              .onChange(of: model.scheduleTime) { _ in
+                if model.dailyEnabled && !model.isWorking { model.saveSchedule() }
+              }
+            Toggle("", isOn: Binding(get: { model.dailyEnabled }, set: { model.setDailyEnabled($0) }))
+              .labelsHidden().toggleStyle(.switch).tint(Theme.teal).disabled(model.isWorking)
+          }
+        }
+        RowDivider()
+        PreferenceRow(icon: "sunrise.fill", color: Theme.coral, title: "Sync at login", detail: model.loginSyncEnabled ? "Once whenever you sign in" : "Off") {
+          Toggle("", isOn: Binding(get: { model.loginSyncEnabled }, set: { model.setLoginSyncEnabled($0) }))
+            .labelsHidden().toggleStyle(.switch).tint(Theme.coral).disabled(model.isWorking)
+        }
+        RowDivider()
+        PreferenceRow(icon: "power", color: Theme.teal, title: "Open at login", detail: "Start the app after you sign in") {
+          Toggle("", isOn: Binding(get: { model.openAtLogin }, set: { model.setOpenAtLogin($0) }))
+            .labelsHidden().toggleStyle(.switch).tint(Theme.teal).disabled(model.isWorking)
+        }
+        RowDivider()
+        PreferenceRow(icon: "menubar.rectangle", color: Theme.blue, title: "Show in menu bar", detail: "Quick access while the app is running") {
+          Toggle("", isOn: Binding(get: { model.menuBarEnabled }, set: { model.setMenuBarEnabled($0) }))
+            .labelsHidden().toggleStyle(.switch).tint(Theme.blue).disabled(model.isWorking)
+        }
       }
-      Spacer()
-      Toggle("", isOn: $isOn)
-        .labelsHidden().toggleStyle(.switch).tint(tint).disabled(disabled)
     }
   }
 }
 
-struct Card<Content: View>: View {
+struct ExtensionSetupSheet: View {
+  @EnvironmentObject private var model: SyncModel
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 18) {
+      HStack(alignment: .top, spacing: 12) {
+        Image(systemName: "puzzlepiece.extension.fill")
+          .font(.system(size: 24, weight: .semibold))
+          .foregroundStyle(Theme.blue)
+          .frame(width: 38, height: 38)
+          .background(Theme.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        VStack(alignment: .leading, spacing: 3) {
+          Text("Extension setup").font(.system(size: 18, weight: .bold, design: .rounded))
+          Text("Load each folder once. The app handles syncing after that.")
+            .font(.system(size: 11.5)).foregroundStyle(.secondary)
+        }
+        Spacer()
+        SetupStateBadge(ready: model.extensionsReady)
+      }
+
+      VStack(spacing: 0) {
+        SetupEndpointRow(icon: model.sourceIcon, title: model.selectedBrowser.name, detail: "Load the source extension") {
+          Button("Open page") { model.openSourceExtensions() }
+          Button("Show folder") { model.revealExtension(model.selectedSourceID) }
+        }
+        Divider().padding(.leading, 58)
+        SetupEndpointRow(icon: model.codexIcon, title: "Codex", detail: "Load the destination extension") {
+          Button("Show folder") { model.revealExtension("codex") }
+        }
+      }
+      .background(Color(nsColor: .controlBackgroundColor).opacity(0.65), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.07)))
+
+      Text("In each browser, enable Developer mode and choose Load unpacked. Password access is never requested.")
+        .font(.system(size: 10.5))
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+
+      HStack {
+        Button("Refresh") { model.refresh() }
+        Spacer()
+        Button("Done") { dismiss() }
+          .keyboardShortcut(.defaultAction)
+      }
+    }
+    .padding(22)
+    .frame(width: 460)
+  }
+}
+
+struct AppBackground: View {
+  var body: some View {
+    ZStack {
+      Color(nsColor: .windowBackgroundColor)
+      LinearGradient(
+        colors: [Theme.blue.opacity(0.035), Color.clear, Theme.teal.opacity(0.025)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+      )
+    }
+  }
+}
+
+struct Surface<Content: View>: View {
+  var padding: CGFloat = 14
   @ViewBuilder var content: Content
 
   var body: some View {
     content
-      .padding(14)
-      .background(Color(nsColor: .controlBackgroundColor).opacity(0.78))
-      .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-      .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).stroke(Color.primary.opacity(0.07), lineWidth: 1))
+      .padding(padding)
+      .background(Color(nsColor: .controlBackgroundColor).opacity(0.74))
+      .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.primary.opacity(0.075)))
   }
 }
 
-struct LogoBadge: View {
+struct EndpointBadge: View {
   let icon: NSImage
-  let label: String
+  let eyebrow: String
+  let title: String
   var showsChevron = false
 
   var body: some View {
-    HStack(spacing: 8) {
-      Image(nsImage: icon)
-        .resizable()
-        .scaledToFit()
-        .frame(width: 30, height: 30)
-      Text(label).font(.system(size: 13, weight: .semibold, design: .rounded))
-      if showsChevron {
-        Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
+    HStack(spacing: 9) {
+      Image(nsImage: icon).resizable().scaledToFit().frame(width: 32, height: 32)
+      VStack(alignment: .leading, spacing: 0) {
+        Text(eyebrow)
+          .font(.system(size: 8, weight: .bold))
+          .tracking(0.6)
+          .foregroundStyle(.tertiary)
+        HStack(spacing: 4) {
+          Text(title).font(.system(size: 13, weight: .semibold, design: .rounded))
+          if showsChevron {
+            Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary)
+          }
+        }
       }
     }
-    .padding(.vertical, 2)
+    .frame(minWidth: 105, alignment: .leading)
   }
 }
 
-struct RelayRail: View {
+struct RelayPath: View {
   let active: Bool
 
   var body: some View {
     ZStack {
       Capsule()
-        .fill(LinearGradient(colors: [Theme.braveCoral.opacity(0.28), Theme.relayBlue.opacity(0.5), Theme.codexTeal.opacity(0.28)], startPoint: .leading, endPoint: .trailing))
-        .frame(height: 4)
+        .fill(LinearGradient(colors: [Theme.coral.opacity(0.42), Theme.blue.opacity(0.65), Theme.teal.opacity(0.45)], startPoint: .leading, endPoint: .trailing))
+        .frame(height: 3)
       Image(systemName: active ? "ellipsis" : "arrow.right")
-        .font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
-        .frame(width: 24, height: 24).background(Theme.relayBlue, in: Circle())
-        .shadow(color: Theme.relayBlue.opacity(0.25), radius: 5, y: 2)
+        .font(.system(size: 10, weight: .bold))
+        .foregroundStyle(.white)
+        .frame(width: 24, height: 24)
+        .background(Theme.blue, in: Circle())
+        .shadow(color: Theme.blue.opacity(0.25), radius: 5, y: 2)
     }
     .frame(maxWidth: .infinity)
+    .accessibilityLabel(active ? "Sync in progress" : "Syncs to Codex")
   }
 }
 
-struct StatusPill: View {
+struct SectionLabel: View {
+  let title: String
+  let detail: String
+  var separated = false
+
+  var body: some View {
+    HStack {
+      Text(title).font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary)
+      Spacer()
+      Text(detail).font(.system(size: 9.5, weight: .medium)).foregroundStyle(.tertiary)
+    }
+    .padding(.horizontal, 14)
+    .padding(.top, separated ? 12 : 11)
+    .padding(.bottom, 7)
+    .overlay(alignment: .top) {
+      if separated { Divider() }
+    }
+  }
+}
+
+struct PreferenceRow<Trailing: View>: View {
+  let icon: String
+  let color: Color
+  let title: String
+  let detail: String
+  var muted = false
+  @ViewBuilder var trailing: Trailing
+
+  var body: some View {
+    HStack(spacing: 11) {
+      Image(systemName: icon)
+        .font(.system(size: 15, weight: .medium))
+        .foregroundStyle(muted ? Color.secondary : color)
+        .frame(width: 22)
+      VStack(alignment: .leading, spacing: 1) {
+        Text(title).font(.system(size: 12.5, weight: .semibold))
+        Text(detail).font(.system(size: 10)).foregroundStyle(.secondary)
+      }
+      .opacity(muted ? 0.62 : 1)
+      Spacer()
+      trailing
+    }
+    .padding(.horizontal, 14)
+    .frame(height: 45)
+  }
+}
+
+struct RowDivider: View {
+  var body: some View { Divider().padding(.leading, 48) }
+}
+
+struct StatusIndicator: View {
   let state: SyncModel.State
 
   var body: some View {
-    HStack(spacing: 6) { Circle().fill(color).frame(width: 7, height: 7); Text(label) }
-      .font(.system(size: 11, weight: .semibold))
-      .padding(.horizontal, 10).padding(.vertical, 6)
-      .background(color.opacity(0.12), in: Capsule()).foregroundStyle(color)
+    HStack(spacing: 6) {
+      Circle().fill(color).frame(width: 7, height: 7)
+      Text(label)
+    }
+    .font(.system(size: 10.5, weight: .semibold))
+    .foregroundStyle(color)
+    .padding(.horizontal, 9).padding(.vertical, 5)
+    .background(color.opacity(0.1), in: Capsule())
   }
 
   private var label: String {
-    switch state { case .ready: "Ready"; case .syncing: "Syncing"; case .success: "Synced"; case .error: "Needs attention" }
+    switch state { case .ready: "Ready"; case .syncing: "Syncing"; case .success: "Synced"; case .error: "Check setup" }
   }
 
   private var color: Color {
-    switch state { case .ready: Theme.relayBlue; case .syncing: Theme.braveCoral; case .success: Theme.codexTeal; case .error: .red }
+    switch state { case .ready: Theme.blue; case .syncing: Theme.coral; case .success: Theme.teal; case .error: .red }
+  }
+}
+
+struct SetupEndpointRow<Actions: View>: View {
+  let icon: NSImage
+  let title: String
+  let detail: String
+  @ViewBuilder var actions: Actions
+
+  var body: some View {
+    HStack(spacing: 12) {
+      Image(nsImage: icon).resizable().scaledToFit().frame(width: 34, height: 34)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title).font(.system(size: 13, weight: .semibold))
+        Text(detail).font(.system(size: 10.5)).foregroundStyle(.secondary)
+      }
+      Spacer()
+      HStack(spacing: 7) { actions }.controlSize(.small)
+    }
+    .padding(13)
+  }
+}
+
+struct SetupStateBadge: View {
+  let ready: Bool
+
+  var body: some View {
+    Text(ready ? "Folders ready" : "Setup needed")
+      .font(.system(size: 10, weight: .semibold))
+      .foregroundStyle(ready ? Theme.teal : .secondary)
+      .padding(.horizontal, 8).padding(.vertical, 5)
+      .background((ready ? Theme.teal : Color.secondary).opacity(0.1), in: Capsule())
   }
 }
 
 enum Theme {
-  static let braveCoral = Color(red: 0.98, green: 0.33, blue: 0.19)
-  static let codexTeal = Color(red: 0.06, green: 0.64, blue: 0.50)
-  static let relayBlue = Color(red: 0.20, green: 0.49, blue: 0.96)
+  static let blue = Color(red: 0.20, green: 0.49, blue: 0.96)
+  static let teal = Color(red: 0.06, green: 0.64, blue: 0.50)
+  static let coral = Color(red: 0.98, green: 0.33, blue: 0.19)
 }

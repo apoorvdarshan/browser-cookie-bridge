@@ -4,8 +4,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import {
   APP_ID,
+  APP_LOGIN_APP_ID,
   LOGIN_SYNC_APP_ID,
   appSupportDir,
+  appLoginLaunchAgentPath,
   launchAgentPath,
   loginSyncLaunchAgentPath,
 } from "./paths.js";
@@ -79,6 +81,32 @@ export function buildLoginSyncPlist({ cliPath, nodePath, support }) {
 `;
 }
 
+export function installAppLogin({ appPath, home = os.homedir(), bootstrapNow = true }) {
+  const plist = appLoginLaunchAgentPath(home);
+  fs.mkdirSync(path.dirname(plist), { recursive: true });
+  fs.writeFileSync(plist, buildAppLoginPlist({ appPath }), { mode: 0o600 });
+  if (bootstrapNow) bootstrap(plist, "app login launch");
+  return plist;
+}
+
+export function buildAppLoginPlist({ appPath }) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>${APP_LOGIN_APP_ID}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/open</string>
+    <string>${xml(appPath)}</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>ProcessType</key><string>Interactive</string>
+</dict>
+</plist>
+`;
+}
+
 export function removeSchedule(home = os.homedir()) {
   const plist = launchAgentPath(home);
   if (!fs.existsSync(plist)) return false;
@@ -89,6 +117,14 @@ export function removeSchedule(home = os.homedir()) {
 
 export function removeLoginSync(home = os.homedir()) {
   const plist = loginSyncLaunchAgentPath(home);
+  if (!fs.existsSync(plist)) return false;
+  spawnSync("launchctl", ["bootout", `gui/${process.getuid()}`, plist], { stdio: "ignore" });
+  fs.unlinkSync(plist);
+  return true;
+}
+
+export function removeAppLogin(home = os.homedir()) {
+  const plist = appLoginLaunchAgentPath(home);
   if (!fs.existsSync(plist)) return false;
   spawnSync("launchctl", ["bootout", `gui/${process.getuid()}`, plist], { stdio: "ignore" });
   fs.unlinkSync(plist);
