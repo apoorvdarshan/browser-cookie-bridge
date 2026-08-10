@@ -165,18 +165,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   }
 
   private func addProjectLinks(to menu: NSMenu) {
-    let links = NSMenu(title: "Project & Support")
-    addLink("Open-source repository", url: ProjectLinks.repository, to: links)
-    addLink("Report a bug…", url: ProjectLinks.issues, to: links)
-    addLink("MIT license", url: ProjectLinks.license, to: links)
-    links.addItem(.separator())
-    addLink("Support on Ko-fi", url: ProjectLinks.koFi, to: links)
-    addLink("Follow @apoorvdarshan on X", url: ProjectLinks.x, to: links)
-    let productHunt = links.addItem(withTitle: "Vote on Product Hunt — link coming soon", action: nil, keyEquivalent: "")
+    menu.addItem(.separator())
+    addLink("Open-source repository", url: ProjectLinks.repository, to: menu)
+    addLink("Report a bug…", url: ProjectLinks.issues, to: menu)
+    addLink("MIT license", url: ProjectLinks.license, to: menu)
+    menu.addItem(.separator())
+    addLink("Support on Ko-fi", url: ProjectLinks.koFi, to: menu)
+    addLink("Follow @apoorvdarshan on X", url: ProjectLinks.x, to: menu)
+    let productHunt = menu.addItem(withTitle: "Vote on Product Hunt — link coming soon", action: nil, keyEquivalent: "")
     productHunt.isEnabled = false
-    let parent = NSMenuItem(title: "Project & Support", action: nil, keyEquivalent: "")
-    parent.submenu = links
-    menu.addItem(parent)
   }
 
   private func addLink(_ title: String, url: URL, to menu: NSMenu) {
@@ -194,8 +191,13 @@ struct ContentView: View {
   var body: some View {
     VStack(spacing: 12) {
       header
-      SyncPanel()
-      PreferencesPanel()
+      ScrollView {
+        VStack(spacing: 12) {
+          SyncPanel()
+          PreferencesPanel()
+        }
+        .padding(.trailing, 2)
+      }
       footer
     }
     .padding(18)
@@ -235,19 +237,6 @@ struct ContentView: View {
       Label("Data stays on this Mac", systemImage: "lock.shield.fill")
         .foregroundStyle(.secondary)
       Spacer()
-      Menu {
-        Link(destination: ProjectLinks.repository) { Label("Open-source repository", systemImage: "chevron.left.forwardslash.chevron.right") }
-        Link(destination: ProjectLinks.issues) { Label("Report a bug…", systemImage: "ladybug") }
-        Link(destination: ProjectLinks.license) { Label("MIT license", systemImage: "doc.text") }
-        Divider()
-        Link(destination: ProjectLinks.koFi) { Label("Support on Ko-fi", systemImage: "heart") }
-        Link(destination: ProjectLinks.x) { Label("Follow @apoorvdarshan on X", systemImage: "person.crop.circle.badge.plus") }
-        Button("Vote on Product Hunt — link coming soon") {}
-          .disabled(true)
-      } label: {
-        Label("Project & support", systemImage: "link")
-      }
-      .controlSize(.small)
       if let version = model.availableUpdateVersion {
         Button(model.isInstallingUpdate ? "Installing…" : "Install \(version)") {
           model.installAvailableUpdate()
@@ -510,6 +499,19 @@ struct PreferencesPanel: View {
           Toggle("", isOn: Binding(get: { model.autoCheckUpdates }, set: { model.setAutoCheckUpdates($0) }))
             .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
         }
+
+        SectionLabel(title: "Project & support", detail: "Open source", separated: true)
+        ProjectLinkRow(icon: "chevron.left.forwardslash.chevron.right", title: "Open-source repository", detail: "View the code on GitHub", url: ProjectLinks.repository)
+        RowDivider()
+        ProjectLinkRow(icon: "ladybug", title: "Report a bug", detail: "Open a GitHub issue", url: ProjectLinks.issues)
+        RowDivider()
+        ProjectLinkRow(icon: "doc.text", title: "MIT license", detail: "Read the open-source license", url: ProjectLinks.license)
+        RowDivider()
+        ProjectLinkRow(icon: "heart", title: "Support on Ko-fi", detail: "Sponsor development", url: ProjectLinks.koFi)
+        RowDivider()
+        ProjectLinkRow(icon: "person.crop.circle.badge.plus", title: "Follow @apoorvdarshan on X", detail: "Developer updates", url: ProjectLinks.x)
+        RowDivider()
+        ProjectLinkRow(icon: "clock", title: "Vote on Product Hunt", detail: "Link coming soon", url: nil)
       }
     }
   }
@@ -661,6 +663,46 @@ struct PreferenceRow<Trailing: View>: View {
     }
     .padding(.horizontal, 14)
     .frame(height: 42)
+  }
+}
+
+struct ProjectLinkRow: View {
+  let icon: String
+  let title: String
+  let detail: String
+  let url: URL?
+
+  var body: some View {
+    Group {
+      if let url {
+        Link(destination: url) { row }
+          .buttonStyle(.plain)
+      } else {
+        row.opacity(0.45)
+      }
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(url == nil ? "\(title), \(detail)" : title)
+  }
+
+  private var row: some View {
+    HStack(spacing: 11) {
+      Image(systemName: icon)
+        .font(.system(size: 14, weight: .medium))
+        .foregroundStyle(url == nil ? Color.secondary : Theme.accent)
+        .frame(width: 22)
+      VStack(alignment: .leading, spacing: 1) {
+        Text(title).font(.system(size: 12.5, weight: .semibold))
+        Text(detail).font(.system(size: 10)).foregroundStyle(.secondary)
+      }
+      Spacer()
+      Image(systemName: url == nil ? "hourglass" : "arrow.up.right")
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(.tertiary)
+    }
+    .padding(.horizontal, 14)
+    .frame(height: 42)
+    .contentShape(Rectangle())
   }
 }
 
