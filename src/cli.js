@@ -93,7 +93,8 @@ function preferences(args) {
 
 function installDesktopApp(args) {
   assertMacOS();
-  installRuntime();
+  const firstInstall = !fs.existsSync(configPath());
+  const runtime = installRuntime();
   const existing = fs.existsSync(configPath()) ? readConfig() : null;
   const config = installConfig({
     hour: existing?.schedule?.hour ?? 9,
@@ -105,6 +106,12 @@ function installDesktopApp(args) {
     installAppLogin({ appPath: destination, bootstrapNow: false });
   } else {
     removeAppLogin();
+  }
+  if (firstInstall) {
+    const cliPath = path.join(runtime, "bin", "brave-codex-cookie-sync.js");
+    installSchedule({ hour: config.schedule.hour, minute: config.schedule.minute, cliPath });
+    installLoginSync({ cliPath });
+    console.log(`Daily sync and sync at login enabled by default at ${pad(config.schedule.hour)}:${pad(config.schedule.minute)}.`);
   }
   console.log(`Installed: ${destination}`);
   console.log("The app is available in your user Applications folder and Spotlight.");

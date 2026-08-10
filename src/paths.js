@@ -8,7 +8,7 @@ export const APP_LOGIN_APP_ID = `${APP_ID}.app-login`;
 export const DEFAULT_PORT = 43128;
 export const EXTENSION_ID = "ihanfnkcipmlhmokbcinlkdfcfheofjb";
 export const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}`;
-export const SOURCE_BROWSERS = ["brave", "chrome", "edge", "arc", "vivaldi", "opera"];
+export const SOURCE_BROWSERS = ["brave", "chrome", "edge", "arc", "vivaldi", "opera", "comet", "atlas"];
 export const TARGET_BROWSERS = [...SOURCE_BROWSERS, "codex"];
 
 export function projectRoot() {

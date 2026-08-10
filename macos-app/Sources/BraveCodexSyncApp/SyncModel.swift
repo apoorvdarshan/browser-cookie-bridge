@@ -23,7 +23,9 @@ final class SyncModel: ObservableObject {
     BrowserChoice(id: "edge", name: "Edge", bundleIdentifier: "com.microsoft.edgemac", applicationName: "Microsoft Edge", extensionURL: "edge://extensions"),
     BrowserChoice(id: "arc", name: "Arc", bundleIdentifier: "company.thebrowser.Browser", applicationName: "Arc", extensionURL: "chrome://extensions"),
     BrowserChoice(id: "vivaldi", name: "Vivaldi", bundleIdentifier: "com.vivaldi.Vivaldi", applicationName: "Vivaldi", extensionURL: "vivaldi://extensions"),
-    BrowserChoice(id: "opera", name: "Opera", bundleIdentifier: "com.operasoftware.Opera", applicationName: "Opera", extensionURL: "opera://extensions")
+    BrowserChoice(id: "opera", name: "Opera", bundleIdentifier: "com.operasoftware.Opera", applicationName: "Opera", extensionURL: "opera://extensions"),
+    BrowserChoice(id: "comet", name: "Comet", bundleIdentifier: "ai.perplexity.comet", applicationName: "Comet", extensionURL: "chrome://extensions"),
+    BrowserChoice(id: "atlas", name: "Atlas", bundleIdentifier: "com.openai.atlas", applicationName: "ChatGPT Atlas", extensionURL: "chrome://extensions")
   ]
 
   @Published var state: State = .ready

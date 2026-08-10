@@ -211,7 +211,7 @@ struct SourcePicker: View {
           .foregroundStyle(Theme.accent)
       }
       .font(.system(size: 8, weight: .bold))
-      LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 5), count: 3), spacing: 5) {
+      LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 5), count: 4), spacing: 5) {
         ForEach(model.browsers) { browser in
           EndpointButton(
             icon: model.browserIcon(browser),
@@ -222,7 +222,7 @@ struct SourcePicker: View {
         }
       }
     }
-    .frame(width: 130)
+    .frame(width: 175)
   }
 }
 
@@ -240,7 +240,7 @@ struct TargetPicker: View {
           .foregroundStyle(Theme.accent)
       }
       .font(.system(size: 8, weight: .bold))
-      LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 5), count: 4), spacing: 5) {
+      LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 5), count: 5), spacing: 5) {
         ForEach(model.browsers) { browser in
           EndpointButton(
             icon: model.browserIcon(browser),
@@ -257,7 +257,7 @@ struct TargetPicker: View {
         ) { model.selectTarget("codex") }
       }
     }
-    .frame(width: 175)
+    .frame(width: 220)
   }
 }
 

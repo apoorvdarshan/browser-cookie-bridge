@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import test from "node:test";
-import { EXTENSION_ID, projectRoot } from "../src/paths.js";
+import { EXTENSION_ID, SOURCE_BROWSERS, projectRoot } from "../src/paths.js";
 
 test("manifest key produces the pinned extension ID", () => {
   const manifest = JSON.parse(
@@ -16,6 +16,11 @@ test("manifest key produces the pinned extension ID", () => {
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.service_worker, "background.js");
   assert.equal(projectRoot().endsWith("brave-codex-cookie-sync"), true);
+});
+
+test("agentic Chromium browsers are available as relay endpoints", () => {
+  assert.equal(SOURCE_BROWSERS.includes("comet"), true);
+  assert.equal(SOURCE_BROWSERS.includes("atlas"), true);
 });
 
 test("browser extension routing is selected dynamically by the broker", () => {
