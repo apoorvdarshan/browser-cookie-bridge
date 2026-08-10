@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#151514" />
+  <meta name="description" content="Browser Cookie Bridge moves cookies and signed-in sessions between Chromium browsers and into ChatGPT Codex—locally on your Mac." />
+  <meta property="og:title" content="Browser Cookie Bridge" />
+  <meta property="og:description" content="Local cookie and session transfer for macOS." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="assets/hero-transfer.webp" />
+  <title>Browser Cookie Bridge — Local session transfer for macOS</title>
+  <link rel="icon" href="assets/favicon.png" type="image/png" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" data-header>
+    <div class="nav-shell">
+      <a class="brand" href="#top" aria-label="Browser Cookie Bridge home">
+        <img src="assets/cookie-logo.png" alt="" width="40" height="40" />
+        <span>Browser Cookie Bridge</span>
+      </a>
+
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
+        <span class="sr-only">Toggle navigation</span>
+        <span></span><span></span>
+      </button>
+
+      <nav class="site-nav" id="site-nav" aria-label="Main navigation" data-nav>
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#safety">Safety</a>
+        <a href="#install">Install</a>
+        <a class="nav-github" href="https://github.com/apoorvdarshan/browser-cookie-bridge" target="_blank" rel="noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .7a11.6 11.6 0 0 0-3.7 22.6c.6.1.8-.3.8-.6v-2.3c-3.4.7-4.1-1.4-4.1-1.4-.5-1.4-1.3-1.7-1.3-1.7-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.3 11.3 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.9.1 3.2.8.9 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A11.6 11.6 0 0 0 12 .7Z" /></svg>
+          GitHub
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-art" aria-hidden="true"></div>
+      <div class="hero-grain" aria-hidden="true"></div>
+      <div class="shell hero-grid">
+        <div class="hero-copy" data-reveal>
+          <div class="eyebrow"><span class="live-dot"></span> Native macOS utility · local beta</div>
+          <h1>Your browser sessions.<br /><em>Across the browsers you use.</em></h1>
+          <p class="hero-lede">Move cookies and signed-in sessions between Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Comet—or import them into ChatGPT Codex. No cloud relay. No cookie logs.</p>
+
+          <div class="hero-actions">
+            <a class="button button-primary" href="#install">Build the Mac app <span aria-hidden="true">↓</span></a>
+            <a class="button button-quiet" href="https://github.com/apoorvdarshan/browser-cookie-bridge" target="_blank" rel="noreferrer">View source <span aria-hidden="true">↗</span></a>
+          </div>
+
+          <div class="hero-meta" aria-label="Project highlights">
+            <span>macOS 13+</span>
+            <span>MIT licensed</span>
+            <span>Open source</span>
+          </div>
+        </div>
+
+        <div class="hero-route" data-reveal data-delay="1">
+          <div class="route-caption">
+            <span>Local transfer</span>
+            <span class="route-status"><i></i> Ready</span>
+          </div>
+          <div class="route-board">
+            <div class="route-endpoint">
+              <span class="route-label">Export from</span>
+              <div class="route-icons route-icons-source">
+                <img src="assets/browsers/brave.svg" alt="Brave" />
+                <img src="assets/browsers/chrome.svg" alt="Chrome" />
+                <img src="assets/browsers/edge.svg" alt="Edge" />
+              </div>
+              <strong>Pick a browser</strong>
+            </div>
+
+            <div class="rail" aria-label="Transfer direction">
+              <span class="rail-line"></span>
+              <img class="rail-cookie" src="assets/cookie-logo.png" alt="" />
+              <span class="rail-arrow">→</span>
+            </div>
+
+            <div class="route-endpoint route-endpoint-destination">
+              <span class="route-label">Import into</span>
+              <div class="route-icons">
+                <img src="assets/browsers/chatgpt-codex.svg" alt="ChatGPT Codex" />
+              </div>
+              <strong>ChatGPT Codex</strong>
+            </div>
+          </div>
+          <div class="route-foot">
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 5v6.3c0 4.8 3.2 9.2 7.5 10.7 4.3-1.5 7.5-5.9 7.5-10.7V5L12 2Zm0 3.1 4.5 1.8v4.4c0 3.2-1.8 6.3-4.5 7.7-2.7-1.4-4.5-4.5-4.5-7.7V6.9L12 5.1Z" /></svg> Data stays on this Mac</span>
+            <span>Cookies on by default</span>
+          </div>
+        </div>
+      </div>
+      <a class="scroll-cue" href="#features"><span>Explore</span><i></i></a>
+    </section>
+
+    <section class="proof-strip" aria-label="Product principles">
+      <div class="shell proof-grid">
+        <div><strong>01</strong><span>Local by design</span></div>
+        <div><strong>02</strong><span>Explicit endpoints</span></div>
+        <div><strong>03</strong><span>Backed up before write</span></div>
+        <div><strong>04</strong><span>No password access</span></div>
+      </div>
+    </section>
+
+    <section class="section intro" id="features">
+      <div class="shell">
+        <div class="section-heading split-heading" data-reveal>
+          <div>
+            <p class="kicker">What it solves</p>
+            <h2>One login.<br />Seven browsers.<br /><span>Zero cloud relay.</span></h2>
+          </div>
+          <p>Signing into the same sites across browser profiles is repetitive. Browser Cookie Bridge gives your local profiles a small, native control panel: choose the source, destination, and data—then move it directly.</p>
+        </div>
+
+        <div class="browser-marquee" data-reveal aria-label="Supported browsers">
+          <div class="browser-track">
+            <article><img src="assets/browsers/brave.svg" alt="" /><span>Brave</span></article>
+            <article><img src="assets/browsers/chrome.svg" alt="" /><span>Chrome</span></article>
+            <article><img src="assets/browsers/edge.svg" alt="" /><span>Edge</span></article>
+            <article><img src="assets/browsers/arc.svg" alt="" /><span>Arc</span></article>
+            <article><img src="assets/browsers/vivaldi.svg" alt="" /><span>Vivaldi</span></article>
+            <article><img src="assets/browsers/opera.svg" alt="" /><span>Opera</span></article>
+            <article><img src="assets/browsers/comet.svg" alt="" /><span>Comet</span></article>
+            <article class="codex-browser"><img src="assets/browsers/chatgpt-codex.svg" alt="" /><span>ChatGPT Codex <small>Import only</small></span></article>
+          </div>
+        </div>
+
+        <div class="feature-stage">
+          <article class="feature-hero" data-reveal>
+            <div class="feature-copy">
+              <p class="feature-index">Source → destination</p>
+              <h3>A route you can see before it runs.</h3>
+              <p>Both endpoints stay visible. The app identifies what connected, what failed, and which browser needs attention—without vague background errors.</p>
+              <ul class="check-list">
+                <li>Cookies enabled by default</li>
+                <li>History is always optional</li>
+                <li>Passwords remain unavailable</li>
+              </ul>
+            </div>
+            <div class="app-shot-wrap">
+              <div class="app-shot-glow"></div>
+              <img src="assets/app-screenshot.webp" alt="Browser Cookie Bridge native macOS interface showing browser endpoints and automation controls" loading="lazy" />
+            </div>
+          </article>
+
+          <div class="feature-pair">
+            <article class="feature-card privacy-card" data-reveal>
+              <div class="card-copy">
+                <span class="card-mark">Local</span>
+                <h3>Your sessions stay on your Mac.</h3>
+                <p>The broker binds to loopback, holds browser-to-browser payloads in memory, and never writes cookie values to logs.</p>
+              </div>
+              <img src="assets/local-privacy.webp" alt="Browser Cookie Bridge privacy artwork" loading="lazy" />
+            </article>
+
+            <article class="feature-card automation-card" data-reveal data-delay="1">
+              <div class="card-copy">
+                <span class="card-mark">Quietly capable</span>
+                <h3>Sync when it fits your routine.</h3>
+                <p>Run on demand, once at login, or at a fixed local time. Closing the window keeps the menu-bar helper available.</p>
+              </div>
+              <img src="assets/automation.webp" alt="Browser Cookie Bridge automation artwork" loading="lazy" />
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section process-section" id="how-it-works">
+      <div class="shell">
+        <div class="section-heading process-heading" data-reveal>
+          <p class="kicker">How it works</p>
+          <h2>Three deliberate steps.<br />No hidden sync.</h2>
+        </div>
+
+        <div class="process-list">
+          <article data-reveal>
+            <div class="process-number">1</div>
+            <div><h3>Choose both endpoints</h3><p>Select a source browser and a different browser—or ChatGPT Codex—as the destination.</p></div>
+            <span class="process-note">Saved automatically</span>
+          </article>
+          <article data-reveal>
+            <div class="process-number">2</div>
+            <div><h3>Choose what moves</h3><p>Cookies preserve supported attributes. History URLs are optional. Passwords and Keychain data stay untouched.</p></div>
+            <span class="process-note">Cookies default on</span>
+          </article>
+          <article data-reveal>
+            <div class="process-number">3</div>
+            <div><h3>Review the result</h3><p>Success, partial transfer, blocked state, and endpoint errors are surfaced in the app and menu bar.</p></div>
+            <span class="process-note">Actionable status</span>
+          </article>
+        </div>
+
+        <div class="codex-callout" data-reveal>
+          <div class="codex-icon"><img src="assets/browsers/chatgpt-codex.svg" alt="" /></div>
+          <div>
+            <p class="kicker">Codex destination</p>
+            <h3>Close Codex. Transfer. Reopen.</h3>
+            <p>Codex must be completely closed so its local SQLite database can be backed up and replaced safely. The app blocks the write while Codex is running and never force-quits it.</p>
+          </div>
+          <a href="#faq">Why is this required? <span>↓</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section safety-section" id="safety">
+      <div class="shell safety-grid">
+        <div class="safety-copy" data-reveal>
+          <p class="kicker">Safety before convenience</p>
+          <h2>Cookies are credentials.<br /><span>The app treats them that way.</span></h2>
+          <p>Codex transfers work on a separate copy, run SQLite integrity checks, and replace the destination only after validation. If replacement fails, the original backup is restored.</p>
+          <a class="text-link" href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">Read the security policy <span>↗</span></a>
+        </div>
+
+        <div class="safety-ledger" data-reveal data-delay="1">
+          <div class="ledger-head"><span>Transfer ledger</span><span>Policy</span></div>
+          <div><span>Cookie values in logs</span><strong>Never</strong></div>
+          <div><span>Password-store access</span><strong>Never</strong></div>
+          <div><span>Remote relay</span><strong>None</strong></div>
+          <div><span>Codex pre-change backup</span><strong>Always</strong></div>
+          <div><span>Unknown database schema</span><strong>Fail closed</strong></div>
+          <div><span>Backups retained</span><strong>14 newest</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section data-section">
+      <div class="shell">
+        <div class="section-heading data-heading" data-reveal>
+          <p class="kicker">Transfer support</p>
+          <h2>Exactly what moves—and what never does.</h2>
+        </div>
+        <div class="data-table" data-reveal>
+          <div class="data-row data-row-head"><span>Data</span><span>Support</span><span>What to expect</span></div>
+          <div class="data-row"><strong>Cookies & sessions</strong><span><i class="status-dot status-on"></i> Default</span><p>Supported values, domain, path, expiry, security, SameSite, and partition attributes.</p></div>
+          <div class="data-row"><strong>History URLs</strong><span><i class="status-dot status-partial"></i> Optional</span><p>URLs transfer; original visit times and page titles cannot be preserved.</p></div>
+          <div class="data-row"><strong>Passwords</strong><span><i class="status-dot"></i> Never</span><p>Chromium extensions cannot read the browser password store.</p></div>
+          <div class="data-row"><strong>Bookmarks & autofill</strong><span><i class="status-dot"></i> Never</span><p>Bookmarks, payment data, autofill, and iCloud Keychain remain untouched.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section install-section" id="install">
+      <div class="shell install-grid">
+        <div class="install-copy" data-reveal>
+          <p class="kicker">Install locally</p>
+          <h2>Build it on your Mac.<br />Know exactly what runs.</h2>
+          <p>Browser Cookie Bridge is open source and currently in local beta. The native SwiftUI app builds into your user Applications folder—no administrator password required.</p>
+          <div class="requirements">
+            <span>macOS 13+</span><span>Node.js 22.5+</span><span>Xcode CLI tools</span>
+          </div>
+        </div>
+
+        <div class="terminal" data-reveal data-delay="1">
+          <div class="terminal-bar"><span class="terminal-dots"><i></i><i></i><i></i></span><span>Terminal — install</span><span></span></div>
+          <div class="install-tabs" role="tablist" aria-label="Installation method">
+            <button type="button" role="tab" aria-selected="true" aria-controls="source-panel" id="source-tab" data-install-tab="source">From source</button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="npm-panel" id="npm-tab" data-install-tab="npm">npm <small>after release</small></button>
+          </div>
+          <div class="terminal-panel" id="source-panel" role="tabpanel" aria-labelledby="source-tab" data-install-panel="source">
+            <pre><code><span class="prompt">$</span> git clone https://github.com/apoorvdarshan/browser-cookie-bridge.git
+<span class="prompt">$</span> cd browser-cookie-bridge
+<span class="prompt">$</span> npm test
+<span class="prompt">$</span> npm run build:app</code></pre>
+            <button class="copy-button" type="button" data-copy="git clone https://github.com/apoorvdarshan/browser-cookie-bridge.git&#10;cd browser-cookie-bridge&#10;npm test&#10;npm run build:app"><span>Copy commands</span></button>
+          </div>
+          <div class="terminal-panel" id="npm-panel" role="tabpanel" aria-labelledby="npm-tab" data-install-panel="npm" hidden>
+            <pre><code><span class="prompt">$</span> npx browser-cookie-bridge install-app</code></pre>
+            <p class="terminal-note">The npm package will become available with the first tagged public release.</p>
+            <button class="copy-button" type="button" data-copy="npx browser-cookie-bridge install-app"><span>Copy command</span></button>
+          </div>
+          <div class="terminal-result"><span>→</span> Installs to ~/Applications/Browser Cookie Bridge.app</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section faq-section" id="faq">
+      <div class="shell faq-grid">
+        <div class="faq-heading" data-reveal>
+          <p class="kicker">Straight answers</p>
+          <h2>Before you move a session.</h2>
+          <p>Still unsure? Open a GitHub issue without including cookie values, tokens, or private browser data.</p>
+          <a class="text-link" href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml" target="_blank" rel="noreferrer">Report a bug <span>↗</span></a>
+        </div>
+
+        <div class="faq-list" data-reveal data-delay="1">
+          <details open><summary>Why must Codex be closed?<span></span></summary><p>Codex can overwrite or ignore offline database changes while its Chromium process is running. The app blocks direct import until Codex is completely closed so it can back up, validate, and replace the database safely.</p></details>
+          <details><summary>Do other browsers need to be closed?<span></span></summary><p>No for extension-based browser-to-browser transfers. Those browsers should be open so their installed extensions can receive the request. Codex is the exception because it uses a direct local database merge.</p></details>
+          <details><summary>Does this move passwords?<span></span></summary><p>No. Browser extensions cannot access Chromium's password store. Browser Cookie Bridge does not access passwords, Keychain items, payment data, bookmarks, or autofill.</p></details>
+          <details><summary>Does it overwrite all destination cookies?<span></span></summary><p>The importer merges selected records using their cookie identity fields. Existing unrelated destination cookies remain in place. Codex is backed up before any replacement.</p></details>
+          <details><summary>Will every website stay signed in?<span></span></summary><p>Not always. Some sites bind sessions to a device, browser, IP address, or other risk signals and may ask you to sign in again.</p></details>
+          <details><summary>Is the npm package live?<span></span></summary><p>Not yet. The release workflow is ready, but the first public package has not been published. Build from source for now.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing-cta">
+      <div class="shell" data-reveal>
+        <img src="assets/cookie-logo.png" alt="" width="116" height="116" />
+        <p class="kicker">Local. Explicit. Open source.</p>
+        <h2>Bridge the browser you use<br />to the browser you need.</h2>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#install">Build the app</a>
+          <a class="button button-quiet" href="https://github.com/apoorvdarshan/browser-cookie-bridge" target="_blank" rel="noreferrer">Star on GitHub <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="#top"><img src="assets/cookie-logo.png" alt="" width="44" height="44" /><span>Browser Cookie Bridge</span></a>
+        <p>Local cookie and session transfer for macOS.</p>
+        <span>MIT licensed · © <span data-year>2026</span> Apoorv Darshan</span>
+      </div>
+      <div class="footer-column"><strong>Project</strong><a href="https://github.com/apoorvdarshan/browser-cookie-bridge">GitHub</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge#readme">Documentation</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/CONTRIBUTING.md">Contributing</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">Security</a></div>
+      <div class="footer-column"><strong>Support</strong><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a><a href="https://ko-fi.com/apoorvdarshan">Ko-fi</a><a href="https://x.com/apoorvdarshan">Follow on X</a><span class="muted-link">Product Hunt · soon</span></div>
+      <div class="footer-column"><strong>Legal</strong><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/LICENSE">MIT License</a></div>
+    </div>
+    <div class="shell footer-note">Not affiliated with Brave, Google, Microsoft, The Browser Company, Vivaldi, Opera, Perplexity, or OpenAI. Their names and marks belong to their respective owners.</div>
+  </footer>
+</body>
+</html>

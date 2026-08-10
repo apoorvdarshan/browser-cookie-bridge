@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en" class="legal-page">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f5f1e9" />
+  <meta name="description" content="Privacy policy for Browser Cookie Bridge." />
+  <title>Privacy — Browser Cookie Bridge</title>
+  <link rel="icon" href="assets/favicon.png" type="image/png" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="script.js" defer></script>
+</head>
+<body class="legal-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header is-scrolled" data-header>
+    <div class="nav-shell">
+      <a class="brand" href="index.html"><img src="assets/cookie-logo.png" alt="" width="40" height="40" /><span>Browser Cookie Bridge</span></a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle><span class="sr-only">Toggle navigation</span><span></span><span></span></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main navigation" data-nav>
+        <a href="index.html#features">Features</a><a href="index.html#safety">Safety</a><a href="terms.html">Terms</a>
+        <a class="nav-github" href="https://github.com/apoorvdarshan/browser-cookie-bridge" target="_blank" rel="noreferrer">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="legal-hero">
+      <div class="shell">
+        <p class="kicker">Policy</p>
+        <h1>Privacy, in plain language.</h1>
+        <p>Browser Cookie Bridge is built to move selected browser data locally. The app has no user account, analytics SDK, cloud relay, or developer-operated cookie database.</p>
+        <div class="legal-meta">Effective August 10, 2026 · Version 1.0</div>
+      </div>
+    </section>
+
+    <div class="shell legal-layout">
+      <aside class="legal-toc" aria-label="On this page">
+        <strong>On this page</strong>
+        <a href="#summary">Summary</a><a href="#app-data">Data handled by the app</a><a href="#website">Website data</a><a href="#storage">Local storage</a><a href="#sharing">Sharing</a><a href="#choices">Your choices</a><a href="#security">Security</a><a href="#changes">Changes</a><a href="#contact">Contact</a>
+      </aside>
+
+      <article class="legal-content">
+        <section id="summary">
+          <h2>Summary</h2>
+          <div class="legal-callout"><p><strong>The short version:</strong> selected cookie and history data is processed on your Mac for the transfer you request. Browser Cookie Bridge does not send that browser data to the developer or a hosted service.</p></div>
+        </section>
+
+        <section id="app-data">
+          <h2>Data handled by the app</h2>
+          <p>When you run a transfer, Browser Cookie Bridge may process the following data locally:</p>
+          <ul>
+            <li>Cookie values and supported attributes such as domain, path, expiry, security, SameSite, and partition information</li>
+            <li>History URLs, when you explicitly enable history transfer</li>
+            <li>Source and destination browser choices</li>
+            <li>Automation and interface preferences, including login sync, daily time, menu-bar visibility, and update checks</li>
+            <li>Local technical status needed to complete a transfer, such as whether a selected endpoint connected or Codex is running</li>
+          </ul>
+          <p>The app does not access browser passwords, bookmarks, autofill, payment information, iCloud Keychain, or unrelated files.</p>
+
+          <h3>Browser-to-browser transfer</h3>
+          <p>Selected data passes through a short-lived broker bound to IPv4 loopback. The broker holds transfer payloads in memory, requires a random local token and expected extension origin, and does not write cookie values or history URLs to logs.</p>
+
+          <h3>ChatGPT Codex import</h3>
+          <p>For a Codex destination, the app reads the selected local Chromium profile and works with Codex's local SQLite data while Codex is closed. It creates a backup and a separate working copy, validates the result, and replaces the destination only after integrity checks pass.</p>
+        </section>
+
+        <section id="website">
+          <h2>Website data</h2>
+          <p>This static website does not set advertising cookies, use behavioral analytics, embed trackers, or collect form submissions. It links to GitHub, Ko-fi, X, and other external services only when you choose to follow those links.</p>
+          <p>The service that hosts this website may receive standard request information such as your IP address, browser user agent, requested page, and timestamp. That processing is controlled by the hosting provider's own policy.</p>
+        </section>
+
+        <section id="storage">
+          <h2>Local storage and retention</h2>
+          <p>Configuration, generated extensions, the pinned runtime, and Codex backups are stored under <code>~/Library/Application Support/BraveCodexCookieSync/</code>. Configuration and generated token files use user-only filesystem permissions.</p>
+          <p>The newest 14 Codex pre-change backups are retained. You control the Mac account and can remove local app data by uninstalling the app and deleting its Application Support folder after confirming you no longer need the backups.</p>
+        </section>
+
+        <section id="sharing">
+          <h2>Sharing and sale</h2>
+          <p>Browser Cookie Bridge does not sell personal information. It does not send cookie values, history URLs, generated tokens, or browser databases to the developer, advertisers, data brokers, or a remote relay.</p>
+          <p>Your selected destination browser receives the data you explicitly transfer. The destination browser and websites you visit remain governed by their own privacy practices.</p>
+        </section>
+
+        <section id="choices">
+          <h2>Your choices</h2>
+          <ul>
+            <li>Cookies can be turned off, although they are enabled by default.</li>
+            <li>History transfer is optional and disabled by default.</li>
+            <li>Daily sync can remain off or run at a local time you choose.</li>
+            <li>Sync at login, Open at login, menu-bar visibility, and automatic update checks can each be disabled.</li>
+            <li>You decide which source and destination browsers participate.</li>
+            <li>You can stop using the app and remove its local files at any time.</li>
+          </ul>
+        </section>
+
+        <section id="security">
+          <h2>Security</h2>
+          <p>Cookies are credentials. Protect your macOS account, use only profiles you own and trust, and never share generated extension folders or backups. Imported Codex cookies can remain readable to software running as your macOS user until the relevant website refreshes them.</p>
+          <p>For the full threat model and private vulnerability reporting instructions, read the <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">Security Policy</a>.</p>
+        </section>
+
+        <section id="children">
+          <h2>Children</h2>
+          <p>Browser Cookie Bridge is a developer utility and is not directed to children. The project does not knowingly collect personal information from children.</p>
+        </section>
+
+        <section id="changes">
+          <h2>Changes to this policy</h2>
+          <p>This policy may change when the app's behavior or distribution changes. Material updates will be committed to the public repository, and the effective date above will be revised.</p>
+        </section>
+
+        <section id="contact">
+          <h2>Contact</h2>
+          <p>For general privacy questions, open a <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues">GitHub issue</a> without including private browser data. For a suspected vulnerability, use the private process in <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">SECURITY.md</a> and do not post it publicly.</p>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <div class="footer-brand"><a class="brand" href="index.html"><img src="assets/cookie-logo.png" alt="" width="44" height="44" /><span>Browser Cookie Bridge</span></a><p>Local cookie and session transfer for macOS.</p><span>MIT licensed · © <span data-year>2026</span> Apoorv Darshan</span></div>
+      <div class="footer-column"><strong>Project</strong><a href="https://github.com/apoorvdarshan/browser-cookie-bridge">GitHub</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge#readme">Documentation</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">Security</a></div>
+      <div class="footer-column"><strong>Support</strong><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a><a href="https://ko-fi.com/apoorvdarshan">Ko-fi</a><a href="https://x.com/apoorvdarshan">Follow on X</a></div>
+      <div class="footer-column"><strong>Legal</strong><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/LICENSE">MIT License</a></div>
+    </div>
+  </footer>
+</body>
+</html>

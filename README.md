@@ -204,6 +204,14 @@ If Browser Cookie Bridge is useful to you:
 
 Product screenshots, the transparent cookie logo, and launch artwork live in [`marketing/`](marketing/).
 
+## Website
+
+The product landing page, documentation overview, Privacy Policy, and Terms live in [`web/`](web/). Preview them locally at `http://localhost:3000`:
+
+```bash
+npm run web
+```
+
 ## License
 
 [MIT](LICENSE) © 2026 [Apoorv Darshan](https://github.com/apoorvdarshan)
