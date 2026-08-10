@@ -39,7 +39,7 @@ export function appLoginLaunchAgentPath(home = os.homedir()) {
 }
 
 export function installedAppPath(home = os.homedir()) {
-  return path.join(home, "Applications", "Brave Codex Sync.app");
+  return path.join(home, "Applications", "Browser ChatGPT Sync.app");
 }
 
 export function braveCookiePaths(home = os.homedir()) {

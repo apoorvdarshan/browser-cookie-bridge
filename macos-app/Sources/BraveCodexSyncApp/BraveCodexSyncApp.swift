@@ -7,10 +7,10 @@ struct BraveCodexSyncApp: App {
   @StateObject private var model = SyncModel()
 
   var body: some Scene {
-    Window("Brave Codex Sync", id: "main") {
+    Window("Browser ChatGPT Sync", id: "main") {
       ContentView(appDelegate: appDelegate)
         .environmentObject(model)
-        .frame(width: 560, height: 682)
+        .frame(width: 590, height: 646)
         .background(AppBackground())
     }
     .windowResizability(.contentSize)
@@ -60,9 +60,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     if enabled {
       guard statusItem == nil else { return }
       let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-      item.button?.image = NSImage(systemSymbolName: "arrow.left.arrow.right.circle.fill", accessibilityDescription: "Browser to Codex")
+      item.button?.image = NSImage(systemSymbolName: "arrow.left.arrow.right.circle.fill", accessibilityDescription: "Browser to ChatGPT")
       let menu = NSMenu()
-      menu.addItem(withTitle: "Show Browser → Codex", action: #selector(showMainWindowAction), keyEquivalent: "")
+      menu.addItem(withTitle: "Show Browser → ChatGPT", action: #selector(showMainWindowAction), keyEquivalent: "")
       menu.addItem(withTitle: "Sync now", action: #selector(syncNowAction), keyEquivalent: "")
       menu.addItem(.separator())
       menu.addItem(withTitle: "Quit", action: #selector(quitAction), keyEquivalent: "q")
@@ -96,13 +96,13 @@ struct ContentView: View {
   let appDelegate: AppDelegate
 
   var body: some View {
-    VStack(spacing: 14) {
+    VStack(spacing: 12) {
       header
       SyncPanel()
       PreferencesPanel()
       footer
     }
-    .padding(20)
+    .padding(18)
     .onAppear {
       appDelegate.attach(model: model)
       model.refresh()
@@ -121,7 +121,7 @@ struct ContentView: View {
         .frame(width: 36, height: 36)
         .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
       VStack(alignment: .leading, spacing: 1) {
-        Text("Browser → Codex")
+        Text("Browser → ChatGPT")
           .font(.system(size: 19, weight: .bold, design: .rounded))
         Text("Local browser data sync")
           .font(.system(size: 11.5, weight: .medium))
@@ -160,10 +160,10 @@ struct SyncPanel: View {
   var body: some View {
     Surface {
       VStack(spacing: 14) {
-        HStack(spacing: 14) {
-          sourcePicker
+        HStack(spacing: 12) {
+          BrowserRail()
           RelayPath(active: model.isSyncing)
-          EndpointBadge(icon: model.codexIcon, eyebrow: "DESTINATION", title: "Codex")
+          DestinationBadge(chatGPTIcon: model.chatGPTIcon, codexIcon: model.codexIcon)
         }
         Divider().opacity(0.65)
         HStack(spacing: 12) {
@@ -187,7 +187,7 @@ struct SyncPanel: View {
             .frame(minWidth: 92)
           }
           .buttonStyle(.borderedProminent)
-          .tint(Theme.blue)
+          .tint(Theme.accent)
           .disabled(model.isSyncing)
           .keyboardShortcut(.return, modifiers: .command)
         }
@@ -195,30 +195,87 @@ struct SyncPanel: View {
     }
   }
 
-  private var sourcePicker: some View {
-    Menu {
-      ForEach(model.browsers) { browser in
-        Button {
-          model.selectSource(browser.id)
-        } label: {
-          HStack {
+}
+
+struct BrowserRail: View {
+  @EnvironmentObject private var model: SyncModel
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack {
+        Text("SOURCE BROWSER")
+          .tracking(0.65)
+          .foregroundStyle(.tertiary)
+        Spacer()
+        Text(model.selectedBrowser.name)
+          .foregroundStyle(Theme.accent)
+      }
+      .font(.system(size: 8, weight: .bold))
+      .frame(width: 236)
+      HStack(spacing: 4) {
+        ForEach(model.browsers) { browser in
+          Button {
+            model.selectSource(browser.id)
+          } label: {
             Image(nsImage: model.browserIcon(browser))
-            Text(browser.name)
-            if browser.id == model.selectedSourceID { Image(systemName: "checkmark") }
+              .resizable()
+              .scaledToFit()
+              .frame(width: 29, height: 29)
+              .frame(width: 36, height: 36)
+              .background(
+                model.selectedSourceID == browser.id ? Theme.accent.opacity(0.12) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+              )
+              .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                  .stroke(model.selectedSourceID == browser.id ? Theme.accent.opacity(0.75) : Color.primary.opacity(0.06), lineWidth: 1)
+              )
           }
+          .buttonStyle(.plain)
+          .disabled(model.isWorking || model.isSyncing)
+          .help(browser.name)
+          .accessibilityLabel(browser.name)
+          .accessibilityAddTraits(model.selectedSourceID == browser.id ? .isSelected : [])
         }
       }
-    } label: {
-      EndpointBadge(
-        icon: model.sourceIcon,
-        eyebrow: "SOURCE",
-        title: model.selectedBrowser.name,
-        showsChevron: true
-      )
     }
-    .menuStyle(.borderlessButton)
+  }
+}
+
+struct DestinationBadge: View {
+  let chatGPTIcon: NSImage
+  let codexIcon: NSImage
+
+  var body: some View {
+    HStack(spacing: 8) {
+      HStack(spacing: -9) {
+        AppLogo(icon: chatGPTIcon)
+        AppLogo(icon: codexIcon)
+      }
+      VStack(alignment: .leading, spacing: 0) {
+        Text("DESTINATION")
+          .font(.system(size: 8, weight: .bold))
+          .tracking(0.65)
+          .foregroundStyle(.tertiary)
+        Text("ChatGPT Codex")
+          .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+          .lineLimit(1)
+      }
+    }
     .fixedSize()
-    .disabled(model.isWorking || model.isSyncing)
+  }
+}
+
+struct AppLogo: View {
+  let icon: NSImage
+
+  var body: some View {
+    Image(nsImage: icon)
+      .resizable()
+      .scaledToFit()
+      .frame(width: 38, height: 38)
+      .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.primary.opacity(0.09)))
   }
 }
 
@@ -229,14 +286,14 @@ struct PreferencesPanel: View {
     Surface(padding: 0) {
       VStack(spacing: 0) {
         SectionLabel(title: "Sync data", detail: "Saved automatically")
-        PreferenceRow(icon: "network", color: Theme.blue, title: "Cookies", detail: "Site sessions and sign-ins") {
+        PreferenceRow(icon: "network", color: Theme.accent, title: "Cookies", detail: "Site sessions and sign-ins") {
           Toggle("", isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.blue).disabled(model.isWorking)
+            .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
         }
         RowDivider()
-        PreferenceRow(icon: "clock.arrow.circlepath", color: Theme.teal, title: "History URLs", detail: "Original visit times are not preserved") {
+        PreferenceRow(icon: "clock.arrow.circlepath", color: Theme.accent, title: "History URLs", detail: "Original visit times are not preserved") {
           Toggle("", isOn: Binding(get: { model.historyEnabled }, set: { model.setHistoryEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.teal).disabled(model.isWorking)
+            .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
         }
         RowDivider()
         PreferenceRow(icon: "key.slash", color: .secondary, title: "Passwords", detail: "Browser extensions cannot access passwords", muted: true) {
@@ -248,7 +305,7 @@ struct PreferencesPanel: View {
         }
 
         SectionLabel(title: "Automation", detail: "Runs in the background", separated: true)
-        PreferenceRow(icon: "clock.badge.checkmark", color: Theme.blue, title: "Daily sync", detail: model.dailyEnabled ? "At the selected local time" : "Off") {
+        PreferenceRow(icon: "clock.badge.checkmark", color: Theme.accent, title: "Daily sync", detail: model.dailyEnabled ? "At the selected local time" : "Off") {
           HStack(spacing: 8) {
             DatePicker("", selection: $model.scheduleTime, displayedComponents: .hourAndMinute)
               .labelsHidden()
@@ -258,23 +315,23 @@ struct PreferencesPanel: View {
                 if model.dailyEnabled && !model.isWorking { model.saveSchedule() }
               }
             Toggle("", isOn: Binding(get: { model.dailyEnabled }, set: { model.setDailyEnabled($0) }))
-              .labelsHidden().toggleStyle(.switch).tint(Theme.teal).disabled(model.isWorking)
+              .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
           }
         }
         RowDivider()
-        PreferenceRow(icon: "sunrise.fill", color: Theme.coral, title: "Sync at login", detail: model.loginSyncEnabled ? "Once whenever you sign in" : "Off") {
+        PreferenceRow(icon: "sunrise.fill", color: Theme.accent, title: "Sync at login", detail: model.loginSyncEnabled ? "Once whenever you sign in" : "Off") {
           Toggle("", isOn: Binding(get: { model.loginSyncEnabled }, set: { model.setLoginSyncEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.coral).disabled(model.isWorking)
+            .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
         }
         RowDivider()
-        PreferenceRow(icon: "power", color: Theme.teal, title: "Open at login", detail: "Start the app after you sign in") {
+        PreferenceRow(icon: "power", color: Theme.accent, title: "Open at login", detail: "Start the app after you sign in") {
           Toggle("", isOn: Binding(get: { model.openAtLogin }, set: { model.setOpenAtLogin($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.teal).disabled(model.isWorking)
+            .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
         }
         RowDivider()
-        PreferenceRow(icon: "menubar.rectangle", color: Theme.blue, title: "Show in menu bar", detail: "Quick access while the app is running") {
+        PreferenceRow(icon: "menubar.rectangle", color: Theme.accent, title: "Show in menu bar", detail: "Quick access while the app is running") {
           Toggle("", isOn: Binding(get: { model.menuBarEnabled }, set: { model.setMenuBarEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.blue).disabled(model.isWorking)
+            .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
         }
       }
     }
@@ -290,9 +347,9 @@ struct ExtensionSetupSheet: View {
       HStack(alignment: .top, spacing: 12) {
         Image(systemName: "puzzlepiece.extension.fill")
           .font(.system(size: 24, weight: .semibold))
-          .foregroundStyle(Theme.blue)
+          .foregroundStyle(Theme.accent)
           .frame(width: 38, height: 38)
-          .background(Theme.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+          .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         VStack(alignment: .leading, spacing: 3) {
           Text("Extension setup").font(.system(size: 18, weight: .bold, design: .rounded))
           Text("Load each folder once. The app handles syncing after that.")
@@ -308,7 +365,7 @@ struct ExtensionSetupSheet: View {
           Button("Show folder") { model.revealExtension(model.selectedSourceID) }
         }
         Divider().padding(.leading, 58)
-        SetupEndpointRow(icon: model.codexIcon, title: "Codex", detail: "Load the destination extension") {
+        SetupEndpointRow(icon: model.codexIcon, title: "ChatGPT Codex", detail: "Load the destination extension") {
           Button("Show folder") { model.revealExtension("codex") }
         }
       }
@@ -337,7 +394,7 @@ struct AppBackground: View {
     ZStack {
       Color(nsColor: .windowBackgroundColor)
       LinearGradient(
-        colors: [Theme.blue.opacity(0.035), Color.clear, Theme.teal.opacity(0.025)],
+        colors: [Theme.accent.opacity(0.035), Color.clear, Theme.accent.opacity(0.012)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
       )
@@ -353,34 +410,8 @@ struct Surface<Content: View>: View {
     content
       .padding(padding)
       .background(Color(nsColor: .controlBackgroundColor).opacity(0.74))
-      .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-      .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.primary.opacity(0.075)))
-  }
-}
-
-struct EndpointBadge: View {
-  let icon: NSImage
-  let eyebrow: String
-  let title: String
-  var showsChevron = false
-
-  var body: some View {
-    HStack(spacing: 9) {
-      Image(nsImage: icon).resizable().scaledToFit().frame(width: 32, height: 32)
-      VStack(alignment: .leading, spacing: 0) {
-        Text(eyebrow)
-          .font(.system(size: 8, weight: .bold))
-          .tracking(0.6)
-          .foregroundStyle(.tertiary)
-        HStack(spacing: 4) {
-          Text(title).font(.system(size: 13, weight: .semibold, design: .rounded))
-          if showsChevron {
-            Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary)
-          }
-        }
-      }
-    }
-    .frame(minWidth: 105, alignment: .leading)
+      .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.075)))
   }
 }
 
@@ -390,17 +421,17 @@ struct RelayPath: View {
   var body: some View {
     ZStack {
       Capsule()
-        .fill(LinearGradient(colors: [Theme.coral.opacity(0.42), Theme.blue.opacity(0.65), Theme.teal.opacity(0.45)], startPoint: .leading, endPoint: .trailing))
+        .fill(Theme.accent.opacity(0.38))
         .frame(height: 3)
       Image(systemName: active ? "ellipsis" : "arrow.right")
         .font(.system(size: 10, weight: .bold))
         .foregroundStyle(.white)
         .frame(width: 24, height: 24)
-        .background(Theme.blue, in: Circle())
-        .shadow(color: Theme.blue.opacity(0.25), radius: 5, y: 2)
+        .background(Theme.accent, in: Circle())
+        .shadow(color: Theme.accent.opacity(0.22), radius: 5, y: 2)
     }
     .frame(maxWidth: .infinity)
-    .accessibilityLabel(active ? "Sync in progress" : "Syncs to Codex")
+    .accessibilityLabel(active ? "Sync in progress" : "Syncs to ChatGPT Codex")
   }
 }
 
@@ -447,7 +478,7 @@ struct PreferenceRow<Trailing: View>: View {
       trailing
     }
     .padding(.horizontal, 14)
-    .frame(height: 45)
+    .frame(height: 42)
   }
 }
 
@@ -474,7 +505,7 @@ struct StatusIndicator: View {
   }
 
   private var color: Color {
-    switch state { case .ready: Theme.blue; case .syncing: Theme.coral; case .success: Theme.teal; case .error: .red }
+    switch state { case .ready, .syncing, .success: Theme.accent; case .error: .red }
   }
 }
 
@@ -504,14 +535,12 @@ struct SetupStateBadge: View {
   var body: some View {
     Text(ready ? "Folders ready" : "Setup needed")
       .font(.system(size: 10, weight: .semibold))
-      .foregroundStyle(ready ? Theme.teal : .secondary)
+      .foregroundStyle(ready ? Theme.accent : .secondary)
       .padding(.horizontal, 8).padding(.vertical, 5)
-      .background((ready ? Theme.teal : Color.secondary).opacity(0.1), in: Capsule())
+      .background((ready ? Theme.accent : Color.secondary).opacity(0.1), in: Capsule())
   }
 }
 
 enum Theme {
-  static let blue = Color(red: 0.20, green: 0.49, blue: 0.96)
-  static let teal = Color(red: 0.06, green: 0.64, blue: 0.50)
-  static let coral = Color(red: 0.98, green: 0.33, blue: 0.19)
+  static let accent = Color(red: 0.27, green: 0.47, blue: 0.96)
 }

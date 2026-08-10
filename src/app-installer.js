@@ -18,7 +18,7 @@ export function installApp({ home = os.homedir(), open = true } = {}) {
     "--show-bin-path",
   ]).trim();
 
-  const staging = path.join(appSupportDir(home), "app-build", "Brave Codex Sync.app");
+  const staging = path.join(appSupportDir(home), "app-build", "Browser ChatGPT Sync.app");
   const contents = path.join(staging, "Contents");
   const macos = path.join(contents, "MacOS");
   const resources = path.join(contents, "Resources");
@@ -28,7 +28,7 @@ export function installApp({ home = os.homedir(), open = true } = {}) {
   fs.copyFileSync(path.join(binPath, "BraveCodexSyncApp"), path.join(macos, "BraveCodexSyncApp"));
   fs.chmodSync(path.join(macos, "BraveCodexSyncApp"), 0o755);
   fs.copyFileSync(path.join(packagePath, "Info.plist"), path.join(contents, "Info.plist"));
-  fs.copyFileSync(path.join(packagePath, "Resources", "AppIcon.icns"), path.join(resources, "AppIcon.icns"));
+  fs.cpSync(path.join(packagePath, "Resources"), resources, { recursive: true, force: true });
 
   run("codesign", ["--force", "--deep", "--sign", "-", staging]);
 
@@ -36,6 +36,8 @@ export function installApp({ home = os.homedir(), open = true } = {}) {
   fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o755 });
   fs.rmSync(destination, { recursive: true, force: true });
   fs.cpSync(staging, destination, { recursive: true, force: true });
+  const legacyDestination = path.join(home, "Applications", "Brave Codex Sync.app");
+  if (legacyDestination !== destination) fs.rmSync(legacyDestination, { recursive: true, force: true });
   run("xattr", ["-dr", "com.apple.quarantine", destination], { allowFailure: true });
   if (open) run("open", [destination]);
   return destination;

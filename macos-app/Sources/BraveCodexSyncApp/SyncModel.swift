@@ -52,11 +52,19 @@ final class SyncModel: ObservableObject {
     browsers.first(where: { $0.id == selectedSourceID }) ?? browsers[0]
   }
 
-  var sourceIcon: NSImage { appIcon(bundleIdentifier: selectedBrowser.bundleIdentifier, fallbackSymbol: "globe") }
-  var codexIcon: NSImage { appIcon(bundleIdentifier: "com.openai.codex", fallbackSymbol: "sparkles") }
+  var sourceIcon: NSImage { browserIcon(selectedBrowser) }
+  var chatGPTIcon: NSImage { chatGPTResource("electron.icns") ?? appIcon(bundleIdentifier: "com.openai.codex", fallbackSymbol: "sparkles") }
+  var codexIcon: NSImage { chatGPTResource("app.icns") ?? appIcon(bundleIdentifier: "com.openai.codex", fallbackSymbol: "terminal") }
 
   func browserIcon(_ browser: BrowserChoice) -> NSImage {
-    appIcon(bundleIdentifier: browser.bundleIdentifier, fallbackSymbol: "globe")
+    if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: browser.bundleIdentifier) {
+      return NSWorkspace.shared.icon(forFile: appURL.path)
+    }
+    if let bundled = Bundle.main.url(forResource: browser.id, withExtension: "svg", subdirectory: "BrowserIcons"),
+       let image = NSImage(contentsOf: bundled) {
+      return image
+    }
+    return appIcon(bundleIdentifier: browser.bundleIdentifier, fallbackSymbol: "globe")
   }
 
   init() {
@@ -115,14 +123,14 @@ final class SyncModel: ObservableObject {
     isSyncing = true
     state = .syncing
     primaryStatus = "Transferring selected data"
-    secondaryStatus = "Waiting for \(selectedBrowser.name) and Codex extensions…"
+    secondaryStatus = "Waiting for \(selectedBrowser.name) and ChatGPT Codex…"
     runCLI(["sync", "--timeout", "300"]) { [weak self] success, output in
       guard let self else { return }
       self.isSyncing = false
       if success {
         self.state = .success
         self.primaryStatus = "Browser sync complete"
-        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and Codex are up to date"
+        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and ChatGPT Codex are up to date"
       } else {
         self.state = .error
         self.primaryStatus = "Sync did not finish"
@@ -275,6 +283,11 @@ final class SyncModel: ObservableObject {
       return NSWorkspace.shared.icon(forFile: url.path)
     }
     return NSImage(systemSymbolName: fallbackSymbol, accessibilityDescription: nil) ?? NSImage()
+  }
+
+  private func chatGPTResource(_ filename: String) -> NSImage? {
+    guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") else { return nil }
+    return NSImage(contentsOf: appURL.appending(path: "Contents/Resources/\(filename)"))
   }
 
   private func loadConfig() -> AppConfig? {
