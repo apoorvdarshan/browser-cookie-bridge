@@ -52,6 +52,18 @@ The fixed daily sync and login sync are independent controls. Login sync runs on
 
 `setup` copies a pinned runtime into the utility's Application Support folder. The daily job runs that copy, so an `npx` cache cleanup cannot silently replace or remove the scheduled code.
 
+## Releases
+
+Pushing a semantic version tag runs the release workflow. The tag must match the version in `package.json`, `extension-template/manifest.json`, and the macOS app's `Info.plist`.
+
+```bash
+npm run release:check
+git tag v0.21.1
+git push origin v0.21.1
+```
+
+After the tests pass, GitHub Actions publishes the package to npm and creates a GitHub Release with generated notes and the npm tarball attached. Pushing a normal branch or commit does not publish anything.
+
 ## Commands
 
 ```text

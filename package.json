@@ -9,12 +9,25 @@
   "scripts": {
     "test": "node --test",
     "check": "node --check bin/brave-codex-cookie-sync.js && node --check src/app-installer.js && node --check src/broker.js && node --check src/cli.js && node --check src/config.js && node --check src/paths.js && node --check src/scheduler.js && node --check extension-template/background.js",
+    "release:check": "node scripts/check-release-version.js",
     "build:app": "node bin/brave-codex-cookie-sync.js install-app --no-open"
   },
   "engines": {
     "node": ">=20"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apoorvdarshan/browser-cookie-bridge.git"
+  },
+  "homepage": "https://github.com/apoorvdarshan/browser-cookie-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/apoorvdarshan/browser-cookie-bridge/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "files": [
     "bin",
     "src",
