@@ -10,7 +10,7 @@ struct BraveCodexSyncApp: App {
     Window("Browser ChatGPT Sync", id: "main") {
       ContentView(appDelegate: appDelegate)
         .environmentObject(model)
-        .frame(width: 660, height: 682)
+        .frame(width: 644, height: 682)
         .background(AppBackground())
     }
     .windowResizability(.contentSize)
@@ -253,7 +253,7 @@ struct TargetPicker: View {
       VStack(spacing: 5) {
         HStack(spacing: 5) {
           ForEach(Array(model.browsers.prefix(4))) { browser in targetButton(browser) }
-          Color.clear.frame(width: 35, height: 40)
+          Color.clear.frame(width: 19, height: 40)
         }
         HStack(spacing: 5) {
           ForEach(Array(model.browsers.dropFirst(4))) { browser in targetButton(browser) }
@@ -262,14 +262,14 @@ struct TargetPicker: View {
             name: "ChatGPT Codex",
             selected: model.selectedTargetID == "codex",
             disabled: model.isWorking || model.isSyncing,
-            buttonWidth: 80,
+            buttonWidth: 64,
             iconWidth: 66,
             iconHeight: 38
           ) { model.selectTarget("codex") }
         }
       }
     }
-    .frame(width: 215)
+    .frame(width: 199)
   }
 
   private func targetButton(_ browser: BrowserChoice) -> some View {
