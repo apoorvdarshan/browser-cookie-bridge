@@ -10,7 +10,7 @@ struct BraveCodexSyncApp: App {
     Window("Browser ChatGPT Sync", id: "main") {
       ContentView(appDelegate: appDelegate)
         .environmentObject(model)
-        .frame(width: 620, height: 682)
+        .frame(width: 665, height: 682)
         .background(AppBackground())
     }
     .windowResizability(.contentSize)
@@ -250,24 +250,35 @@ struct TargetPicker: View {
           .foregroundStyle(Theme.accent)
       }
       .font(.system(size: 8, weight: .bold))
-      LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 5), count: 4), spacing: 5) {
-        ForEach(model.browsers) { browser in
-          EndpointButton(
-            icon: model.browserIcon(browser),
-            name: browser.name,
-            selected: model.selectedTargetID == browser.id,
-            disabled: model.isWorking || model.isSyncing || model.selectedSourceID == browser.id
-          ) { model.selectTarget(browser.id) }
+      VStack(spacing: 5) {
+        HStack(spacing: 5) {
+          ForEach(Array(model.browsers.prefix(5))) { browser in targetButton(browser) }
         }
-        EndpointButton(
-          icon: model.codexIcon,
-          name: "ChatGPT Codex",
-          selected: model.selectedTargetID == "codex",
-          disabled: model.isWorking || model.isSyncing
-        ) { model.selectTarget("codex") }
+        HStack(spacing: 5) {
+          ForEach(Array(model.browsers.dropFirst(5))) { browser in targetButton(browser) }
+          Color.clear.frame(width: 40, height: 40)
+          EndpointButton(
+            icon: model.codexIcon,
+            name: "ChatGPT Codex",
+            selected: model.selectedTargetID == "codex",
+            disabled: model.isWorking || model.isSyncing,
+            buttonWidth: 85,
+            iconWidth: 60,
+            iconHeight: 34
+          ) { model.selectTarget("codex") }
+        }
       }
     }
-    .frame(width: 175)
+    .frame(width: 220)
+  }
+
+  private func targetButton(_ browser: BrowserChoice) -> some View {
+    EndpointButton(
+      icon: model.browserIcon(browser),
+      name: browser.name,
+      selected: model.selectedTargetID == browser.id,
+      disabled: model.isWorking || model.isSyncing || model.selectedSourceID == browser.id
+    ) { model.selectTarget(browser.id) }
   }
 }
 
@@ -276,6 +287,9 @@ struct EndpointButton: View {
   let name: String
   let selected: Bool
   let disabled: Bool
+  var buttonWidth: CGFloat = 40
+  var iconWidth: CGFloat = 31
+  var iconHeight: CGFloat = 31
   let action: () -> Void
 
   var body: some View {
@@ -283,8 +297,8 @@ struct EndpointButton: View {
       Image(nsImage: icon)
         .resizable()
         .scaledToFit()
-        .frame(width: 31, height: 31)
-        .frame(width: 40, height: 40)
+        .frame(width: iconWidth, height: iconHeight)
+        .frame(width: buttonWidth, height: 40)
         .background(
           selected ? Theme.accent.opacity(0.13) : Color.primary.opacity(0.025),
           in: RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -571,5 +585,5 @@ struct SetupStateBadge: View {
 }
 
 enum Theme {
-  static let accent = Color(red: 0.27, green: 0.47, blue: 0.96)
+  static let accent = Color(red: 0.46, green: 0.46, blue: 0.48)
 }
