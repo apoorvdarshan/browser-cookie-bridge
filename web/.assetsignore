@@ -2,4 +2,5 @@ README.md
 server.js
 wrangler.jsonc
 .assetsignore
+.wrangler/**
 .DS_Store
