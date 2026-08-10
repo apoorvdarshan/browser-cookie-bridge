@@ -22,7 +22,7 @@
     "type": "git",
     "url": "git+https://github.com/apoorvdarshan/browser-cookie-bridge.git"
   },
-  "homepage": "https://github.com/apoorvdarshan/browser-cookie-bridge#readme",
+  "homepage": "https://cookiebridge.apoorvdarshan.com/",
   "bugs": {
     "url": "https://github.com/apoorvdarshan/browser-cookie-bridge/issues"
   },
@@ -30,6 +30,16 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
+  "keywords": [
+    "browser",
+    "cookies",
+    "sessions",
+    "macos",
+    "chromium",
+    "brave",
+    "codex"
+  ],
+  "funding": "https://ko-fi.com/apoorvdarshan",
   "files": [
     "bin",
     "src",

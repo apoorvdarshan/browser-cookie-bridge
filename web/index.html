@@ -57,6 +57,7 @@
             "priceCurrency": "USD"
           },
           "license": "https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/LICENSE",
+          "downloadUrl": "https://www.npmjs.com/package/browser-cookie-bridge",
           "author": {
             "@type": "Person",
             "name": "Apoorv Darshan",
@@ -64,6 +65,7 @@
           },
           "sameAs": [
             "https://github.com/apoorvdarshan/browser-cookie-bridge",
+            "https://www.npmjs.com/package/browser-cookie-bridge",
             "https://www.producthunt.com/products/browser-cookie-bridge"
           ]
         }
@@ -105,12 +107,12 @@
       <div class="hero-grain" aria-hidden="true"></div>
       <div class="shell hero-grid">
         <div class="hero-copy" data-reveal>
-          <div class="eyebrow"><span class="live-dot"></span> Native macOS utility · local beta</div>
+          <div class="eyebrow"><span class="live-dot"></span> Native macOS utility · v1.0.0</div>
           <h1>Your browser sessions.<br /><em>Across the browsers you use.</em></h1>
           <p class="hero-lede">Move cookies and signed-in sessions between Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Comet—or import them into ChatGPT Codex. No cloud relay. No cookie logs.</p>
 
           <div class="hero-actions">
-            <a class="button button-primary" href="#install">Build the Mac app <span aria-hidden="true">↓</span></a>
+            <a class="button button-primary" href="#install">Install the Mac app <span aria-hidden="true">↓</span></a>
             <a class="button button-quiet" href="https://github.com/apoorvdarshan/browser-cookie-bridge" target="_blank" rel="noreferrer">View source <span aria-hidden="true">↗</span></a>
           </div>
 
@@ -311,8 +313,8 @@
       <div class="shell install-grid">
         <div class="install-copy" data-reveal>
           <p class="kicker">Install locally</p>
-          <h2>Build it on your Mac.<br />Know exactly what runs.</h2>
-          <p>Browser Cookie Bridge is open source and currently in local beta. The native SwiftUI app builds into your user Applications folder—no administrator password required.</p>
+          <h2>Install it with one command.<br />Know exactly what runs.</h2>
+          <p>Browser Cookie Bridge 1.0.0 is published on npm and remains fully open source. The native SwiftUI app builds on your Mac into your Applications folder—no administrator password required.</p>
           <div class="requirements">
             <span>macOS 13+</span><span>Node.js 22.5+</span><span>Xcode CLI tools</span>
           </div>
@@ -321,19 +323,19 @@
         <div class="terminal" data-reveal data-delay="1">
           <div class="terminal-bar"><span class="terminal-dots"><i></i><i></i><i></i></span><span>Terminal — install</span><span></span></div>
           <div class="install-tabs" role="tablist" aria-label="Installation method">
-            <button type="button" role="tab" aria-selected="true" aria-controls="source-panel" id="source-tab" data-install-tab="source">From source</button>
-            <button type="button" role="tab" aria-selected="false" aria-controls="npm-panel" id="npm-tab" data-install-tab="npm">npm <small>after release</small></button>
+            <button type="button" role="tab" aria-selected="true" aria-controls="npm-panel" id="npm-tab" data-install-tab="npm">npm <small>recommended</small></button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="source-panel" id="source-tab" data-install-tab="source">From source</button>
           </div>
-          <div class="terminal-panel" id="source-panel" role="tabpanel" aria-labelledby="source-tab" data-install-panel="source">
+          <div class="terminal-panel" id="source-panel" role="tabpanel" aria-labelledby="source-tab" data-install-panel="source" hidden>
             <pre><code><span class="prompt">$</span> git clone https://github.com/apoorvdarshan/browser-cookie-bridge.git
 <span class="prompt">$</span> cd browser-cookie-bridge
 <span class="prompt">$</span> npm test
 <span class="prompt">$</span> npm run build:app</code></pre>
             <button class="copy-button" type="button" data-copy="git clone https://github.com/apoorvdarshan/browser-cookie-bridge.git&#10;cd browser-cookie-bridge&#10;npm test&#10;npm run build:app"><span>Copy commands</span></button>
           </div>
-          <div class="terminal-panel" id="npm-panel" role="tabpanel" aria-labelledby="npm-tab" data-install-panel="npm" hidden>
+          <div class="terminal-panel" id="npm-panel" role="tabpanel" aria-labelledby="npm-tab" data-install-panel="npm">
             <pre><code><span class="prompt">$</span> npx browser-cookie-bridge install-app</code></pre>
-            <p class="terminal-note">The npm package will become available with the first tagged public release.</p>
+            <p class="terminal-note"><a href="https://www.npmjs.com/package/browser-cookie-bridge" target="_blank" rel="noreferrer">Version 1.0.0 is live on npm ↗</a></p>
             <button class="copy-button" type="button" data-copy="npx browser-cookie-bridge install-app"><span>Copy command</span></button>
           </div>
           <div class="terminal-result"><span>→</span> Installs to ~/Applications/Browser Cookie Bridge.app</div>
@@ -356,7 +358,7 @@
           <details><summary>Does this move passwords?<span></span></summary><p>No. Browser extensions cannot access Chromium's password store. Browser Cookie Bridge does not access passwords, Keychain items, payment data, bookmarks, or autofill.</p></details>
           <details><summary>Does it overwrite all destination cookies?<span></span></summary><p>The importer merges selected records using their cookie identity fields. Existing unrelated destination cookies remain in place. Codex is backed up before any replacement.</p></details>
           <details><summary>Will every website stay signed in?<span></span></summary><p>Not always. Some sites bind sessions to a device, browser, IP address, or other risk signals and may ask you to sign in again.</p></details>
-          <details><summary>Is the npm package live?<span></span></summary><p>Not yet. The release workflow is ready, but the first public package has not been published. Build from source for now.</p></details>
+          <details><summary>Is the npm package live?<span></span></summary><p>Yes. Install the latest public release with <code>npx browser-cookie-bridge install-app</code> or inspect it on <a href="https://www.npmjs.com/package/browser-cookie-bridge" target="_blank" rel="noreferrer">npm</a>.</p></details>
         </div>
       </div>
     </section>
@@ -367,7 +369,7 @@
         <p class="kicker">Local. Explicit. Open source.</p>
         <h2>Bridge the browser you use<br />to the browser you need.</h2>
         <div class="hero-actions">
-          <a class="button button-primary" href="#install">Build the app</a>
+          <a class="button button-primary" href="#install">Install the app</a>
           <a class="button button-quiet" href="https://github.com/apoorvdarshan/browser-cookie-bridge" target="_blank" rel="noreferrer">Star on GitHub <span aria-hidden="true">↗</span></a>
           <a class="button button-quiet" href="https://www.producthunt.com/products/browser-cookie-bridge" target="_blank" rel="noreferrer">View on Product Hunt <span aria-hidden="true">↗</span></a>
         </div>
@@ -382,7 +384,7 @@
         <p>Local cookie and session transfer for macOS.</p>
         <span>MIT licensed · © <span data-year>2026</span> Apoorv Darshan</span>
       </div>
-      <div class="footer-column"><strong>Project</strong><a href="https://github.com/apoorvdarshan/browser-cookie-bridge">GitHub</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge#readme">Documentation</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/CONTRIBUTING.md">Contributing</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">Security</a><a href="sitemap.xml">Sitemap</a></div>
+      <div class="footer-column"><strong>Project</strong><a href="https://github.com/apoorvdarshan/browser-cookie-bridge">GitHub</a><a href="https://www.npmjs.com/package/browser-cookie-bridge">npm</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge#readme">Documentation</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/CONTRIBUTING.md">Contributing</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">Security</a><a href="sitemap.xml">Sitemap</a></div>
       <div class="footer-column"><strong>Support</strong><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a><a href="https://ko-fi.com/apoorvdarshan">Ko-fi</a><a href="https://x.com/apoorvdarshan">Follow on X</a><a href="https://www.producthunt.com/products/browser-cookie-bridge">Product Hunt</a></div>
       <div class="footer-column"><strong>Legal</strong><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/LICENSE">MIT License</a></div>
     </div>

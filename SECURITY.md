@@ -12,7 +12,7 @@ Security fixes are applied to the latest published release and the current `main
 | `main` | Best effort |
 | Older releases | ❌ |
 
-The project is currently in local beta. Until the first public release is published, `main` is the only maintained version.
+The latest npm/GitHub release and the current `main` branch receive security fixes under the policy above.
 
 ## Report a vulnerability privately
 

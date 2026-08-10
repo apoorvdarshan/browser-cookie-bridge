@@ -12,6 +12,7 @@
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple&logoColor=white" alt="macOS 13+" />
   <img src="https://img.shields.io/badge/Swift-6-8E2735?logo=swift&logoColor=white" alt="Swift 6" />
   <img src="https://img.shields.io/badge/Node.js-22.5%2B-3C873A?logo=nodedotjs&logoColor=white" alt="Node.js 22.5+" />
+  <a href="https://www.npmjs.com/package/browser-cookie-bridge"><img src="https://img.shields.io/npm/v/browser-cookie-bridge?logo=npm&color=CB3837" alt="browser-cookie-bridge on npm" /></a>
   <img src="https://img.shields.io/badge/local--first-no%20cloud-C68B3C" alt="Local-first, no cloud" />
   <img src="https://img.shields.io/github/stars/apoorvdarshan/browser-cookie-bridge?logo=github&color=C68B3C" alt="GitHub stars" />
   <a href="https://www.producthunt.com/products/browser-cookie-bridge"><img src="https://img.shields.io/badge/Product%20Hunt-View%20launch-DA552F?logo=producthunt&logoColor=white" alt="Browser Cookie Bridge on Product Hunt" /></a>
@@ -20,6 +21,7 @@
 
 <p>
   <a href="#installation"><b>Install</b></a> ·
+  <a href="https://www.npmjs.com/package/browser-cookie-bridge">npm</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#security--privacy">Security</a> ·
   <a href="CONTRIBUTING.md">Contribute</a> ·
@@ -28,7 +30,7 @@
   <a href="#support">Support</a>
 </p>
 
-<p><code>npm run build:app</code></p>
+<p><code>npx browser-cookie-bridge install-app</code></p>
 
 <br />
 
@@ -38,7 +40,7 @@
 
 ---
 
-> **Status — local beta.** The native app and transfer engine work locally; the first public npm release has not been published yet. Importing into ChatGPT Codex is an intentionally unsupported direct integration and requires Codex to be completely closed.
+> **Version 1.0.0 is available on npm.** Importing into ChatGPT Codex is an intentionally unsupported direct integration and requires Codex to be completely closed.
 
 ## Why Browser Cookie Bridge
 
@@ -78,6 +80,18 @@ Some websites bind sessions to a specific device or browser and may ask you to s
 
 ## Installation
 
+### Via npm
+
+Run the published package directly:
+
+```bash
+npx browser-cookie-bridge install-app
+```
+
+No administrator password is needed. The app is built from source on your Mac and installed in your user Applications folder unless an existing writable system Applications copy is being updated.
+
+**[View `browser-cookie-bridge` on npm →](https://www.npmjs.com/package/browser-cookie-bridge)**
+
 ### From source
 
 ```bash
@@ -88,16 +102,6 @@ npm run build:app
 ```
 
 The final command compiles the native SwiftUI app, enables **Open at login**, **Sync at login**, and the **menu-bar helper**, then launches it. A first install uses `~/Applications/Browser Cookie Bridge.app` without requesting administrator access. If an existing `/Applications/Browser Cookie Bridge.app` is present, later builds and updates keep using that system Applications copy instead of creating a duplicate. Daily sync stays off until you enable it.
-
-### Via npm
-
-The package will be installable after the first tagged release:
-
-```bash
-npx browser-cookie-bridge install-app
-```
-
-No administrator password is needed. The app is built from source on your Mac and installed in your user Applications folder unless an existing writable system Applications copy is being updated.
 
 ## Setup
 
@@ -184,8 +188,8 @@ Pushing a semantic version tag runs tests, validates that package and app versio
 
 ```bash
 npm run release:check
-git tag v1.0.0
-git push origin v1.0.0
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 A normal branch push does not publish anything.
@@ -199,6 +203,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for local setu
 If Browser Cookie Bridge is useful to you:
 
 - ⭐ **Star** the repository
+- 📦 **[Install from npm](https://www.npmjs.com/package/browser-cookie-bridge)**
 - 🐛 **[Report a bug](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml)** — never include cookie values or tokens
 - ☕ **[Support on Ko-fi](https://ko-fi.com/apoorvdarshan)**
 - 𝕏 **Follow [@apoorvdarshan](https://x.com/apoorvdarshan)**
