@@ -5,7 +5,7 @@ Launch-ready artwork for Browser Cookie Bridge. Product Hunt currently recommend
 ## Source assets
 
 - `app-screenshot.png` — Retina capture of the installed macOS app (`1424×1660`)
-- `app-icon.png` — full-resolution cookie app icon (`1254×1254`)
+- `app-icon.png` — transparent, full-resolution cookie logo with no app-icon tile (`1254×1254`)
 
 ## Product Hunt
 
@@ -18,7 +18,7 @@ The gallery size follows [Product Hunt's official posting guide](https://help.pr
 
 ## Generation notes
 
-The three gallery images were created with OpenAI's built-in image-generation tool using `app-screenshot.png` as the product UI reference and `app-icon.png` as the brand reference. They were then normalized to the exact Product Hunt gallery dimensions.
+The three gallery images and transparent cookie cutout were created with OpenAI's built-in image-generation tool using the real app screenshot and original cookie artwork as references. The gallery images were then normalized to the exact Product Hunt dimensions.
 
 ### Overview prompt
 
