@@ -145,7 +145,9 @@ function installDesktopApp(args) {
     console.log("Daily sync is off by default; sync at login is enabled.");
   }
   console.log(`Installed: ${destination}`);
-  console.log("The app is available in your user Applications folder and Spotlight.");
+  console.log(destination.startsWith("/Applications/")
+    ? "The app is available in Applications and Spotlight."
+    : "The app is available in your user Applications folder and Spotlight.");
 }
 
 function setup(args) {

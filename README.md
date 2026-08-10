@@ -87,7 +87,7 @@ npm test
 npm run build:app
 ```
 
-The final command compiles the native SwiftUI app, installs it as `~/Applications/Browser Cookie Bridge.app`, enables **Open at login**, **Sync at login**, and the **menu-bar helper**, then launches it. Daily sync stays off until you enable it.
+The final command compiles the native SwiftUI app, enables **Open at login**, **Sync at login**, and the **menu-bar helper**, then launches it. A first install uses `~/Applications/Browser Cookie Bridge.app` without requesting administrator access. If an existing `/Applications/Browser Cookie Bridge.app` is present, later builds and updates keep using that system Applications copy instead of creating a duplicate. Daily sync stays off until you enable it.
 
 ### Via npm
 
@@ -97,7 +97,7 @@ The package will be installable after the first tagged release:
 npx browser-cookie-bridge install-app
 ```
 
-No administrator password is needed. The app is built from source on your Mac and installed in your user Applications folder.
+No administrator password is needed. The app is built from source on your Mac and installed in your user Applications folder unless an existing writable system Applications copy is being updated.
 
 ## Setup
 

@@ -3,10 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { appSupportDir, installedAppPath } from "./paths.js";
+import {
+  appSupportDir,
+  installedAppPath,
+  systemInstalledAppPath,
+  userInstalledAppPath,
+} from "./paths.js";
 import { installAppLogin } from "./scheduler.js";
-
-const APP_BUNDLE_NAME = "Browser Cookie Bridge.app";
 
 export function startDetachedUpdate({ version, appPath, appPID, home = os.homedir() }) {
   validateUpdateRequest({ version, appPath, appPID, home });
@@ -94,8 +97,8 @@ export function validateUpdateRequest({ version, appPath, appPID, home = os.home
   if (!Number.isInteger(appPID) || appPID <= 1) throw new Error("Invalid app process ID");
   const resolved = path.resolve(appPath ?? "");
   const allowed = new Set([
-    path.resolve("/Applications", APP_BUNDLE_NAME),
-    path.resolve(installedAppPath(home)),
+    path.resolve(systemInstalledAppPath()),
+    path.resolve(userInstalledAppPath(home)),
   ]);
   if (!allowed.has(resolved)) throw new Error(`Refusing to replace unexpected app path: ${resolved}`);
   return resolved;

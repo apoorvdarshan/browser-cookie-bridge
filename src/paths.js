@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,8 +40,18 @@ export function appLoginLaunchAgentPath(home = os.homedir()) {
   return path.join(home, "Library", "LaunchAgents", `${APP_LOGIN_APP_ID}.plist`);
 }
 
-export function installedAppPath(home = os.homedir()) {
+export function userInstalledAppPath(home = os.homedir()) {
   return path.join(home, "Applications", "Browser Cookie Bridge.app");
+}
+
+export function systemInstalledAppPath() {
+  return path.join("/Applications", "Browser Cookie Bridge.app");
+}
+
+export function installedAppPath(home = os.homedir()) {
+  const systemApp = systemInstalledAppPath();
+  const isCurrentUser = path.resolve(home) === path.resolve(os.homedir());
+  return isCurrentUser && fs.existsSync(systemApp) ? systemApp : userInstalledAppPath(home);
 }
 
 export function braveCookiePaths(home = os.homedir()) {
