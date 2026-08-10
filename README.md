@@ -21,6 +21,7 @@
   <a href="#installation"><b>Install</b></a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#security--privacy">Security</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a> ·
   <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a> ·
   <a href="#support">Support</a>
 </p>
@@ -173,6 +174,8 @@ The broker validates a random token and extension origin, limits payload size, a
 
 Cookies are credentials. Review the source, protect your macOS account, and transfer only between profiles you trust.
 
+Found a vulnerability? Read [SECURITY.md](SECURITY.md) and report it privately. Do not open a public issue or include real browser data.
+
 ## Releases
 
 Pushing a semantic version tag runs tests, validates that package and app versions match, publishes to npm, and creates a GitHub Release with the tarball attached.
@@ -184,6 +187,10 @@ git push origin v1.0.0
 ```
 
 A normal branch push does not publish anything.
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, validation, privacy requirements, and pull request guidance.
 
 ## Support
 
