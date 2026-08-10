@@ -1,6 +1,6 @@
 {
   "name": "browser-cookie-bridge",
-  "version": "0.21.0",
+  "version": "0.21.1",
   "description": "Private local cookie and session transfer for macOS",
   "type": "module",
   "bin": {

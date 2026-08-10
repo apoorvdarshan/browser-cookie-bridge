@@ -119,9 +119,10 @@ struct ContentView: View {
     HStack(spacing: 11) {
       Image(nsImage: NSApp.applicationIconImage)
         .resizable()
-        .scaledToFit()
+        .scaledToFill()
+        .frame(width: 43, height: 43)
         .frame(width: 36, height: 36)
-        .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
       VStack(alignment: .leading, spacing: 1) {
         Text("Browser Cookie Bridge")
           .font(.system(size: 19, weight: .bold, design: .rounded))
