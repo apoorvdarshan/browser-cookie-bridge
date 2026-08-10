@@ -3,14 +3,21 @@ import Foundation
 
 extension Notification.Name {
   static let menuBarVisibilityChanged = Notification.Name("BraveCodexSync.menuBarVisibilityChanged")
-  static let menuBarSyncAlert = Notification.Name("BraveCodexSync.menuBarSyncAlert")
+  static let nativeAlert = Notification.Name("BraveCodexSync.nativeAlert")
+  static let updateStateChanged = Notification.Name("BraveCodexSync.updateStateChanged")
 }
 
-struct MenuBarSyncAlert {
+struct NativeAlert {
   enum Kind { case information, warning, error }
   let title: String
   let message: String
   let kind: Kind
+}
+
+struct UpdateMenuState {
+  let version: String?
+  let checking: Bool
+  let installing: Bool
 }
 
 struct BrowserChoice: Identifiable, Hashable {
@@ -42,6 +49,10 @@ final class SyncModel: ObservableObject {
   @Published var loginSyncEnabled = false
   @Published var openAtLogin = false
   @Published var menuBarEnabled = true
+  @Published var autoCheckUpdates = true
+  @Published var isCheckingForUpdates = false
+  @Published var isInstallingUpdate = false
+  @Published var availableUpdateVersion: String?
   @Published var scheduleTime = Date()
   @Published var extensionsReady = false
   @Published var cookiesEnabled = true
@@ -59,6 +70,9 @@ final class SyncModel: ObservableObject {
   private var loginSyncAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.login-sync.plist") }
   private var appLoginAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.app-login.plist") }
   private var codexStatusTimer: Timer?
+  private var updateTimer: Timer?
+  private var didCheckAfterLaunch = false
+  private var didConsumeUpdateResult = false
 
   var selectedBrowser: BrowserChoice {
     browsers.first(where: { $0.id == selectedSourceID }) ?? browsers[0]
@@ -108,6 +122,12 @@ final class SyncModel: ObservableObject {
     codexStatusTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
       Task { @MainActor in self?.updateCodexRunningStatus() }
     }
+    updateTimer = Timer.scheduledTimer(withTimeInterval: 24 * 60 * 60, repeats: true) { [weak self] _ in
+      Task { @MainActor in
+        guard let self, self.autoCheckUpdates else { return }
+        self.checkForUpdates()
+      }
+    }
   }
 
   func refresh() {
@@ -132,12 +152,18 @@ final class SyncModel: ObservableObject {
       cookiesEnabled = config.imports?.cookies ?? true
       historyEnabled = config.imports?.history ?? false
       menuBarEnabled = config.ui?.menuBar ?? true
+      autoCheckUpdates = config.ui?.autoCheckUpdates ?? true
     }
     NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: menuBarEnabled)
     extensionsReady = requiredExtensionIDs.allSatisfy {
       FileManager.default.fileExists(atPath: support.appending(path: "extension-\($0)/manifest.json").path)
     }
     updateCodexRunningStatus()
+    consumeUpdateResultIfNeeded()
+    if autoCheckUpdates && !didCheckAfterLaunch {
+      didCheckAfterLaunch = true
+      checkForUpdates()
+    }
   }
 
   func selectSource(_ id: String) {
@@ -170,17 +196,106 @@ final class SyncModel: ObservableObject {
     persistPreferences(successMessage: enabled ? "Menu-bar icon enabled" : "Menu-bar icon hidden")
   }
 
+  func setAutoCheckUpdates(_ enabled: Bool) {
+    autoCheckUpdates = enabled
+    persistPreferences(successMessage: enabled ? "Automatic update checks enabled" : "Automatic update checks disabled")
+    if enabled { checkForUpdates() }
+  }
+
+  func checkForUpdates(showAlert: Bool = false) {
+    guard !isCheckingForUpdates, !isInstallingUpdate else { return }
+    guard let url = URL(string: "https://registry.npmjs.org/browser-cookie-bridge/latest") else { return }
+    isCheckingForUpdates = true
+    postUpdateState()
+    var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+    request.setValue("Browser-Cookie-Bridge/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+    URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+      Task { @MainActor in
+        guard let self else { return }
+        self.isCheckingForUpdates = false
+        let status = (response as? HTTPURLResponse)?.statusCode
+        if let error {
+          self.postUpdateState()
+          if showAlert {
+            self.postNativeAlert(title: "Could not check for updates", message: error.localizedDescription, kind: .error)
+          }
+          return
+        }
+        guard status == 200,
+              let data,
+              let release = try? JSONDecoder().decode(PackageRelease.self, from: data) else {
+          self.postUpdateState()
+          if showAlert {
+            let message = status == 404
+              ? "No public release is available yet. This development build is already installed."
+              : "The update service returned an unexpected response. Try again later."
+            self.postNativeAlert(title: "No update information", message: message, kind: status == 404 ? .information : .error)
+          }
+          return
+        }
+        if self.isVersion(release.version, newerThan: self.currentVersion) {
+          self.availableUpdateVersion = release.version
+          if !self.codexBlocked && !self.isSyncing {
+            self.state = .ready
+            self.primaryStatus = "Update \(release.version) available"
+            self.secondaryStatus = "Install it now; the app will relaunch automatically"
+          }
+          if showAlert {
+            self.postNativeAlert(
+              title: "Update \(release.version) is available",
+              message: "Choose Install Update in the menu bar or click Install in the app.",
+              kind: .information
+            )
+          }
+        } else {
+          self.availableUpdateVersion = nil
+          if showAlert {
+            self.postNativeAlert(title: "Browser Cookie Bridge is up to date", message: "Version \(self.currentVersion) is the latest available release.", kind: .information)
+          }
+        }
+        self.postUpdateState()
+      }
+    }.resume()
+  }
+
+  func installAvailableUpdate() {
+    guard let version = availableUpdateVersion, !isInstallingUpdate else { return }
+    isInstallingUpdate = true
+    state = .syncing
+    primaryStatus = "Preparing update \(version)"
+    secondaryStatus = "The app will close, install the update, and relaunch automatically"
+    postUpdateState()
+    runCLI([
+      "install-update",
+      "--version", version,
+      "--app-path", Bundle.main.bundlePath,
+      "--app-pid", String(ProcessInfo.processInfo.processIdentifier)
+    ]) { [weak self] success, output in
+      guard let self else { return }
+      if success {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { NSApp.terminate(nil) }
+      } else {
+        self.isInstallingUpdate = false
+        self.state = .error
+        self.primaryStatus = "Could not start the update"
+        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Try again from the menu bar"
+        self.postUpdateState()
+        self.postNativeAlert(title: self.primaryStatus, message: self.secondaryStatus, kind: .error)
+      }
+    }
+  }
+
   func syncNow(showMenuBarAlert: Bool = false) {
     guard !isSyncing else {
       if showMenuBarAlert {
-        postMenuBarAlert(title: "Sync already running", message: "Wait for the current transfer to finish.", kind: .information)
+        postNativeAlert(title: "Sync already running", message: "Wait for the current transfer to finish.", kind: .information)
       }
       return
     }
     updateCodexRunningStatus()
     guard !codexBlocked else {
       if showMenuBarAlert {
-        postMenuBarAlert(title: primaryStatus, message: secondaryStatus, kind: .warning)
+        postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: .warning)
       }
       return
     }
@@ -209,7 +324,7 @@ final class SyncModel: ObservableObject {
       }
       self.updateCodexRunningStatus()
       if showMenuBarAlert {
-        self.postMenuBarAlert(
+        self.postNativeAlert(
           title: self.primaryStatus,
           message: self.secondaryStatus,
           kind: success ? (partial ? .warning : .information) : .error
@@ -290,7 +405,8 @@ final class SyncModel: ObservableObject {
       "--target", selectedTargetID,
       "--cookies", cookiesEnabled ? "on" : "off",
       "--history", historyEnabled ? "on" : "off",
-      "--menu-bar", menuBarEnabled ? "on" : "off"
+      "--menu-bar", menuBarEnabled ? "on" : "off",
+      "--auto-check-updates", autoCheckUpdates ? "on" : "off"
     ]
     runCLI(arguments) { [weak self] success, output in
       guard let self else { return }
@@ -408,12 +524,63 @@ final class SyncModel: ObservableObject {
     }
   }
 
-  private func postMenuBarAlert(title: String, message: String, kind: MenuBarSyncAlert.Kind) {
+  private var currentVersion: String {
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+  }
+
+  private func isVersion(_ candidate: String, newerThan installed: String) -> Bool {
+    let lhs = candidate.split(separator: "-", maxSplits: 1)[0].split(separator: ".").map { Int($0) ?? 0 }
+    let rhs = installed.split(separator: "-", maxSplits: 1)[0].split(separator: ".").map { Int($0) ?? 0 }
+    for index in 0..<max(lhs.count, rhs.count) {
+      let left = index < lhs.count ? lhs[index] : 0
+      let right = index < rhs.count ? rhs[index] : 0
+      if left != right { return left > right }
+    }
+    return false
+  }
+
+  private func consumeUpdateResultIfNeeded() {
+    guard !didConsumeUpdateResult else { return }
+    didConsumeUpdateResult = true
+    let url = support.appending(path: "update-result.json")
+    guard let data = try? Data(contentsOf: url),
+          let result = try? JSONDecoder().decode(UpdateResult.self, from: data) else { return }
+    try? FileManager.default.removeItem(at: url)
+    if result.status == "success" {
+      state = .success
+      primaryStatus = "Updated to version \(result.version)"
+      secondaryStatus = "Browser Cookie Bridge was installed and relaunched successfully"
+    } else {
+      state = .error
+      primaryStatus = "Update \(result.version) failed"
+      secondaryStatus = result.message ?? "The previous app has been reopened"
+      postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: .error)
+    }
+  }
+
+  private func postUpdateState() {
     NotificationCenter.default.post(
-      name: .menuBarSyncAlert,
-      object: MenuBarSyncAlert(title: title, message: message, kind: kind)
+      name: .updateStateChanged,
+      object: UpdateMenuState(version: availableUpdateVersion, checking: isCheckingForUpdates, installing: isInstallingUpdate)
     )
   }
+
+  private func postNativeAlert(title: String, message: String, kind: NativeAlert.Kind) {
+    NotificationCenter.default.post(
+      name: .nativeAlert,
+      object: NativeAlert(title: title, message: message, kind: kind)
+    )
+  }
+}
+
+private struct PackageRelease: Decodable {
+  let version: String
+}
+
+private struct UpdateResult: Decodable {
+  let status: String
+  let version: String
+  let message: String?
 }
 
 private struct AppConfig: Decodable {
@@ -437,5 +604,6 @@ private struct AppConfig: Decodable {
   struct UISettings: Decodable {
     let menuBar: Bool?
     let openAtLogin: Bool?
+    let autoCheckUpdates: Bool?
   }
 }

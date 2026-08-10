@@ -49,6 +49,7 @@ export function installConfig({ home, hour = 9, minute = 0 }) {
     ui: {
       menuBar: existing.ui?.menuBar !== false,
       openAtLogin: existing.ui?.openAtLogin !== false,
+      autoCheckUpdates: existing.ui?.autoCheckUpdates !== false,
     },
     schedule: { hour, minute },
     createdAt: existing.createdAt || new Date().toISOString(),
@@ -62,7 +63,7 @@ export function installConfig({ home, hour = 9, minute = 0 }) {
   return config;
 }
 
-export function updatePreferences({ home, cookies, history, sourceBrowser, targetBrowser, menuBar, openAtLogin }) {
+export function updatePreferences({ home, cookies, history, sourceBrowser, targetBrowser, menuBar, openAtLogin, autoCheckUpdates }) {
   const config = readConfig(home);
   if (!SOURCE_BROWSERS.includes(sourceBrowser)) {
     throw new Error(`Unsupported source browser: ${sourceBrowser}`);
@@ -76,7 +77,11 @@ export function updatePreferences({ home, cookies, history, sourceBrowser, targe
   config.sourceBrowser = sourceBrowser;
   config.targetBrowser = targetBrowser;
   config.imports = { cookies: Boolean(cookies), passwords: false, history: Boolean(history) };
-  config.ui = { menuBar: Boolean(menuBar), openAtLogin: Boolean(openAtLogin) };
+  config.ui = {
+    menuBar: Boolean(menuBar),
+    openAtLogin: Boolean(openAtLogin),
+    autoCheckUpdates: Boolean(autoCheckUpdates),
+  };
   config.updatedAt = new Date().toISOString();
   writePrivateJson(configPath(home), config);
   return config;

@@ -30,6 +30,7 @@ import {
   removeLoginSync,
   removeSchedule,
 } from "./scheduler.js";
+import { performUpdate, startDetachedUpdate } from "./updater.js";
 
 const HELP = `browser-cookie-bridge
 
@@ -38,7 +39,7 @@ Local cookie and session transfer between Chromium browsers and into ChatGPT Cod
 Commands:
   setup [--hour 9] [--minute 0] [--no-schedule]
   install-app [--no-open]
-  preferences --source brave --target codex --cookies on --history off --menu-bar off
+  preferences --source brave --target codex --cookies on --history off --menu-bar on --auto-check-updates on
   sync [--timeout 300]
   doctor
   enable-login-sync
@@ -60,6 +61,10 @@ export async function main(argv) {
       return installDesktopApp(args);
     case "preferences":
       return preferences(args);
+    case "install-update":
+      return installUpdate(args);
+    case "perform-update":
+      return performUpdateWorker(args);
     case "doctor":
       return doctor();
     case "enable-login-sync":
@@ -82,6 +87,26 @@ export async function main(argv) {
   }
 }
 
+function installUpdate(args) {
+  assertMacOS();
+  const result = startDetachedUpdate({
+    version: stringFlag(args, "--version", ""),
+    appPath: stringFlag(args, "--app-path", ""),
+    appPID: integerFlag(args, "--app-pid", 0, 2, Number.MAX_SAFE_INTEGER),
+  });
+  console.log(`Update worker started: ${result.workerPID}`);
+}
+
+function performUpdateWorker(args) {
+  assertMacOS();
+  const result = performUpdate({
+    version: stringFlag(args, "--version", ""),
+    appPath: stringFlag(args, "--app-path", ""),
+    appPID: integerFlag(args, "--app-pid", 0, 2, Number.MAX_SAFE_INTEGER),
+  });
+  console.log(`Updated and relaunched: ${result.destination}`);
+}
+
 function preferences(args) {
   const existing = readConfig();
   const config = updatePreferences({
@@ -91,9 +116,10 @@ function preferences(args) {
     targetBrowser: stringFlag(args, "--target", existing.targetBrowser || "codex"),
     menuBar: booleanFlag(args, "--menu-bar", existing.ui?.menuBar === true),
     openAtLogin: booleanFlag(args, "--open-at-login", existing.ui?.openAtLogin !== false),
+    autoCheckUpdates: booleanFlag(args, "--auto-check-updates", existing.ui?.autoCheckUpdates !== false),
   });
   console.log(
-    `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}`,
+    `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}, auto-check-updates=${config.ui.autoCheckUpdates ? "on" : "off"}`,
   );
 }
 
@@ -277,6 +303,7 @@ function setAppLogin(enabled) {
     history: existing.imports?.history === true,
     menuBar: existing.ui?.menuBar === true,
     openAtLogin: enabled,
+    autoCheckUpdates: existing.ui?.autoCheckUpdates !== false,
   });
   if (enabled) {
     const appPath = installedAppPath();

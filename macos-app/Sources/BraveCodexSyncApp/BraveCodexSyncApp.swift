@@ -10,7 +10,7 @@ struct BraveCodexSyncApp: App {
     Window("Browser Cookie Bridge", id: "main") {
       ContentView(appDelegate: appDelegate)
         .environmentObject(model)
-        .frame(width: 644, height: 682)
+        .frame(width: 644, height: 730)
         .background(AppBackground())
     }
     .windowResizability(.contentSize)
@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   weak var model: SyncModel?
   private weak var mainWindow: NSWindow?
   private var statusItem: NSStatusItem?
+  private var updateMenuItem: NSMenuItem?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     NotificationCenter.default.addObserver(
@@ -34,8 +35,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     )
     NotificationCenter.default.addObserver(
       self,
-      selector: #selector(showMenuBarSyncAlert(_:)),
-      name: .menuBarSyncAlert,
+      selector: #selector(showNativeAlert(_:)),
+      name: .nativeAlert,
+      object: nil
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(updateStateChanged(_:)),
+      name: .updateStateChanged,
       object: nil
     )
   }
@@ -71,6 +78,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       let menu = NSMenu()
       menu.addItem(withTitle: "Show Browser Cookie Bridge", action: #selector(showMainWindowAction), keyEquivalent: "")
       menu.addItem(withTitle: "Sync now", action: #selector(syncNowAction), keyEquivalent: "")
+      let updateItem = menu.addItem(withTitle: "Check for Updates…", action: #selector(updateAction), keyEquivalent: "")
+      updateMenuItem = updateItem
       menu.addItem(.separator())
       menu.addItem(withTitle: "Quit", action: #selector(quitAction), keyEquivalent: "q")
       for menuItem in menu.items { menuItem.target = self }
@@ -79,6 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     } else if let statusItem {
       NSStatusBar.system.removeStatusItem(statusItem)
       self.statusItem = nil
+      updateMenuItem = nil
     }
   }
 
@@ -89,10 +99,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
   @objc private func showMainWindowAction() { showMainWindow() }
   @objc private func syncNowAction() { model?.syncNow(showMenuBarAlert: true) }
+  @objc private func updateAction() {
+    if model?.availableUpdateVersion != nil { model?.installAvailableUpdate() }
+    else { model?.checkForUpdates(showAlert: true) }
+  }
   @objc private func quitAction() { NSApp.terminate(nil) }
 
-  @objc private func showMenuBarSyncAlert(_ notification: Notification) {
-    guard let payload = notification.object as? MenuBarSyncAlert else { return }
+  @objc private func showNativeAlert(_ notification: Notification) {
+    guard let payload = notification.object as? NativeAlert else { return }
     let alert = NSAlert()
     alert.messageText = payload.title
     alert.informativeText = payload.message
@@ -104,6 +118,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     alert.addButton(withTitle: "OK")
     NSApp.activate(ignoringOtherApps: true)
     alert.runModal()
+  }
+
+  @objc private func updateStateChanged(_ notification: Notification) {
+    guard let payload = notification.object as? UpdateMenuState else { return }
+    if payload.installing {
+      updateMenuItem?.title = "Installing Update…"
+      updateMenuItem?.isEnabled = false
+    } else if payload.checking {
+      updateMenuItem?.title = "Checking for Updates…"
+      updateMenuItem?.isEnabled = false
+    } else if let version = payload.version {
+      updateMenuItem?.title = "Install Update \(version)…"
+      updateMenuItem?.isEnabled = true
+    } else {
+      updateMenuItem?.title = "Check for Updates…"
+      updateMenuItem?.isEnabled = true
+    }
   }
 
   private func showMainWindow() {
@@ -162,6 +193,19 @@ struct ContentView: View {
       Label("Data stays on this Mac", systemImage: "lock.shield.fill")
         .foregroundStyle(.secondary)
       Spacer()
+      if let version = model.availableUpdateVersion {
+        Button(model.isInstallingUpdate ? "Installing…" : "Install \(version)") {
+          model.installAvailableUpdate()
+        }
+        .controlSize(.small)
+        .disabled(model.isInstallingUpdate)
+      } else {
+        Button(model.isCheckingForUpdates ? "Checking…" : "Check for updates…") {
+          model.checkForUpdates(showAlert: true)
+        }
+        .controlSize(.small)
+        .disabled(model.isCheckingForUpdates || model.isInstallingUpdate)
+      }
       Button {
         model.refresh()
       } label: {
@@ -404,6 +448,11 @@ struct PreferencesPanel: View {
         RowDivider()
         PreferenceRow(icon: "menubar.rectangle", color: Theme.accent, title: "Show in menu bar", detail: "Quick access while the app is running") {
           Toggle("", isOn: Binding(get: { model.menuBarEnabled }, set: { model.setMenuBarEnabled($0) }))
+            .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
+        }
+        RowDivider()
+        PreferenceRow(icon: "arrow.triangle.2.circlepath.circle", color: Theme.accent, title: "Automatically check for updates", detail: model.autoCheckUpdates ? "Once a day while the app is running" : "Manual checks only") {
+          Toggle("", isOn: Binding(get: { model.autoCheckUpdates }, set: { model.setAutoCheckUpdates($0) }))
             .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
         }
       }

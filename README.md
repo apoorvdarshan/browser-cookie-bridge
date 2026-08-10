@@ -17,7 +17,7 @@ cd /Users/apoorvdarshan/browser-cookie-bridge
 npm test
 npm run check
 npm pack
-npx --yes ./browser-cookie-bridge-0.23.2.tgz install-app
+npx --yes ./browser-cookie-bridge-1.0.0.tgz install-app
 ```
 
 This builds and installs `Browser Cookie Bridge.app` into your user Applications folder. The app provides:
@@ -25,7 +25,8 @@ This builds and installs `Browser Cookie Bridge.app` into your user Applications
 - Separate **Export from** and **Import into** pickers with large browser icons
 - ChatGPT Codex available only as an import destination, represented by a paired OpenAI and Codex mark
 - Persistent Cookies and History URL choices
-- Manual and daily direct sync
+- Manual, login, and optional daily direct sync
+- Automatic daily update checks, plus one-click install and relaunch
 - Daily sync, disabled by default, with a fixed local time when enabled
 - Sync when you sign in, enabled by default on a fresh installation
 - Open at login, enabled by default
@@ -45,15 +46,17 @@ Only the selected endpoints respond to a transfer. The source browser may remain
 You can also control preferences and sync from the packed CLI:
 
 ```bash
-npx --yes ./browser-cookie-bridge-0.23.2.tgz preferences --source brave --target codex --cookies on --history off --menu-bar on
-npx --yes ./browser-cookie-bridge-0.23.2.tgz sync --timeout 300
-npx --yes ./browser-cookie-bridge-0.23.2.tgz setup --hour 9 --minute 0
-npx --yes ./browser-cookie-bridge-0.23.2.tgz enable-login-sync
+npx --yes ./browser-cookie-bridge-1.0.0.tgz preferences --source brave --target codex --cookies on --history off --menu-bar on --auto-check-updates on
+npx --yes ./browser-cookie-bridge-1.0.0.tgz sync --timeout 300
+npx --yes ./browser-cookie-bridge-1.0.0.tgz setup --hour 9 --minute 0
+npx --yes ./browser-cookie-bridge-1.0.0.tgz enable-login-sync
 ```
 
 The fixed daily sync and login sync are independent controls. Login sync runs once when you sign in, not every rolling 24 hours; the fixed daily time therefore never drifts after restarts or sleep. Neither option launches or force-quits a browser. A scheduled Codex sync exits without changing data when Codex is open; close Codex and run **Sync now**, or leave it closed at the next scheduled time.
 
 `setup` copies a pinned runtime into the utility's Application Support folder. The daily job runs that copy, so an `npx` cache cleanup cannot silently replace or remove the scheduled code.
+
+Automatic update checks are enabled by default and query the public npm release metadata once when the app starts and then every 24 hours while it remains running. Installing an available update is always an explicit action. The detached updater closes Browser Cookie Bridge, installs the selected release locally, relaunches it in the background, and preserves the previous installed bundle if replacement fails.
 
 ## Releases
 
@@ -61,8 +64,8 @@ Pushing a semantic version tag runs the release workflow. The tag must match the
 
 ```bash
 npm run release:check
-git tag v0.23.2
-git push origin v0.23.2
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
 After the tests pass, GitHub Actions publishes the package to npm and creates a GitHub Release with generated notes and the npm tarball attached. Pushing a normal branch or commit does not publish anything.
