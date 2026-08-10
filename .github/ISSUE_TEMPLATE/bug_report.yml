@@ -1,0 +1,76 @@
+name: Bug report
+description: Report something that is not working in Browser Cookie Bridge
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Do not include cookie values, passwords, tokens, or other private browser data.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: "1.0.0 (build 23)"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "macOS 26.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Export source
+      options:
+        - Brave
+        - Chrome
+        - Edge
+        - Arc
+        - Vivaldi
+        - Opera
+        - Comet
+    validations:
+      required: true
+  - type: dropdown
+    id: destination
+    attributes:
+      label: Import destination
+      options:
+        - ChatGPT Codex
+        - Brave
+        - Chrome
+        - Edge
+        - Arc
+        - Vivaldi
+        - Opera
+        - Comet
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the exact status or error shown by the app, but remove private data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Select …
+        2. Click …
+        3. See …
+    validations:
+      required: true

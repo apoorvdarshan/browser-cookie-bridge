@@ -100,3 +100,15 @@ Supported source IDs: `brave`, `chrome`, `edge`, `arc`, `vivaldi`, `opera`, and 
 - Some sites bind sessions to a device or browser and may reject transferred cookies.
 
 The Codex destination is an intentionally unsupported direct integration. Codex updates can change its database locations or schemas; the app refuses unknown schemas and keeps the original backup.
+
+## Project links
+
+- [Open-source repository](https://github.com/apoorvdarshan/browser-cookie-bridge)
+- [Report a bug](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml)
+- [Support on Ko-fi](https://ko-fi.com/apoorvdarshan)
+- [Follow @apoorvdarshan on X](https://x.com/apoorvdarshan)
+- Product Hunt voting link coming soon
+
+## License
+
+Browser Cookie Bridge is open-source software available under the [MIT License](LICENSE). Copyright © 2026 Apoorv Darshan.

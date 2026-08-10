@@ -1,6 +1,14 @@
 import AppKit
 import SwiftUI
 
+private enum ProjectLinks {
+  static let repository = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge")!
+  static let issues = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml")!
+  static let license = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/LICENSE")!
+  static let koFi = URL(string: "https://ko-fi.com/apoorvdarshan")!
+  static let x = URL(string: "https://x.com/apoorvdarshan")!
+}
+
 @main
 struct BraveCodexSyncApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -86,6 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       menu.addItem(withTitle: "Sync now", action: #selector(syncNowAction), keyEquivalent: "")
       let updateItem = menu.addItem(withTitle: "Check for Updates…", action: #selector(updateAction), keyEquivalent: "")
       updateMenuItem = updateItem
+      addProjectLinks(to: menu)
       menu.addItem(.separator())
       menu.addItem(withTitle: "Quit", action: #selector(quitAction), keyEquivalent: "q")
       for menuItem in menu.items { menuItem.target = self }
@@ -110,6 +119,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     else { model?.checkForUpdates(showAlert: true) }
   }
   @objc private func quitAction() { NSApp.terminate(nil) }
+
+  @objc private func openProjectLink(_ sender: NSMenuItem) {
+    guard let address = sender.representedObject as? String,
+          let url = URL(string: address) else { return }
+    NSWorkspace.shared.open(url)
+  }
 
   @objc private func showNativeAlert(_ notification: Notification) {
     guard let payload = notification.object as? NativeAlert else { return }
@@ -147,6 +162,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     NSApp.setActivationPolicy(.regular)
     mainWindow?.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
+  }
+
+  private func addProjectLinks(to menu: NSMenu) {
+    let links = NSMenu(title: "Project & Support")
+    addLink("Open-source repository", url: ProjectLinks.repository, to: links)
+    addLink("Report a bug…", url: ProjectLinks.issues, to: links)
+    addLink("MIT license", url: ProjectLinks.license, to: links)
+    links.addItem(.separator())
+    addLink("Support on Ko-fi", url: ProjectLinks.koFi, to: links)
+    addLink("Follow @apoorvdarshan on X", url: ProjectLinks.x, to: links)
+    let productHunt = links.addItem(withTitle: "Vote on Product Hunt — link coming soon", action: nil, keyEquivalent: "")
+    productHunt.isEnabled = false
+    let parent = NSMenuItem(title: "Project & Support", action: nil, keyEquivalent: "")
+    parent.submenu = links
+    menu.addItem(parent)
+  }
+
+  private func addLink(_ title: String, url: URL, to menu: NSMenu) {
+    let item = menu.addItem(withTitle: title, action: #selector(openProjectLink(_:)), keyEquivalent: "")
+    item.target = self
+    item.representedObject = url.absoluteString
   }
 }
 
@@ -199,6 +235,19 @@ struct ContentView: View {
       Label("Data stays on this Mac", systemImage: "lock.shield.fill")
         .foregroundStyle(.secondary)
       Spacer()
+      Menu {
+        Link(destination: ProjectLinks.repository) { Label("Open-source repository", systemImage: "chevron.left.forwardslash.chevron.right") }
+        Link(destination: ProjectLinks.issues) { Label("Report a bug…", systemImage: "ladybug") }
+        Link(destination: ProjectLinks.license) { Label("MIT license", systemImage: "doc.text") }
+        Divider()
+        Link(destination: ProjectLinks.koFi) { Label("Support on Ko-fi", systemImage: "heart") }
+        Link(destination: ProjectLinks.x) { Label("Follow @apoorvdarshan on X", systemImage: "person.crop.circle.badge.plus") }
+        Button("Vote on Product Hunt — link coming soon") {}
+          .disabled(true)
+      } label: {
+        Label("Project & support", systemImage: "link")
+      }
+      .controlSize(.small)
       if let version = model.availableUpdateVersion {
         Button(model.isInstallingUpdate ? "Installing…" : "Install \(version)") {
           model.installAvailableUpdate()
