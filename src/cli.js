@@ -3,7 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { installApp } from "./app-installer.js";
 import { createBroker } from "./broker.js";
-import { openCodexBrowserImport, stageCodexImport } from "./codex-import.js";
+import {
+  CODEX_RUNNING_ERROR,
+  directImportToCodex,
+  isCodexRunning,
+} from "./codex-direct-import.js";
 import { readChromiumProfile } from "./chromium-reader.js";
 import { installConfig, installRuntime, readConfig, updatePreferences } from "./config.js";
 import {
@@ -36,7 +40,6 @@ Commands:
   install-app [--no-open]
   preferences --source brave --target codex --cookies on --history off --menu-bar off
   sync [--timeout 300]
-  open-codex-import
   doctor
   enable-login-sync
   disable-login-sync
@@ -53,8 +56,6 @@ export async function main(argv) {
       return setup(args);
     case "sync":
       return sync(args);
-    case "open-codex-import":
-      return openCodexImport();
     case "install-app":
       return installDesktopApp(args);
     case "preferences":
@@ -143,7 +144,7 @@ function setup(args) {
   console.log(`Pinned runtime: ${runtime}`);
   if (config.targetBrowser === "codex") {
     console.log(`Source browser: ${config.sourceBrowser} (read locally; no extension required)`);
-    console.log("Target integration: Codex native browser-profile import");
+    console.log("Target integration: direct local Codex merge (Codex must be closed)");
   } else {
     console.log(`Source extension (${config.sourceBrowser}): ${installedExtensionDir(undefined, config.sourceBrowser)}`);
     console.log(`Target extension (${config.targetBrowser}): ${installedExtensionDir(undefined, config.targetBrowser)}`);
@@ -152,7 +153,7 @@ function setup(args) {
   if (plist) console.log(`Daily schedule: ${pad(hour)}:${pad(minute)} (${plist})`);
   console.log(`Broker port: 127.0.0.1:${config.port}`);
   console.log(config.targetBrowser === "codex"
-    ? "Cookie values are stored only in the dedicated Chrome-compatible staging profile and are encrypted."
+    ? "Codex is backed up and validated before its local browser data is changed."
     : "Cookie values are transferred in memory and are not written to logs or disk.");
 }
 
@@ -162,13 +163,18 @@ async function sync(args) {
   const config = readConfig();
   const isCodexTarget = (config.targetBrowser || "codex") === "codex";
   if (isCodexTarget) {
+    if (isCodexRunning()) throw new Error(CODEX_RUNNING_ERROR);
     const payload = readChromiumProfile({
       browser: config.sourceBrowser || "brave",
       imports: config.imports || { cookies: true, history: false },
     });
     console.log(`Read ${payload.cookies.length} cookies and ${payload.history.length} history URLs from ${config.sourceBrowser || "brave"}.`);
-    const result = stageCodexImport({ cookies: payload.cookies, history: payload.history });
-    console.log(codexStagingSummary(result));
+    const result = directImportToCodex({
+      cookies: payload.cookies,
+      history: payload.history,
+      codexRunning: false,
+    });
+    console.log(directCodexSummary(result));
     return result;
   }
   const broker = createBroker({
@@ -196,14 +202,14 @@ async function sync(args) {
   return result;
 }
 
-export function codexStagingSummary(result) {
-  const staged = (result.stagedCookies || 0) + (result.stagedHistory || 0);
+export function directCodexSummary(result) {
+  const imported = result.imported + result.historyImported;
   const skipped = result.skipped + result.historySkipped;
   const failures = result.failed + result.historyFailed;
   if (failures > 0) {
-    return `Codex import prepared with warnings: ${staged} staged, ${skipped} skipped, ${failures} failed. Open ChatGPT Settings → Browser → Import… and choose Browser Cookie Bridge.`;
+    return `Direct Codex sync completed with warnings: ${imported} imported, ${skipped} skipped, ${failures} failed. Backup: ${result.backupPath}`;
   }
-  return `Codex import prepared: ${staged} staged and ${skipped} skipped. Open ChatGPT Settings → Browser → Import… and choose Browser Cookie Bridge.`;
+  return `Direct Codex sync complete: ${imported} imported and ${skipped} skipped. Reopen Codex to use the updated sessions. Backup: ${result.backupPath}`;
 }
 
 export function transferSummary(result) {
@@ -230,7 +236,7 @@ function doctor() {
   console.log(`Source extension: ${status(installedExtensionDir(home, source))}`);
   console.log(
     target === "codex"
-      ? "Target integration: Codex native browser-profile import"
+      ? "Target integration: direct local Codex merge (Codex must be closed)"
       : `Target extension: ${status(installedExtensionDir(home, target))}`,
   );
   console.log(`Daily schedule: ${status(launchAgentPath(home))}`);
@@ -244,12 +250,6 @@ function doctor() {
   console.log("No cookie names, domains, values, or encryption keys were read.");
 }
 
-function openCodexImport() {
-  assertMacOS();
-  openCodexBrowserImport();
-  console.log("Opened ChatGPT Codex browser settings. Choose Import… and the Browser Cookie Bridge profile.");
-}
-
 function enableLoginSync() {
   assertMacOS();
   const runtime = installRuntime();
@@ -260,7 +260,7 @@ function enableLoginSync() {
   console.log(`Login sync enabled: ${plist}`);
   const config = readConfig();
   console.log(config.targetBrowser === "codex"
-    ? "A sync starts when you sign in and refreshes the encrypted Codex import profile."
+    ? "A sync starts when you sign in and updates Codex only when Codex is closed."
     : "A sync starts when you sign in and waits up to five minutes for both browser extensions.");
 }
 

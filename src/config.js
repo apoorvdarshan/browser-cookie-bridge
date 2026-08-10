@@ -89,6 +89,7 @@ export function installRuntime(home) {
 
   fs.mkdirSync(target, { recursive: true, mode: 0o700 });
   for (const name of ["bin", "src", "extension-template"]) {
+    fs.rmSync(path.join(target, name), { recursive: true, force: true });
     fs.cpSync(path.join(source, name), path.join(target, name), { recursive: true, force: true });
   }
   const appSource = path.join(source, "macos-app");

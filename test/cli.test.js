@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { codexStagingSummary, transferSummary } from "../src/cli.js";
+import { directCodexSummary, transferSummary } from "../src/cli.js";
 
 test("transfer summary distinguishes complete and partial imports", () => {
   const complete = transferSummary({ imported: 8, failed: 0, skipped: 2, historyImported: 3, historyFailed: 0, historySkipped: 1 });
@@ -11,15 +11,17 @@ test("transfer summary distinguishes complete and partial imports", () => {
   assert.match(partial, /Reload the destination extension/);
 });
 
-test("Codex summary explains the required native import step", () => {
-  const summary = codexStagingSummary({
-    stagedCookies: 8,
-    stagedHistory: 0,
+test("Codex summary explains the completed direct merge and backup", () => {
+  const summary = directCodexSummary({
+    imported: 8,
+    historyImported: 0,
     failed: 0,
     skipped: 2,
     historyFailed: 0,
     historySkipped: 0,
+    backupPath: "/tmp/backup",
   });
-  assert.match(summary, /Codex import prepared: 8 staged and 2 skipped/);
-  assert.match(summary, /Settings → Browser → Import/);
+  assert.match(summary, /Direct Codex sync complete: 8 imported and 2 skipped/);
+  assert.match(summary, /Reopen Codex/);
+  assert.match(summary, /Backup: \/tmp\/backup/);
 });

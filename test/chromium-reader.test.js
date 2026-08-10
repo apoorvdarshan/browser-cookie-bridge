@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { readChromiumProfile } from "../src/chromium-reader.js";
-import { deriveChromeEncryptionKey, encryptChromeCookieValue } from "../src/codex-import.js";
 
 test("native Chromium reader decrypts a version 24 cookie profile while the database is readable", () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-reader-"));
@@ -20,7 +20,8 @@ test("native Chromium reader decrypts a version 24 cookie profile while the data
       CREATE TABLE cookies(
         host_key TEXT, top_frame_site_key TEXT, name TEXT, value TEXT, encrypted_value BLOB,
         path TEXT, expires_utc INTEGER, is_secure INTEGER, is_httponly INTEGER,
-        has_expires INTEGER, is_persistent INTEGER, samesite INTEGER
+        has_expires INTEGER, is_persistent INTEGER, samesite INTEGER,
+        has_cross_site_ancestor INTEGER
       );
     `);
     const encrypted = encryptChromeCookieValue({
@@ -28,7 +29,7 @@ test("native Chromium reader decrypts a version 24 cookie profile while the data
       value: "native-reader-secret",
       encryptionKey: deriveChromeEncryptionKey(password),
     });
-    database.prepare("INSERT INTO cookies VALUES (?, '', ?, '', ?, '/', 0, 1, 1, 0, 0, 1)")
+    database.prepare("INSERT INTO cookies VALUES (?, '', ?, '', ?, '/', 0, 1, 1, 0, 0, 1, 1)")
       .run(".example.test", "session", encrypted);
     database.close();
 
@@ -46,3 +47,14 @@ test("native Chromium reader decrypts a version 24 cookie profile while the data
     fs.rmSync(home, { recursive: true, force: true });
   }
 });
+
+function deriveChromeEncryptionKey(password) {
+  return crypto.pbkdf2Sync(password, "saltysalt", 1003, 16, "sha1");
+}
+
+function encryptChromeCookieValue({ domain, value, encryptionKey }) {
+  const hostDigest = crypto.createHash("sha256").update(domain).digest();
+  const cipher = crypto.createCipheriv("aes-128-cbc", encryptionKey, Buffer.alloc(16, 0x20));
+  const encrypted = Buffer.concat([cipher.update(Buffer.concat([hostDigest, Buffer.from(value)])), cipher.final()]);
+  return Buffer.concat([Buffer.from("v10"), encrypted]);
+}

@@ -100,7 +100,8 @@ function readCookies({ databasePath, password }) {
     const rows = database.prepare(`
       SELECT host_key, top_frame_site_key, name, value, encrypted_value, path,
              CAST(expires_utc AS TEXT) AS expires_utc,
-             is_secure, is_httponly, has_expires, is_persistent, samesite
+             is_secure, is_httponly, has_expires, is_persistent, samesite,
+             has_cross_site_ancestor
       FROM cookies
     `).all();
     const cookies = [];
@@ -123,7 +124,12 @@ function readCookies({ databasePath, password }) {
           sameSite: ({ "-1": "unspecified", 0: "no_restriction", 1: "lax", 2: "strict" })[row.samesite] || "unspecified",
           session: !persistent,
           ...(persistent ? { expirationDate: chromiumToUnixSeconds(row.expires_utc) } : {}),
-          ...(row.top_frame_site_key ? { partitionKey: { topLevelSite: row.top_frame_site_key } } : {}),
+          ...(row.top_frame_site_key ? {
+            partitionKey: {
+              topLevelSite: row.top_frame_site_key,
+              hasCrossSiteAncestor: Boolean(row.has_cross_site_ancestor),
+            },
+          } : {}),
         });
       } catch {
         // An individual malformed or obsolete cookie must not block the rest of the profile.

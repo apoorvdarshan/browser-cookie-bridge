@@ -182,26 +182,29 @@ struct SyncPanel: View {
               .help(model.secondaryStatus)
           }
           Spacer()
-          if model.codexImportReady {
-            Button("Refresh") { model.syncNow() }
-              .buttonStyle(.bordered)
-              .disabled(model.isSyncing || model.isWorking)
-          }
-          Button {
-            if model.codexImportReady { model.openCodexImport() }
-            else { model.syncNow() }
-          } label: {
+          Button { model.syncNow() } label: {
             HStack(spacing: 7) {
               if model.isSyncing { ProgressView().controlSize(.small) }
-              else { Image(systemName: model.codexImportReady ? "arrow.down.doc" : "arrow.triangle.2.circlepath") }
-              Text(model.isSyncing ? "Syncing…" : (model.codexImportReady ? "Import in Codex" : "Sync now"))
+              else { Image(systemName: model.codexBlocked ? "xmark.circle.fill" : "arrow.triangle.2.circlepath") }
+              Text(model.isSyncing ? "Syncing…" : (model.codexBlocked ? "Close Codex first" : "Sync now"))
             }
-            .frame(minWidth: 92)
+            .frame(minWidth: model.codexBlocked ? 116 : 92)
           }
           .buttonStyle(.borderedProminent)
           .tint(Theme.accent)
-          .disabled(model.isSyncing)
+          .disabled(model.isSyncing || model.codexBlocked)
           .keyboardShortcut(.return, modifiers: .command)
+        }
+        .padding(model.codexBlocked ? 7 : 0)
+        .background(
+          model.codexBlocked ? Theme.active.opacity(0.10) : Color.clear,
+          in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+        )
+        .overlay {
+          if model.codexBlocked {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+              .stroke(Theme.active.opacity(0.38), lineWidth: 1)
+          }
         }
       }
     }
@@ -425,7 +428,7 @@ struct ExtensionSetupSheet: View {
       .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.07)))
 
       Text(model.selectedTargetID == "codex"
-        ? "In the source browser, enable Developer mode and choose Load unpacked. Then use Codex's own Browser → Import flow. Password access is never requested."
+        ? "Codex uses a direct local merge, so no extension is required. Quit Codex before syncing. Password access is never requested."
         : "In both endpoints, enable Developer mode and choose Load unpacked. Password access is never requested.")
         .font(.system(size: 10.5))
         .foregroundStyle(.secondary)

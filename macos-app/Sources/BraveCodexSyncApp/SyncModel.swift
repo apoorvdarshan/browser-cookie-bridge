@@ -40,7 +40,7 @@ final class SyncModel: ObservableObject {
   @Published var historyEnabled = false
   @Published var selectedSourceID = "brave"
   @Published var selectedTargetID = "codex"
-  @Published var codexImportReady = false
+  @Published var codexRunning = false
   @Published var primaryStatus = "Ready to sync"
   @Published var secondaryStatus = "Choose what to move, then start a transfer"
 
@@ -50,6 +50,7 @@ final class SyncModel: ObservableObject {
   private var launchAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.plist") }
   private var loginSyncAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.login-sync.plist") }
   private var appLoginAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.app-login.plist") }
+  private var codexStatusTimer: Timer?
 
   var selectedBrowser: BrowserChoice {
     browsers.first(where: { $0.id == selectedSourceID }) ?? browsers[0]
@@ -60,6 +61,7 @@ final class SyncModel: ObservableObject {
   }
 
   var targetName: String { selectedTargetBrowser?.name ?? "ChatGPT Codex" }
+  var codexBlocked: Bool { selectedTargetID == "codex" && codexRunning }
   var sourceIcon: NSImage { browserIcon(selectedBrowser) }
   var targetIcon: NSImage { selectedTargetBrowser.map(browserIcon) ?? codexIcon }
   var codexIcon: NSImage {
@@ -94,6 +96,10 @@ final class SyncModel: ObservableObject {
   init() {
     let calendar = Calendar.current
     scheduleTime = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
+    updateCodexRunningStatus()
+    codexStatusTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+      Task { @MainActor in self?.updateCodexRunningStatus() }
+    }
   }
 
   func refresh() {
@@ -120,22 +126,15 @@ final class SyncModel: ObservableObject {
       menuBarEnabled = config.ui?.menuBar ?? false
     }
     NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: menuBarEnabled)
-    codexImportReady = selectedTargetID == "codex"
-      && FileManager.default.fileExists(atPath: home.appending(path: "Library/Application Support/Google/Chrome/Browser Cookie Bridge/Cookies").path)
-    if codexImportReady && !isSyncing {
-      state = .success
-      primaryStatus = "Ready for Codex import"
-      secondaryStatus = "Encrypted snapshot ready — import the Browser Cookie Bridge profile"
-    }
     extensionsReady = requiredExtensionIDs.allSatisfy {
       FileManager.default.fileExists(atPath: support.appending(path: "extension-\($0)/manifest.json").path)
     }
+    updateCodexRunningStatus()
   }
 
   func selectSource(_ id: String) {
     guard browsers.contains(where: { $0.id == id }), id != selectedSourceID, id != selectedTargetID else { return }
     selectedSourceID = id
-    codexImportReady = false
     persistPreferences(successMessage: "Export source changed to \(selectedBrowser.name)")
   }
 
@@ -143,9 +142,8 @@ final class SyncModel: ObservableObject {
     let validTarget = id == "codex" || browsers.contains(where: { $0.id == id })
     guard validTarget, id != selectedTargetID, id != selectedSourceID else { return }
     selectedTargetID = id
-    codexImportReady = id == "codex"
-      && FileManager.default.fileExists(atPath: home.appending(path: "Library/Application Support/Google/Chrome/Browser Cookie Bridge/Cookies").path)
     persistPreferences(successMessage: "Import destination changed to \(targetName)")
+    updateCodexRunningStatus()
   }
 
   func setCookiesEnabled(_ enabled: Bool) {
@@ -166,30 +164,32 @@ final class SyncModel: ObservableObject {
 
   func syncNow() {
     guard !isSyncing else { return }
+    updateCodexRunningStatus()
+    guard !codexBlocked else { return }
     isSyncing = true
-    codexImportReady = false
     state = .syncing
     primaryStatus = "Transferring selected data"
     secondaryStatus = selectedTargetID == "codex"
-      ? "Reading \(selectedBrowser.name) and preparing a native Codex import…"
+      ? "Backing up Codex and merging \(selectedBrowser.name) locally…"
       : "Waiting for \(selectedBrowser.name) and \(targetName)…"
     runCLI(["sync", "--timeout", "300"]) { [weak self] success, output in
       guard let self else { return }
       self.isSyncing = false
       if success {
-        let partial = output.contains("Partially synced:")
+        let partial = output.contains("Partially synced:") || output.contains("with warnings")
         self.state = partial ? .warning : .success
         self.primaryStatus = self.selectedTargetID == "codex"
-          ? "Ready for Codex import"
+          ? (partial ? "Codex sync completed with warnings" : "Codex sessions updated")
           : (partial ? "Partially synced" : "Transfer complete")
         self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and \(self.targetName) are up to date"
-        self.codexImportReady = self.selectedTargetID == "codex"
       } else {
-        self.codexImportReady = false
         self.state = .error
         self.primaryStatus = "Sync did not finish"
-        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Keep both apps open and check the extensions"
+        self.secondaryStatus = self.lastMeaningfulLine(output) ?? (self.selectedTargetID == "codex"
+          ? "Quit Codex completely, then try again"
+          : "Keep both browsers open and check the extensions")
       }
+      self.updateCodexRunningStatus()
     }
   }
 
@@ -257,19 +257,6 @@ final class SyncModel: ObservableObject {
     NSWorkspace.shared.activateFileViewerSelecting([folder])
   }
 
-  func openCodexImport() {
-    isWorking = true
-    runCLI(["open-codex-import"]) { [weak self] success, output in
-      guard let self else { return }
-      self.isWorking = false
-      if !success {
-        self.state = .error
-        self.primaryStatus = "Could not open Codex import"
-        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Open ChatGPT Settings → Browser → Import…"
-      }
-    }
-  }
-
   private func persistPreferences(successMessage: String) {
     isWorking = true
     let arguments = [
@@ -296,6 +283,7 @@ final class SyncModel: ObservableObject {
       self.extensionsReady = self.requiredExtensionIDs.allSatisfy {
         FileManager.default.fileExists(atPath: self.support.appending(path: "extension-\($0)/manifest.json").path)
       }
+      self.updateCodexRunningStatus()
     }
   }
 
@@ -376,6 +364,23 @@ final class SyncModel: ObservableObject {
 
   private var requiredExtensionIDs: [String] {
     selectedTargetID == "codex" ? [] : [selectedSourceID, selectedTargetID]
+  }
+
+  private func updateCodexRunningStatus() {
+    let wasRunning = codexRunning
+    codexRunning = NSWorkspace.shared.runningApplications.contains {
+      $0.bundleIdentifier == "com.openai.codex"
+    }
+    guard selectedTargetID == "codex", !isSyncing else { return }
+    if codexRunning {
+      state = .warning
+      primaryStatus = "Quit Codex before syncing"
+      secondaryStatus = "Close ChatGPT Codex completely so its local cookie database can be updated safely"
+    } else if wasRunning && primaryStatus == "Quit Codex before syncing" {
+      state = .ready
+      primaryStatus = "Ready to sync directly"
+      secondaryStatus = "Codex is closed — a backup will be created before anything changes"
+    }
   }
 }
 
