@@ -61,7 +61,11 @@ final class SyncModel: ObservableObject {
   var targetName: String { selectedTargetBrowser?.name ?? "ChatGPT Codex" }
   var sourceIcon: NSImage { browserIcon(selectedBrowser) }
   var targetIcon: NSImage { selectedTargetBrowser.map(browserIcon) ?? codexIcon }
-  var codexIcon: NSImage { chatGPTResource("app.icns") ?? appIcon(bundleIdentifier: "com.openai.codex", fallbackSymbol: "terminal") }
+  var codexIcon: NSImage {
+    bundledIcon("chatgpt-codex")
+      ?? chatGPTResource("app.icns")
+      ?? appIcon(bundleIdentifier: "com.openai.codex", fallbackSymbol: "terminal")
+  }
 
   func browserIcon(_ browser: BrowserChoice) -> NSImage {
     if browser.id == "brave",
@@ -77,6 +81,13 @@ final class SyncModel: ObservableObject {
       return image
     }
     return appIcon(bundleIdentifier: browser.bundleIdentifier, fallbackSymbol: "globe")
+  }
+
+  private func bundledIcon(_ name: String) -> NSImage? {
+    guard let url = Bundle.main.url(forResource: name, withExtension: "svg", subdirectory: "BrowserIcons") else {
+      return nil
+    }
+    return NSImage(contentsOf: url)
   }
 
   init() {
