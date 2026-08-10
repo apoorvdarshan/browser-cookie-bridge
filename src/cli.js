@@ -11,9 +11,10 @@ import {
   installedAppPath,
   installedExtensionDir,
   launchAgentPath,
+  loginSyncLaunchAgentPath,
   SOURCE_BROWSERS,
 } from "./paths.js";
-import { installSchedule, removeSchedule } from "./scheduler.js";
+import { installLoginSync, installSchedule, removeLoginSync, removeSchedule } from "./scheduler.js";
 
 const HELP = `brave-codex-cookie-sync
 
@@ -25,6 +26,8 @@ Commands:
   preferences --source brave --cookies on --history off
   sync [--timeout 300]
   doctor
+  enable-login-sync
+  disable-login-sync
   remove-schedule
   help
 `;
@@ -42,6 +45,10 @@ export async function main(argv) {
       return preferences(args);
     case "doctor":
       return doctor();
+    case "enable-login-sync":
+      return enableLoginSync();
+    case "disable-login-sync":
+      return disableLoginSync();
     case "remove-schedule":
       return remove();
     case "help":
@@ -147,12 +154,28 @@ function doctor() {
   console.log(`Source extension: ${status(installedExtensionDir(home, source))}`);
   console.log(`Codex extension: ${status(installedExtensionDir(home, "codex"))}`);
   console.log(`Daily schedule: ${status(launchAgentPath(home))}`);
+  console.log(`Sync at login: ${status(loginSyncLaunchAgentPath(home))}`);
   console.log(`Desktop app: ${status(installedAppPath(home))}`);
   console.log(`Brave cookie stores detected: ${brave.length}`);
   console.log(`Codex cookie stores detected: ${codex.length}`);
   for (const file of brave) console.log(`  Brave: ${file}`);
   for (const file of codex) console.log(`  Codex: ${file}`);
   console.log("No cookie names, domains, values, or encryption keys were read.");
+}
+
+function enableLoginSync() {
+  assertMacOS();
+  const runtime = installRuntime();
+  if (!fs.existsSync(configPath())) installConfig({ hour: 9, minute: 0 });
+  const plist = installLoginSync({
+    cliPath: path.join(runtime, "bin", "brave-codex-cookie-sync.js"),
+  });
+  console.log(`Login sync enabled: ${plist}`);
+  console.log("A sync starts when you sign in and waits up to five minutes for both browsers.");
+}
+
+function disableLoginSync() {
+  console.log(removeLoginSync() ? "Login sync disabled." : "Login sync was not enabled.");
 }
 
 function remove() {

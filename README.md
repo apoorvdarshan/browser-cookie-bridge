@@ -17,7 +17,7 @@ cd /Users/apoorvdarshan/brave-codex-cookie-sync
 npm test
 npm run check
 npm pack
-npx --yes ./brave-codex-cookie-sync-0.3.0.tgz install-app
+npx --yes ./brave-codex-cookie-sync-0.4.0.tgz install-app
 ```
 
 This builds and installs `Brave Codex Sync.app` into your user Applications folder. The app provides:
@@ -25,6 +25,7 @@ This builds and installs `Brave Codex Sync.app` into your user Applications fold
 - A source picker with installed browser icons and the Codex/OpenAI app icon
 - Persistent Cookies and History URL choices
 - Manual and daily sync
+- Optional sync when you sign in to the Mac
 - Open at login
 - A background menu-bar helper; closing the window does not quit it
 
@@ -38,12 +39,13 @@ Only the source selected in the app responds to a sync. Keep the selected browse
 You can also control preferences and sync from the packed CLI:
 
 ```bash
-npx --yes ./brave-codex-cookie-sync-0.3.0.tgz preferences --source brave --cookies on --history off
-npx --yes ./brave-codex-cookie-sync-0.3.0.tgz sync --timeout 300
-npx --yes ./brave-codex-cookie-sync-0.3.0.tgz setup --hour 9 --minute 0
+npx --yes ./brave-codex-cookie-sync-0.4.0.tgz preferences --source brave --cookies on --history off
+npx --yes ./brave-codex-cookie-sync-0.4.0.tgz sync --timeout 300
+npx --yes ./brave-codex-cookie-sync-0.4.0.tgz setup --hour 9 --minute 0
+npx --yes ./brave-codex-cookie-sync-0.4.0.tgz enable-login-sync
 ```
 
-The scheduled sync does not launch or force-quit either browser. It waits up to five minutes for both installed extensions; if a browser is closed, the run times out without transferring data.
+The fixed daily sync and login sync are independent controls. Login sync runs once when you sign in, not every rolling 24 hours; the fixed daily time therefore never drifts after restarts or sleep. Neither option launches or force-quits a browser. Each run waits up to five minutes for both installed extensions; if a browser is closed, it times out without transferring data.
 
 `setup` copies a pinned runtime into the utility's Application Support folder. The daily job runs that copy, so an `npx` cache cleanup cannot silently replace or remove the scheduled code.
 
@@ -55,6 +57,8 @@ setup [--hour 9] [--minute 0] [--no-schedule]
 preferences --source brave --cookies on --history off
 sync [--timeout 300]
 doctor
+enable-login-sync
+disable-login-sync
 remove-schedule
 help
 ```

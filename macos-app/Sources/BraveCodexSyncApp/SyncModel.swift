@@ -27,6 +27,7 @@ final class SyncModel: ObservableObject {
   @Published var isSyncing = false
   @Published var isWorking = false
   @Published var dailyEnabled = false
+  @Published var loginSyncEnabled = false
   @Published var openAtLogin = false
   @Published var scheduleTime = Date()
   @Published var extensionsReady = false
@@ -40,6 +41,7 @@ final class SyncModel: ObservableObject {
   private var support: URL { home.appending(path: "Library/Application Support/BraveCodexCookieSync") }
   private var runtimeCLI: URL { support.appending(path: "runtime/bin/brave-codex-cookie-sync.js") }
   private var launchAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.plist") }
+  private var loginSyncAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.login-sync.plist") }
 
   var selectedBrowser: BrowserChoice {
     browsers.first(where: { $0.id == selectedSourceID }) ?? browsers[0]
@@ -59,6 +61,7 @@ final class SyncModel: ObservableObject {
 
   func refresh() {
     dailyEnabled = FileManager.default.fileExists(atPath: launchAgent.path)
+    loginSyncEnabled = FileManager.default.fileExists(atPath: loginSyncAgent.path)
     openAtLogin = SMAppService.mainApp.status == .enabled
     if let config = loadConfig() {
       let calendar = Calendar.current
@@ -122,6 +125,28 @@ final class SyncModel: ObservableObject {
 
   func saveSchedule() {
     applySchedule(true)
+  }
+
+  func setLoginSyncEnabled(_ enabled: Bool) {
+    loginSyncEnabled = enabled
+    isWorking = true
+    runCLI([enabled ? "enable-login-sync" : "disable-login-sync"]) { [weak self] success, output in
+      guard let self else { return }
+      self.isWorking = false
+      if success {
+        self.state = .ready
+        self.primaryStatus = enabled ? "Sync at login enabled" : "Sync at login disabled"
+        self.secondaryStatus = enabled
+          ? "A sync starts now and whenever you sign in"
+          : "The fixed daily schedule is unchanged"
+      } else {
+        self.loginSyncEnabled.toggle()
+        self.state = .error
+        self.primaryStatus = "Could not update login sync"
+        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Run install-app again from the CLI"
+      }
+      self.refresh()
+    }
   }
 
   func setOpenAtLogin(_ enabled: Bool) {

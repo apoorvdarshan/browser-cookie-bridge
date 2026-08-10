@@ -1,6 +1,6 @@
 {
   "name": "brave-codex-cookie-sync",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Local Chromium-browser to Codex data sync for macOS",
   "type": "module",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "check": "node --check bin/brave-codex-cookie-sync.js && node --check src/app-installer.js && node --check src/broker.js && node --check src/cli.js && node --check extension-template/background.js",
+    "check": "node --check bin/brave-codex-cookie-sync.js && node --check src/app-installer.js && node --check src/broker.js && node --check src/cli.js && node --check src/config.js && node --check src/paths.js && node --check src/scheduler.js && node --check extension-template/background.js",
     "build:app": "node bin/brave-codex-cookie-sync.js install-app --no-open"
   },
   "engines": {

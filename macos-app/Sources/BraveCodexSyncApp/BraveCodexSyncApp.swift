@@ -10,7 +10,7 @@ struct BraveCodexSyncApp: App {
     WindowGroup("Brave Codex Sync", id: "main") {
       ContentView()
         .environmentObject(model)
-        .frame(width: 548, height: 650)
+        .frame(width: 548, height: 706)
         .background(Color(nsColor: .windowBackgroundColor))
     }
     .windowResizability(.contentSize)
@@ -209,6 +209,21 @@ struct ContentView: View {
             .controlSize(.small).disabled(!model.dailyEnabled || model.isWorking)
           Toggle("", isOn: Binding(get: { model.dailyEnabled }, set: { model.setDailyEnabled($0) }))
             .labelsHidden().toggleStyle(.switch).tint(Theme.codexTeal).disabled(model.isWorking)
+        }
+        Divider()
+        HStack(spacing: 12) {
+          Image(systemName: "sunrise.fill")
+            .font(.system(size: 18, weight: .medium))
+            .foregroundStyle(Theme.braveCoral)
+            .frame(width: 24)
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Sync at login").font(.system(size: 13, weight: .semibold))
+            Text(model.loginSyncEnabled ? "Runs now, then once whenever you sign in" : "No automatic startup transfer")
+              .font(.system(size: 10.5)).foregroundStyle(.secondary)
+          }
+          Spacer()
+          Toggle("", isOn: Binding(get: { model.loginSyncEnabled }, set: { model.setLoginSyncEnabled($0) }))
+            .labelsHidden().toggleStyle(.switch).tint(Theme.braveCoral).disabled(model.isWorking)
         }
         Divider()
         HStack(spacing: 12) {
