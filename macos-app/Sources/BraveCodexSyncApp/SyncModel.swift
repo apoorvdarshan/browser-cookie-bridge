@@ -3,6 +3,14 @@ import Foundation
 
 extension Notification.Name {
   static let menuBarVisibilityChanged = Notification.Name("BraveCodexSync.menuBarVisibilityChanged")
+  static let menuBarSyncAlert = Notification.Name("BraveCodexSync.menuBarSyncAlert")
+}
+
+struct MenuBarSyncAlert {
+  enum Kind { case information, warning, error }
+  let title: String
+  let message: String
+  let kind: Kind
 }
 
 struct BrowserChoice: Identifiable, Hashable {
@@ -162,10 +170,20 @@ final class SyncModel: ObservableObject {
     persistPreferences(successMessage: enabled ? "Menu-bar icon enabled" : "Menu-bar icon hidden")
   }
 
-  func syncNow() {
-    guard !isSyncing else { return }
+  func syncNow(showMenuBarAlert: Bool = false) {
+    guard !isSyncing else {
+      if showMenuBarAlert {
+        postMenuBarAlert(title: "Sync already running", message: "Wait for the current transfer to finish.", kind: .information)
+      }
+      return
+    }
     updateCodexRunningStatus()
-    guard !codexBlocked else { return }
+    guard !codexBlocked else {
+      if showMenuBarAlert {
+        postMenuBarAlert(title: primaryStatus, message: secondaryStatus, kind: .warning)
+      }
+      return
+    }
     isSyncing = true
     state = .syncing
     primaryStatus = "Transferring selected data"
@@ -175,8 +193,8 @@ final class SyncModel: ObservableObject {
     runCLI(["sync", "--timeout", "300"]) { [weak self] success, output in
       guard let self else { return }
       self.isSyncing = false
+      let partial = success && (output.contains("Partially synced:") || output.contains("with warnings"))
       if success {
-        let partial = output.contains("Partially synced:") || output.contains("with warnings")
         self.state = partial ? .warning : .success
         self.primaryStatus = self.selectedTargetID == "codex"
           ? (partial ? "Codex sync completed with warnings" : "Codex sessions updated")
@@ -190,6 +208,13 @@ final class SyncModel: ObservableObject {
           : "Keep both browsers open and check the extensions")
       }
       self.updateCodexRunningStatus()
+      if showMenuBarAlert {
+        self.postMenuBarAlert(
+          title: self.primaryStatus,
+          message: self.secondaryStatus,
+          kind: success ? (partial ? .warning : .information) : .error
+        )
+      }
     }
   }
 
@@ -381,6 +406,13 @@ final class SyncModel: ObservableObject {
       primaryStatus = "Ready to sync directly"
       secondaryStatus = "Codex is closed — a backup will be created before anything changes"
     }
+  }
+
+  private func postMenuBarAlert(title: String, message: String, kind: MenuBarSyncAlert.Kind) {
+    NotificationCenter.default.post(
+      name: .menuBarSyncAlert,
+      object: MenuBarSyncAlert(title: title, message: message, kind: kind)
+    )
   }
 }
 

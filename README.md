@@ -17,7 +17,7 @@ cd /Users/apoorvdarshan/browser-cookie-bridge
 npm test
 npm run check
 npm pack
-npx --yes ./browser-cookie-bridge-0.23.1.tgz install-app
+npx --yes ./browser-cookie-bridge-0.23.2.tgz install-app
 ```
 
 This builds and installs `Browser Cookie Bridge.app` into your user Applications folder. The app provides:
@@ -30,6 +30,7 @@ This builds and installs `Browser Cookie Bridge.app` into your user Applications
 - Sync when you sign in, enabled by default on a fresh installation
 - Open at login, enabled by default
 - A menu-bar helper, enabled by default; closing the window keeps the app running but removes it from the Dock
+- Native menu-bar alerts for blocked, successful, partial, and failed sync attempts
 - A live Codex-running warning that disables direct sync until Codex is completely closed
 - Endpoint-aware errors that identify what did not connect or which app must be closed
 - A distinct partial-sync warning when individual cookies or history URLs fail
@@ -44,10 +45,10 @@ Only the selected endpoints respond to a transfer. The source browser may remain
 You can also control preferences and sync from the packed CLI:
 
 ```bash
-npx --yes ./browser-cookie-bridge-0.23.1.tgz preferences --source brave --target codex --cookies on --history off --menu-bar on
-npx --yes ./browser-cookie-bridge-0.23.1.tgz sync --timeout 300
-npx --yes ./browser-cookie-bridge-0.23.1.tgz setup --hour 9 --minute 0
-npx --yes ./browser-cookie-bridge-0.23.1.tgz enable-login-sync
+npx --yes ./browser-cookie-bridge-0.23.2.tgz preferences --source brave --target codex --cookies on --history off --menu-bar on
+npx --yes ./browser-cookie-bridge-0.23.2.tgz sync --timeout 300
+npx --yes ./browser-cookie-bridge-0.23.2.tgz setup --hour 9 --minute 0
+npx --yes ./browser-cookie-bridge-0.23.2.tgz enable-login-sync
 ```
 
 The fixed daily sync and login sync are independent controls. Login sync runs once when you sign in, not every rolling 24 hours; the fixed daily time therefore never drifts after restarts or sleep. Neither option launches or force-quits a browser. A scheduled Codex sync exits without changing data when Codex is open; close Codex and run **Sync now**, or leave it closed at the next scheduled time.
@@ -60,8 +61,8 @@ Pushing a semantic version tag runs the release workflow. The tag must match the
 
 ```bash
 npm run release:check
-git tag v0.23.1
-git push origin v0.23.1
+git tag v0.23.2
+git push origin v0.23.2
 ```
 
 After the tests pass, GitHub Actions publishes the package to npm and creates a GitHub Release with generated notes and the npm tarball attached. Pushing a normal branch or commit does not publish anything.

@@ -32,6 +32,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       name: .menuBarVisibilityChanged,
       object: nil
     )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(showMenuBarSyncAlert(_:)),
+      name: .menuBarSyncAlert,
+      object: nil
+    )
   }
 
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -82,8 +88,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   }
 
   @objc private func showMainWindowAction() { showMainWindow() }
-  @objc private func syncNowAction() { model?.syncNow() }
+  @objc private func syncNowAction() { model?.syncNow(showMenuBarAlert: true) }
   @objc private func quitAction() { NSApp.terminate(nil) }
+
+  @objc private func showMenuBarSyncAlert(_ notification: Notification) {
+    guard let payload = notification.object as? MenuBarSyncAlert else { return }
+    let alert = NSAlert()
+    alert.messageText = payload.title
+    alert.informativeText = payload.message
+    alert.alertStyle = switch payload.kind {
+    case .information: .informational
+    case .warning: .warning
+    case .error: .critical
+    }
+    alert.addButton(withTitle: "OK")
+    NSApp.activate(ignoringOtherApps: true)
+    alert.runModal()
+  }
 
   private func showMainWindow() {
     NSApp.setActivationPolicy(.regular)
