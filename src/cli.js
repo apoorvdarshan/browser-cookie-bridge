@@ -25,9 +25,9 @@ import {
   removeSchedule,
 } from "./scheduler.js";
 
-const HELP = `brave-codex-cookie-sync
+const HELP = `browser-cookie-bridge
 
-Local browser-data relay between Chromium browsers and into ChatGPT Codex.
+Local cookie and session transfer between Chromium browsers and into ChatGPT Codex.
 
 Commands:
   setup [--hour 9] [--minute 0] [--no-schedule]

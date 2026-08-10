@@ -56,7 +56,7 @@ test("timeout identifies the selected endpoint that did not connect", async () =
   const token = "presence-token";
   const port = 43293;
   const broker = createBroker({ token, port, sourceBrowser: "brave", targetBrowser: "codex", timeoutMs: 100 });
-  const completion = assert.rejects(broker.completion, /Brave did not connect.*Open it.*reload Browser Data Relay/);
+  const completion = assert.rejects(broker.completion, /Brave did not connect.*Open it.*reload Browser Cookie Bridge/);
   await broker.listen();
   await fetch(`http://127.0.0.1:${port}/v1/status`, {
     headers: {

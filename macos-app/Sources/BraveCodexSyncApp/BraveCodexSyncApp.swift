@@ -7,7 +7,7 @@ struct BraveCodexSyncApp: App {
   @StateObject private var model = SyncModel()
 
   var body: some Scene {
-    Window("Browser ChatGPT Sync", id: "main") {
+    Window("Browser Cookie Bridge", id: "main") {
       ContentView(appDelegate: appDelegate)
         .environmentObject(model)
         .frame(width: 644, height: 682)
@@ -61,9 +61,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     if enabled {
       guard statusItem == nil else { return }
       let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-      item.button?.image = NSImage(systemSymbolName: "arrow.left.arrow.right.circle.fill", accessibilityDescription: "Browser to ChatGPT")
+      item.button?.image = NSImage(systemSymbolName: "arrow.left.arrow.right.circle.fill", accessibilityDescription: "Browser Cookie Bridge")
       let menu = NSMenu()
-      menu.addItem(withTitle: "Show Browser → ChatGPT", action: #selector(showMainWindowAction), keyEquivalent: "")
+      menu.addItem(withTitle: "Show Browser Cookie Bridge", action: #selector(showMainWindowAction), keyEquivalent: "")
       menu.addItem(withTitle: "Sync now", action: #selector(syncNowAction), keyEquivalent: "")
       menu.addItem(.separator())
       menu.addItem(withTitle: "Quit", action: #selector(quitAction), keyEquivalent: "q")
@@ -123,9 +123,9 @@ struct ContentView: View {
         .frame(width: 36, height: 36)
         .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
       VStack(alignment: .leading, spacing: 1) {
-        Text("Browser Data Relay")
+        Text("Browser Cookie Bridge")
           .font(.system(size: 19, weight: .bold, design: .rounded))
-        Text("Private, local browser sync")
+        Text("Local cookie and session transfer")
           .font(.system(size: 11.5, weight: .medium))
           .foregroundStyle(.secondary)
       }

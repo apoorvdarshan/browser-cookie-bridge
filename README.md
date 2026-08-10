@@ -1,6 +1,6 @@
-# Browser → ChatGPT Sync
+# Browser Cookie Bridge
 
-An experimental, local-only macOS utility with a compact native control window. It transfers selected browser data between Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Perplexity Comet, or into ChatGPT Codex's built-in browser. ChatGPT Codex is import-only.
+Local cookie and session transfer for macOS. This compact native utility transfers selected browser data between Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Perplexity Comet, or into ChatGPT Codex's built-in browser. ChatGPT Codex is import-only.
 
 - **Cookies** are enabled by default and preserve supported cookie attributes.
 - **History URLs** are optional. Chromium's extension API can add URLs, but it cannot preserve the original visit times or page titles.
@@ -13,17 +13,17 @@ The utility does not edit browser databases directly. Unpacked extensions use su
 Requirements: macOS 13 or newer and Node.js 20 or newer.
 
 ```bash
-cd /Users/apoorvdarshan/brave-codex-cookie-sync
+cd /Users/apoorvdarshan/browser-cookie-bridge
 npm test
 npm run check
 npm pack
-npx --yes ./brave-codex-cookie-sync-0.19.0.tgz install-app
+npx --yes ./browser-cookie-bridge-0.21.0.tgz install-app
 ```
 
-This builds and installs `Browser ChatGPT Sync.app` into your user Applications folder. The app provides:
+This builds and installs `Browser Cookie Bridge.app` into your user Applications folder. The app provides:
 
 - Separate **Export from** and **Import into** pickers with large browser icons
-- ChatGPT Codex available only as an import destination, represented by one Codex icon
+- ChatGPT Codex available only as an import destination, represented by a paired OpenAI and Codex mark
 - Persistent Cookies and History URL choices
 - Manual and daily sync
 - Daily sync and sync when you sign in, both enabled by default on a fresh installation
@@ -42,10 +42,10 @@ Only the two endpoints selected in the app respond to a transfer. Keep both open
 You can also control preferences and sync from the packed CLI:
 
 ```bash
-npx --yes ./brave-codex-cookie-sync-0.19.0.tgz preferences --source brave --target codex --cookies on --history off --menu-bar off
-npx --yes ./brave-codex-cookie-sync-0.19.0.tgz sync --timeout 300
-npx --yes ./brave-codex-cookie-sync-0.19.0.tgz setup --hour 9 --minute 0
-npx --yes ./brave-codex-cookie-sync-0.19.0.tgz enable-login-sync
+npx --yes ./browser-cookie-bridge-0.21.0.tgz preferences --source brave --target codex --cookies on --history off --menu-bar off
+npx --yes ./browser-cookie-bridge-0.21.0.tgz sync --timeout 300
+npx --yes ./browser-cookie-bridge-0.21.0.tgz setup --hour 9 --minute 0
+npx --yes ./browser-cookie-bridge-0.21.0.tgz enable-login-sync
 ```
 
 The fixed daily sync and login sync are independent controls. Login sync runs once when you sign in, not every rolling 24 hours; the fixed daily time therefore never drifts after restarts or sleep. Neither option launches or force-quits a browser. Each run waits up to five minutes for both installed extensions; if a browser is closed, it times out without transferring data.

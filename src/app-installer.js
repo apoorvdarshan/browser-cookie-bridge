@@ -18,7 +18,7 @@ export function installApp({ home = os.homedir(), open = true } = {}) {
     "--show-bin-path",
   ]).trim();
 
-  const staging = path.join(appSupportDir(home), "app-build", "Browser ChatGPT Sync.app");
+  const staging = path.join(appSupportDir(home), "app-build", "Browser Cookie Bridge.app");
   const contents = path.join(staging, "Contents");
   const macos = path.join(contents, "MacOS");
   const resources = path.join(contents, "Resources");
@@ -36,8 +36,10 @@ export function installApp({ home = os.homedir(), open = true } = {}) {
   fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o755 });
   fs.rmSync(destination, { recursive: true, force: true });
   fs.cpSync(staging, destination, { recursive: true, force: true });
-  const legacyDestination = path.join(home, "Applications", "Brave Codex Sync.app");
-  if (legacyDestination !== destination) fs.rmSync(legacyDestination, { recursive: true, force: true });
+  for (const legacyName of ["Browser ChatGPT Sync.app", "Brave Codex Sync.app"]) {
+    const legacyDestination = path.join(home, "Applications", legacyName);
+    if (legacyDestination !== destination) fs.rmSync(legacyDestination, { recursive: true, force: true });
+  }
   run("xattr", ["-dr", "com.apple.quarantine", destination], { allowFailure: true });
   if (open) run("open", [destination]);
   return destination;

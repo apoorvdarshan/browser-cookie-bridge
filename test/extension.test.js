@@ -15,7 +15,7 @@ test("manifest key produces the pinned extension ID", () => {
   assert.equal(id, EXTENSION_ID);
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.service_worker, "background.js");
-  assert.equal(projectRoot().endsWith("brave-codex-cookie-sync"), true);
+  assert.equal(projectRoot().endsWith("browser-cookie-bridge"), true);
 });
 
 test("Comet is available and retired Atlas is excluded", () => {

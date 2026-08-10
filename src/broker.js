@@ -66,8 +66,8 @@ export function createBroker({
         const browser = endpoint === "source" ? sourceBrowser : targetBrowser;
         const detail = safeDetail(body.message);
         const action = endpoint === "source"
-          ? `${browserName(browser)} could not read the selected data. Reload Browser Data Relay on its Extensions page, allow Cookies/History access, and try again.`
-          : `${browserName(browser)} could not finish the import. Reload Browser Data Relay on its Extensions page, allow site access, and try again.`;
+          ? `${browserName(browser)} could not read the selected data. Reload Browser Cookie Bridge on its Extensions page, allow Cookies/History access, and try again.`
+          : `${browserName(browser)} could not finish the import. Reload Browser Cookie Bridge on its Extensions page, allow site access, and try again.`;
         const error = new Error(detail ? `${action} Browser message: ${detail}` : action);
         onEvent({ type: "failure", endpoint, browser, message: error.message });
         rejectCompletion(error);
@@ -213,13 +213,13 @@ function timeoutGuidance(state, sourceBrowser, targetBrowser) {
   const source = browserName(sourceBrowser);
   const target = browserName(targetBrowser);
   if (!state.sourceSeen && !state.targetSeen) {
-    return `Neither endpoint connected. Open ${source} and ${target}, then reload Browser Data Relay on both Extensions pages.`;
+    return `Neither endpoint connected. Open ${source} and ${target}, then reload Browser Cookie Bridge on both Extensions pages.`;
   }
   if (!state.sourceSeen) {
-    return `${source} did not connect. Open it, then reload Browser Data Relay on its Extensions page.`;
+    return `${source} did not connect. Open it, then reload Browser Cookie Bridge on its Extensions page.`;
   }
   if (!state.targetSeen) {
-    return `${target} did not connect. Open it, then reload Browser Data Relay on its Extensions page.`;
+    return `${target} did not connect. Open it, then reload Browser Cookie Bridge on its Extensions page.`;
   }
   if (state.payload === null) {
     return `${source} connected but did not provide data. Reload its extension, allow Cookies/History access, and try again.`;

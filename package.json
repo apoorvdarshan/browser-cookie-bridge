@@ -1,10 +1,10 @@
 {
-  "name": "brave-codex-cookie-sync",
-  "version": "0.19.0",
-  "description": "Local browser-to-browser and ChatGPT Codex data relay for macOS",
+  "name": "browser-cookie-bridge",
+  "version": "0.21.0",
+  "description": "Private local cookie and session transfer for macOS",
   "type": "module",
   "bin": {
-    "brave-codex-cookie-sync": "./bin/brave-codex-cookie-sync.js"
+    "browser-cookie-bridge": "./bin/brave-codex-cookie-sync.js"
   },
   "scripts": {
     "test": "node --test",

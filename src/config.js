@@ -13,7 +13,7 @@ import {
 export function readConfig(home) {
   const target = configPath(home);
   if (!fs.existsSync(target)) {
-    throw new Error("Not configured. Run `brave-codex-cookie-sync setup` first.");
+    throw new Error("Not configured. Run `browser-cookie-bridge setup` first.");
   }
   const config = JSON.parse(fs.readFileSync(target, "utf8"));
   if (!config.token || !Number.isInteger(config.port)) {
@@ -118,7 +118,7 @@ function installExtension(config, home, browser, role) {
   }
 
   const generated = [
-    "// Generated locally by brave-codex-cookie-sync. Do not share this file.",
+    "// Generated locally by Browser Cookie Bridge. Do not share this file.",
     `globalThis.SYNC_CONFIG = ${JSON.stringify({ token: config.token, port: config.port })};`,
     `globalThis.SYNC_ROLE = ${JSON.stringify(role)};`,
     `globalThis.SYNC_BROWSER = ${JSON.stringify(browser)};`,
