@@ -57,7 +57,7 @@ export function installConfig({ home, hour = 9, minute = 0 }) {
 
   writePrivateJson(target, config);
   for (const browser of SOURCE_BROWSERS) installExtension(config, home, browser, "browser");
-  installExtension(config, home, "codex", "target");
+  fs.rmSync(installedExtensionDir(home, "codex"), { recursive: true, force: true });
   fs.rmSync(installedExtensionDir(home, "atlas"), { recursive: true, force: true });
   return config;
 }

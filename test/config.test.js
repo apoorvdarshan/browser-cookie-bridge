@@ -15,9 +15,10 @@ test("preferences default to cookies and persist source and history choices", ()
     assert.equal(installed.targetBrowser, "codex");
     assert.deepEqual(installed.imports, { cookies: true, passwords: false, history: false });
     assert.deepEqual(installed.ui, { menuBar: false, openAtLogin: true });
-    for (const browser of [...SOURCE_BROWSERS, "codex"]) {
+    for (const browser of SOURCE_BROWSERS) {
       assert.equal(fs.existsSync(path.join(installedExtensionDir(home, browser), "manifest.json")), true);
     }
+    assert.equal(fs.existsSync(installedExtensionDir(home, "codex")), false);
     assert.equal(fs.existsSync(installedExtensionDir(home, "atlas")), false);
 
     updatePreferences({

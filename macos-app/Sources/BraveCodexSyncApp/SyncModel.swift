@@ -40,6 +40,7 @@ final class SyncModel: ObservableObject {
   @Published var historyEnabled = false
   @Published var selectedSourceID = "brave"
   @Published var selectedTargetID = "codex"
+  @Published var codexImportReady = false
   @Published var primaryStatus = "Ready to sync"
   @Published var secondaryStatus = "Choose what to move, then start a transfer"
 
@@ -119,7 +120,14 @@ final class SyncModel: ObservableObject {
       menuBarEnabled = config.ui?.menuBar ?? false
     }
     NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: menuBarEnabled)
-    extensionsReady = [selectedSourceID, selectedTargetID].allSatisfy {
+    codexImportReady = selectedTargetID == "codex"
+      && FileManager.default.fileExists(atPath: home.appending(path: "Library/Application Support/Google/Chrome/Browser Cookie Bridge/Cookies").path)
+    if codexImportReady && !isSyncing {
+      state = .success
+      primaryStatus = "Ready for Codex import"
+      secondaryStatus = "Encrypted snapshot ready — import the Browser Cookie Bridge profile"
+    }
+    extensionsReady = requiredExtensionIDs.allSatisfy {
       FileManager.default.fileExists(atPath: support.appending(path: "extension-\($0)/manifest.json").path)
     }
   }
@@ -127,6 +135,7 @@ final class SyncModel: ObservableObject {
   func selectSource(_ id: String) {
     guard browsers.contains(where: { $0.id == id }), id != selectedSourceID, id != selectedTargetID else { return }
     selectedSourceID = id
+    codexImportReady = false
     persistPreferences(successMessage: "Export source changed to \(selectedBrowser.name)")
   }
 
@@ -134,6 +143,8 @@ final class SyncModel: ObservableObject {
     let validTarget = id == "codex" || browsers.contains(where: { $0.id == id })
     guard validTarget, id != selectedTargetID, id != selectedSourceID else { return }
     selectedTargetID = id
+    codexImportReady = id == "codex"
+      && FileManager.default.fileExists(atPath: home.appending(path: "Library/Application Support/Google/Chrome/Browser Cookie Bridge/Cookies").path)
     persistPreferences(successMessage: "Import destination changed to \(targetName)")
   }
 
@@ -156,18 +167,25 @@ final class SyncModel: ObservableObject {
   func syncNow() {
     guard !isSyncing else { return }
     isSyncing = true
+    codexImportReady = false
     state = .syncing
     primaryStatus = "Transferring selected data"
-    secondaryStatus = "Waiting for \(selectedBrowser.name) and \(targetName)…"
+    secondaryStatus = selectedTargetID == "codex"
+      ? "Reading \(selectedBrowser.name) and preparing a native Codex import…"
+      : "Waiting for \(selectedBrowser.name) and \(targetName)…"
     runCLI(["sync", "--timeout", "300"]) { [weak self] success, output in
       guard let self else { return }
       self.isSyncing = false
       if success {
         let partial = output.contains("Partially synced:")
         self.state = partial ? .warning : .success
-        self.primaryStatus = partial ? "Partially synced" : "Transfer complete"
+        self.primaryStatus = self.selectedTargetID == "codex"
+          ? "Ready for Codex import"
+          : (partial ? "Partially synced" : "Transfer complete")
         self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and \(self.targetName) are up to date"
+        self.codexImportReady = self.selectedTargetID == "codex"
       } else {
+        self.codexImportReady = false
         self.state = .error
         self.primaryStatus = "Sync did not finish"
         self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Keep both apps open and check the extensions"
@@ -239,6 +257,19 @@ final class SyncModel: ObservableObject {
     NSWorkspace.shared.activateFileViewerSelecting([folder])
   }
 
+  func openCodexImport() {
+    isWorking = true
+    runCLI(["open-codex-import"]) { [weak self] success, output in
+      guard let self else { return }
+      self.isWorking = false
+      if !success {
+        self.state = .error
+        self.primaryStatus = "Could not open Codex import"
+        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Open ChatGPT Settings → Browser → Import…"
+      }
+    }
+  }
+
   private func persistPreferences(successMessage: String) {
     isWorking = true
     let arguments = [
@@ -262,7 +293,7 @@ final class SyncModel: ObservableObject {
         self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Run install-app again from the CLI"
         self.refresh()
       }
-      self.extensionsReady = [self.selectedSourceID, self.selectedTargetID].allSatisfy {
+      self.extensionsReady = self.requiredExtensionIDs.allSatisfy {
         FileManager.default.fileExists(atPath: self.support.appending(path: "extension-\($0)/manifest.json").path)
       }
     }
@@ -341,6 +372,10 @@ final class SyncModel: ObservableObject {
 
   private var formattedTime: String {
     scheduleTime.formatted(date: .omitted, time: .shortened)
+  }
+
+  private var requiredExtensionIDs: [String] {
+    selectedTargetID == "codex" ? [] : [selectedSourceID, selectedTargetID]
   }
 }
 

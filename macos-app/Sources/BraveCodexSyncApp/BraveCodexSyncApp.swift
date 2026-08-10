@@ -149,8 +149,10 @@ struct ContentView: View {
       .buttonStyle(.plain)
       .foregroundStyle(.secondary)
       .help("Refresh status")
-      Button("Extension setup…") { showingSetup = true }
-        .controlSize(.small)
+      if model.selectedTargetID != "codex" {
+        Button("Extension setup…") { showingSetup = true }
+          .controlSize(.small)
+      }
     }
     .font(.system(size: 10.5, weight: .medium))
     .padding(.horizontal, 3)
@@ -180,13 +182,19 @@ struct SyncPanel: View {
               .help(model.secondaryStatus)
           }
           Spacer()
+          if model.codexImportReady {
+            Button("Refresh") { model.syncNow() }
+              .buttonStyle(.bordered)
+              .disabled(model.isSyncing || model.isWorking)
+          }
           Button {
-            model.syncNow()
+            if model.codexImportReady { model.openCodexImport() }
+            else { model.syncNow() }
           } label: {
             HStack(spacing: 7) {
               if model.isSyncing { ProgressView().controlSize(.small) }
-              else { Image(systemName: "arrow.triangle.2.circlepath") }
-              Text(model.isSyncing ? "Syncing…" : "Sync now")
+              else { Image(systemName: model.codexImportReady ? "arrow.down.doc" : "arrow.triangle.2.circlepath") }
+              Text(model.isSyncing ? "Syncing…" : (model.codexImportReady ? "Import in Codex" : "Sync now"))
             }
             .frame(minWidth: 92)
           }
@@ -405,18 +413,20 @@ struct ExtensionSetupSheet: View {
           Button("Open page") { model.openExtensions(for: model.selectedSourceID) }
           Button("Show folder") { model.revealExtension(model.selectedSourceID) }
         }
-        Divider().padding(.leading, 58)
-        SetupEndpointRow(icon: model.targetIcon, title: model.targetName, detail: "Load the destination extension") {
-          if model.selectedTargetID != "codex" {
+        if model.selectedTargetID != "codex" {
+          Divider().padding(.leading, 58)
+          SetupEndpointRow(icon: model.targetIcon, title: model.targetName, detail: "Load the destination extension") {
             Button("Open page") { model.openExtensions(for: model.selectedTargetID) }
+            Button("Show folder") { model.revealExtension(model.selectedTargetID) }
           }
-          Button("Show folder") { model.revealExtension(model.selectedTargetID) }
         }
       }
       .background(Color(nsColor: .controlBackgroundColor).opacity(0.65), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
       .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.07)))
 
-      Text("In both endpoints, enable Developer mode and choose Load unpacked. Password access is never requested.")
+      Text(model.selectedTargetID == "codex"
+        ? "In the source browser, enable Developer mode and choose Load unpacked. Then use Codex's own Browser → Import flow. Password access is never requested."
+        : "In both endpoints, enable Developer mode and choose Load unpacked. Password access is never requested.")
         .font(.system(size: 10.5))
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)

@@ -3,6 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { installApp } from "./app-installer.js";
 import { createBroker } from "./broker.js";
+import { openCodexBrowserImport, stageCodexImport } from "./codex-import.js";
+import { readChromiumProfile } from "./chromium-reader.js";
 import { installConfig, installRuntime, readConfig, updatePreferences } from "./config.js";
 import {
   braveCookiePaths,
@@ -34,6 +36,7 @@ Commands:
   install-app [--no-open]
   preferences --source brave --target codex --cookies on --history off --menu-bar off
   sync [--timeout 300]
+  open-codex-import
   doctor
   enable-login-sync
   disable-login-sync
@@ -50,6 +53,8 @@ export async function main(argv) {
       return setup(args);
     case "sync":
       return sync(args);
+    case "open-codex-import":
+      return openCodexImport();
     case "install-app":
       return installDesktopApp(args);
     case "preferences":
@@ -136,19 +141,36 @@ function setup(args) {
 
   console.log("Setup complete.");
   console.log(`Pinned runtime: ${runtime}`);
-  console.log(`Source extension (${config.sourceBrowser}): ${installedExtensionDir(undefined, config.sourceBrowser)}`);
-  console.log(`Target extension (${config.targetBrowser}): ${installedExtensionDir(undefined, config.targetBrowser)}`);
-  console.log("Source browser: open its Extensions page → Developer mode → Load unpacked → choose its generated extension folder");
-  console.log("Target browser: open its Extensions page → Developer mode → Load unpacked → choose its generated extension folder");
+  if (config.targetBrowser === "codex") {
+    console.log(`Source browser: ${config.sourceBrowser} (read locally; no extension required)`);
+    console.log("Target integration: Codex native browser-profile import");
+  } else {
+    console.log(`Source extension (${config.sourceBrowser}): ${installedExtensionDir(undefined, config.sourceBrowser)}`);
+    console.log(`Target extension (${config.targetBrowser}): ${installedExtensionDir(undefined, config.targetBrowser)}`);
+    console.log("In both browsers: open Extensions → Developer mode → Load unpacked → choose the generated extension folder");
+  }
   if (plist) console.log(`Daily schedule: ${pad(hour)}:${pad(minute)} (${plist})`);
   console.log(`Broker port: 127.0.0.1:${config.port}`);
-  console.log("Cookie values are transferred in memory and are not written to logs or disk.");
+  console.log(config.targetBrowser === "codex"
+    ? "Cookie values are stored only in the dedicated Chrome-compatible staging profile and are encrypted."
+    : "Cookie values are transferred in memory and are not written to logs or disk.");
 }
 
 async function sync(args) {
   assertMacOS();
   const seconds = integerFlag(args, "--timeout", 300, 5, 3600);
   const config = readConfig();
+  const isCodexTarget = (config.targetBrowser || "codex") === "codex";
+  if (isCodexTarget) {
+    const payload = readChromiumProfile({
+      browser: config.sourceBrowser || "brave",
+      imports: config.imports || { cookies: true, history: false },
+    });
+    console.log(`Read ${payload.cookies.length} cookies and ${payload.history.length} history URLs from ${config.sourceBrowser || "brave"}.`);
+    const result = stageCodexImport({ cookies: payload.cookies, history: payload.history });
+    console.log(codexStagingSummary(result));
+    return result;
+  }
   const broker = createBroker({
     token: config.token,
     port: config.port,
@@ -174,6 +196,16 @@ async function sync(args) {
   return result;
 }
 
+export function codexStagingSummary(result) {
+  const staged = (result.stagedCookies || 0) + (result.stagedHistory || 0);
+  const skipped = result.skipped + result.historySkipped;
+  const failures = result.failed + result.historyFailed;
+  if (failures > 0) {
+    return `Codex import prepared with warnings: ${staged} staged, ${skipped} skipped, ${failures} failed. Open ChatGPT Settings → Browser → Import… and choose Browser Cookie Bridge.`;
+  }
+  return `Codex import prepared: ${staged} staged and ${skipped} skipped. Open ChatGPT Settings → Browser → Import… and choose Browser Cookie Bridge.`;
+}
+
 export function transferSummary(result) {
   const failures = result.failed + result.historyFailed;
   const imported = result.imported + result.historyImported;
@@ -196,7 +228,11 @@ function doctor() {
   console.log(`Selected source: ${source}`);
   console.log(`Selected target: ${target}`);
   console.log(`Source extension: ${status(installedExtensionDir(home, source))}`);
-  console.log(`Target extension: ${status(installedExtensionDir(home, target))}`);
+  console.log(
+    target === "codex"
+      ? "Target integration: Codex native browser-profile import"
+      : `Target extension: ${status(installedExtensionDir(home, target))}`,
+  );
   console.log(`Daily schedule: ${status(launchAgentPath(home))}`);
   console.log(`Sync at login: ${status(loginSyncLaunchAgentPath(home))}`);
   console.log(`Open app at login: ${status(appLoginLaunchAgentPath(home))}`);
@@ -208,6 +244,12 @@ function doctor() {
   console.log("No cookie names, domains, values, or encryption keys were read.");
 }
 
+function openCodexImport() {
+  assertMacOS();
+  openCodexBrowserImport();
+  console.log("Opened ChatGPT Codex browser settings. Choose Import… and the Browser Cookie Bridge profile.");
+}
+
 function enableLoginSync() {
   assertMacOS();
   const runtime = installRuntime();
@@ -216,7 +258,10 @@ function enableLoginSync() {
     cliPath: path.join(runtime, "bin", "brave-codex-cookie-sync.js"),
   });
   console.log(`Login sync enabled: ${plist}`);
-  console.log("A sync starts when you sign in and waits up to five minutes for both browsers.");
+  const config = readConfig();
+  console.log(config.targetBrowser === "codex"
+    ? "A sync starts when you sign in and refreshes the encrypted Codex import profile."
+    : "A sync starts when you sign in and waits up to five minutes for both browser extensions.");
 }
 
 function disableLoginSync() {

@@ -1,19 +1,19 @@
 {
   "name": "browser-cookie-bridge",
-  "version": "0.21.1",
+  "version": "0.22.0",
   "description": "Private local cookie and session transfer for macOS",
   "type": "module",
   "bin": {
     "browser-cookie-bridge": "./bin/brave-codex-cookie-sync.js"
   },
   "scripts": {
-    "test": "node --test",
-    "check": "node --check bin/brave-codex-cookie-sync.js && node --check src/app-installer.js && node --check src/broker.js && node --check src/cli.js && node --check src/config.js && node --check src/paths.js && node --check src/scheduler.js && node --check extension-template/background.js",
+    "test": "node --test test/*.test.js",
+    "check": "node --check bin/brave-codex-cookie-sync.js && node --check src/app-installer.js && node --check src/broker.js && node --check src/chromium-reader.js && node --check src/cli.js && node --check src/codex-import.js && node --check src/config.js && node --check src/paths.js && node --check src/scheduler.js && node --check extension-template/background.js",
     "release:check": "node scripts/check-release-version.js",
     "build:app": "node bin/brave-codex-cookie-sync.js install-app --no-open"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5"
   },
   "license": "MIT",
   "repository": {
