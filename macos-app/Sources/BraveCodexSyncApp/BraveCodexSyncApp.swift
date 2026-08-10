@@ -252,11 +252,11 @@ struct TargetPicker: View {
       .font(.system(size: 8, weight: .bold))
       VStack(spacing: 5) {
         HStack(spacing: 5) {
-          ForEach(Array(model.browsers.prefix(5))) { browser in targetButton(browser) }
+          ForEach(Array(model.browsers.prefix(4))) { browser in targetButton(browser) }
+          Color.clear.frame(width: 40, height: 40)
         }
         HStack(spacing: 5) {
-          ForEach(Array(model.browsers.dropFirst(5))) { browser in targetButton(browser) }
-          Color.clear.frame(width: 40, height: 40)
+          ForEach(Array(model.browsers.dropFirst(4))) { browser in targetButton(browser) }
           EndpointButton(
             icon: model.codexIcon,
             name: "ChatGPT Codex",
