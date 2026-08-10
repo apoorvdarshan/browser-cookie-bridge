@@ -74,11 +74,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     if enabled {
       guard statusItem == nil else { return }
       let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-      let cookieIcon = Bundle.main.url(forResource: "AppIcon", withExtension: "png")
+      let cookieIcon = Bundle.main.url(forResource: "MenuBarCookieTemplate", withExtension: "png")
         .flatMap(NSImage.init(contentsOf:))
-        ?? NSApp.applicationIconImage.copy() as? NSImage
       cookieIcon?.size = NSSize(width: 18, height: 18)
-      cookieIcon?.isTemplate = false
+      cookieIcon?.isTemplate = true
       cookieIcon?.accessibilityDescription = "Browser Cookie Bridge"
       item.button?.image = cookieIcon
       item.button?.imageScaling = .scaleProportionallyDown
