@@ -47,7 +47,7 @@ export function installConfig({ home, hour = 9, minute = 0 }) {
       history: existing.imports?.history === true,
     },
     ui: {
-      menuBar: existing.ui?.menuBar === true,
+      menuBar: existing.ui?.menuBar !== false,
       openAtLogin: existing.ui?.openAtLogin !== false,
     },
     schedule: { hour, minute },

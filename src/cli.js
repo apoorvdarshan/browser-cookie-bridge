@@ -115,9 +115,8 @@ function installDesktopApp(args) {
   }
   if (firstInstall) {
     const cliPath = path.join(runtime, "bin", "brave-codex-cookie-sync.js");
-    installSchedule({ hour: config.schedule.hour, minute: config.schedule.minute, cliPath });
     installLoginSync({ cliPath });
-    console.log(`Daily sync and sync at login enabled by default at ${pad(config.schedule.hour)}:${pad(config.schedule.minute)}.`);
+    console.log("Daily sync is off by default; sync at login is enabled.");
   }
   console.log(`Installed: ${destination}`);
   console.log("The app is available in your user Applications folder and Spotlight.");

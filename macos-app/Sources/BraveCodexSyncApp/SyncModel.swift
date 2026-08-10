@@ -33,7 +33,7 @@ final class SyncModel: ObservableObject {
   @Published var dailyEnabled = false
   @Published var loginSyncEnabled = false
   @Published var openAtLogin = false
-  @Published var menuBarEnabled = false
+  @Published var menuBarEnabled = true
   @Published var scheduleTime = Date()
   @Published var extensionsReady = false
   @Published var cookiesEnabled = true
@@ -123,7 +123,7 @@ final class SyncModel: ObservableObject {
       if selectedTargetID == selectedSourceID { selectedTargetID = "codex" }
       cookiesEnabled = config.imports?.cookies ?? true
       historyEnabled = config.imports?.history ?? false
-      menuBarEnabled = config.ui?.menuBar ?? false
+      menuBarEnabled = config.ui?.menuBar ?? true
     }
     NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: menuBarEnabled)
     extensionsReady = requiredExtensionIDs.allSatisfy {
