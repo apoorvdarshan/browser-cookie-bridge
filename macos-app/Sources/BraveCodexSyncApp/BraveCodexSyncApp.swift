@@ -326,12 +326,12 @@ struct PreferencesPanel: View {
         SectionLabel(title: "Sync data", detail: "Saved automatically")
         PreferenceRow(icon: "network", color: Theme.accent, title: "Cookies", detail: "Site sessions and sign-ins") {
           Toggle("", isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
+            .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
         }
         RowDivider()
         PreferenceRow(icon: "clock.arrow.circlepath", color: Theme.accent, title: "History URLs", detail: "Original visit times are not preserved") {
           Toggle("", isOn: Binding(get: { model.historyEnabled }, set: { model.setHistoryEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
+            .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
         }
         RowDivider()
         PreferenceRow(icon: "key.slash", color: .secondary, title: "Passwords", detail: "Browser extensions cannot access passwords", muted: true) {
@@ -355,23 +355,23 @@ struct PreferencesPanel: View {
                 if model.dailyEnabled && !model.isWorking { model.saveSchedule() }
               }
             Toggle("", isOn: Binding(get: { model.dailyEnabled }, set: { model.setDailyEnabled($0) }))
-              .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
+              .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
           }
         }
         RowDivider()
         PreferenceRow(icon: "sunrise.fill", color: Theme.accent, title: "Sync at login", detail: model.loginSyncEnabled ? "Once whenever you sign in" : "Off") {
           Toggle("", isOn: Binding(get: { model.loginSyncEnabled }, set: { model.setLoginSyncEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
+            .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
         }
         RowDivider()
         PreferenceRow(icon: "power", color: Theme.accent, title: "Open at login", detail: "Start the app after you sign in") {
           Toggle("", isOn: Binding(get: { model.openAtLogin }, set: { model.setOpenAtLogin($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
+            .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
         }
         RowDivider()
         PreferenceRow(icon: "menubar.rectangle", color: Theme.accent, title: "Show in menu bar", detail: "Quick access while the app is running") {
           Toggle("", isOn: Binding(get: { model.menuBarEnabled }, set: { model.setMenuBarEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(model.isWorking)
+            .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
         }
       }
     }
@@ -586,4 +586,5 @@ struct SetupStateBadge: View {
 
 enum Theme {
   static let accent = Color(red: 0.46, green: 0.46, blue: 0.48)
+  static let active = Color(red: 0.54, green: 0.12, blue: 0.18)
 }
