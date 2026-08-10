@@ -212,18 +212,25 @@ struct SourcePicker: View {
           .foregroundStyle(Theme.accent)
       }
       .font(.system(size: 8, weight: .bold))
-      LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 5), count: 4), spacing: 5) {
-        ForEach(model.browsers) { browser in
-          EndpointButton(
-            icon: model.browserIcon(browser),
-            name: browser.name,
-            selected: model.selectedSourceID == browser.id,
-            disabled: model.isWorking || model.isSyncing || model.selectedTargetID == browser.id
-          ) { model.selectSource(browser.id) }
+      VStack(spacing: 5) {
+        HStack(spacing: 5) {
+          ForEach(Array(model.browsers.prefix(4))) { browser in sourceButton(browser) }
+        }
+        HStack(spacing: 5) {
+          ForEach(Array(model.browsers.dropFirst(4))) { browser in sourceButton(browser) }
         }
       }
     }
     .frame(width: 175)
+  }
+
+  private func sourceButton(_ browser: BrowserChoice) -> some View {
+    EndpointButton(
+      icon: model.browserIcon(browser),
+      name: browser.name,
+      selected: model.selectedSourceID == browser.id,
+      disabled: model.isWorking || model.isSyncing || model.selectedTargetID == browser.id
+    ) { model.selectSource(browser.id) }
   }
 }
 
@@ -241,7 +248,7 @@ struct TargetPicker: View {
           .foregroundStyle(Theme.accent)
       }
       .font(.system(size: 8, weight: .bold))
-      LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 5), count: 5), spacing: 5) {
+      LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 5), count: 4), spacing: 5) {
         ForEach(model.browsers) { browser in
           EndpointButton(
             icon: model.browserIcon(browser),
@@ -258,7 +265,7 @@ struct TargetPicker: View {
         ) { model.selectTarget("codex") }
       }
     }
-    .frame(width: 220)
+    .frame(width: 175)
   }
 }
 

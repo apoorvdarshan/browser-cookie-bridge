@@ -236,7 +236,6 @@ function browserName(browser) {
     vivaldi: "Vivaldi",
     opera: "Opera",
     comet: "Comet",
-    atlas: "Atlas",
     codex: "ChatGPT Codex",
   })[browser] || browser;
 }

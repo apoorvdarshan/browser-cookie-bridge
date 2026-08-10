@@ -9,6 +9,7 @@ import { installedExtensionDir, SOURCE_BROWSERS } from "../src/paths.js";
 test("preferences default to cookies and persist source and history choices", () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-codex-sync-"));
   try {
+    fs.mkdirSync(installedExtensionDir(home, "atlas"), { recursive: true });
     const installed = installConfig({ home, hour: 9, minute: 15 });
     assert.equal(installed.sourceBrowser, "brave");
     assert.equal(installed.targetBrowser, "codex");
@@ -17,6 +18,7 @@ test("preferences default to cookies and persist source and history choices", ()
     for (const browser of [...SOURCE_BROWSERS, "codex"]) {
       assert.equal(fs.existsSync(path.join(installedExtensionDir(home, browser), "manifest.json")), true);
     }
+    assert.equal(fs.existsSync(installedExtensionDir(home, "atlas")), false);
 
     updatePreferences({
       home,

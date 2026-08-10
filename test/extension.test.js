@@ -18,9 +18,9 @@ test("manifest key produces the pinned extension ID", () => {
   assert.equal(projectRoot().endsWith("brave-codex-cookie-sync"), true);
 });
 
-test("agentic Chromium browsers are available as relay endpoints", () => {
+test("Comet is available and retired Atlas is excluded", () => {
   assert.equal(SOURCE_BROWSERS.includes("comet"), true);
-  assert.equal(SOURCE_BROWSERS.includes("atlas"), true);
+  assert.equal(SOURCE_BROWSERS.includes("atlas"), false);
 });
 
 test("browser extension routing is selected dynamically by the broker", () => {
