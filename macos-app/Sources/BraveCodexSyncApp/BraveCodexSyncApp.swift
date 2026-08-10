@@ -331,8 +331,10 @@ struct PreferencesPanel: View {
           HStack(spacing: 8) {
             DatePicker("", selection: $model.scheduleTime, displayedComponents: .hourAndMinute)
               .labelsHidden()
+              .datePickerStyle(.field)
+              .controlSize(.regular)
               .disabled(!model.dailyEnabled || model.isWorking)
-              .frame(width: 82)
+              .frame(width: 112, alignment: .center)
               .onChange(of: model.scheduleTime) { _ in
                 if model.dailyEnabled && !model.isWorking { model.saveSchedule() }
               }
