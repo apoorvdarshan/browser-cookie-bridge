@@ -1,7 +1,7 @@
 {
   "name": "brave-codex-cookie-sync",
-  "version": "0.2.0",
-  "description": "Local, cookie-only Brave to Codex browser sync for macOS",
+  "version": "0.3.0",
+  "description": "Local Chromium-browser to Codex data sync for macOS",
   "type": "module",
   "bin": {
     "brave-codex-cookie-sync": "./bin/brave-codex-cookie-sync.js"

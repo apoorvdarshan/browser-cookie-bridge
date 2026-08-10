@@ -4,10 +4,18 @@ import { EXTENSION_ORIGIN } from "./paths.js";
 
 const MAX_BODY_BYTES = 64 * 1024 * 1024;
 
-export function createBroker({ token, port, timeoutMs = 300_000, host = "127.0.0.1", onEvent = () => {} }) {
+export function createBroker({
+  token,
+  port,
+  timeoutMs = 300_000,
+  host = "127.0.0.1",
+  imports = { cookies: true, history: false },
+  sourceBrowser = "brave",
+  onEvent = () => {},
+}) {
   const state = {
     runId: crypto.randomUUID(),
-    cookies: null,
+    payload: null,
     completed: false,
     result: null,
   };
@@ -38,29 +46,35 @@ export function createBroker({ token, port, timeoutMs = 300_000, host = "127.0.0
       if (request.method === "GET" && url.pathname === "/v1/status") {
         sendJson(response, 200, {
           runId: state.runId,
-          sourceNeeded: state.cookies === null,
-          targetNeeded: state.cookies !== null && !state.completed,
+          sourceNeeded: state.payload === null,
+          targetNeeded: state.payload !== null && !state.completed,
+          imports,
+          sourceBrowser,
         });
         return;
       }
 
       if (request.method === "POST" && url.pathname === "/v1/source") {
         const body = await readJson(request);
-        if (!Array.isArray(body.cookies)) {
-          throw new ClientError("cookies must be an array");
+        if (!Array.isArray(body.cookies) || !Array.isArray(body.history)) {
+          throw new ClientError("cookies and history must be arrays");
         }
-        state.cookies = body.cookies;
-        onEvent({ type: "source", count: body.cookies.length });
-        sendJson(response, 202, { accepted: body.cookies.length, runId: state.runId });
+        state.payload = { cookies: body.cookies, history: body.history };
+        onEvent({ type: "source", cookies: body.cookies.length, history: body.history.length });
+        sendJson(response, 202, {
+          acceptedCookies: body.cookies.length,
+          acceptedHistory: body.history.length,
+          runId: state.runId,
+        });
         return;
       }
 
       if (request.method === "GET" && url.pathname === "/v1/payload") {
-        if (state.cookies === null) {
+        if (state.payload === null) {
           sendJson(response, 204, null);
           return;
         }
-        sendJson(response, 200, { runId: state.runId, cookies: state.cookies });
+        sendJson(response, 200, { runId: state.runId, ...state.payload });
         return;
       }
 
@@ -71,8 +85,11 @@ export function createBroker({ token, port, timeoutMs = 300_000, host = "127.0.0
           imported: positiveInteger(body.imported),
           failed: positiveInteger(body.failed),
           skipped: positiveInteger(body.skipped),
+          historyImported: positiveInteger(body.historyImported),
+          historyFailed: positiveInteger(body.historyFailed),
+          historySkipped: positiveInteger(body.historySkipped),
         };
-        state.cookies = null;
+        state.payload = null;
         onEvent({ type: "complete", ...state.result });
         resolveCompletion(state.result);
         sendJson(response, 200, { ok: true });
@@ -88,7 +105,7 @@ export function createBroker({ token, port, timeoutMs = 300_000, host = "127.0.0
 
   const timer = setTimeout(() => {
     const error = new Error(
-      "Timed out waiting for both browser extensions. Keep Brave and Codex open and verify the extension is installed in both.",
+      `Timed out waiting for both browser extensions. Keep ${sourceBrowser} and Codex open and verify the extension is installed in both.`,
     );
     rejectCompletion(error);
     server.close();
@@ -110,7 +127,7 @@ export function createBroker({ token, port, timeoutMs = 300_000, host = "127.0.0
     },
     close() {
       clearTimeout(timer);
-      state.cookies = null;
+      state.payload = null;
       server.close();
     },
     completion,

@@ -1,4 +1,4 @@
-/* global SYNC_CONFIG, SYNC_ROLE */
+/* global SYNC_BROWSER, SYNC_CONFIG, SYNC_ROLE */
 
 importScripts("config.js");
 
@@ -26,7 +26,9 @@ async function runSync() {
   running = true;
   try {
     const status = await request("/v1/status");
-    if (SYNC_ROLE === "source" && status.sourceNeeded) await sendBraveCookies();
+    if (SYNC_ROLE === "source" && SYNC_BROWSER === status.sourceBrowser && status.sourceNeeded) {
+      await sendSourceData(status.imports);
+    }
     if (SYNC_ROLE === "target" && status.targetNeeded) await importIntoCodex();
   } catch {
     // The broker normally exists only during a scheduled or manual sync.
@@ -35,33 +37,53 @@ async function runSync() {
   }
 }
 
-async function sendBraveCookies() {
-  const cookies = await chrome.cookies.getAll({});
-  const transferable = cookies
-    .filter((cookie) => !cookie.expirationDate || cookie.expirationDate > Date.now() / 1000)
-    .map((cookie) => ({
-      name: cookie.name,
-      value: cookie.value,
-      domain: cookie.domain,
-      hostOnly: cookie.hostOnly,
-      path: cookie.path,
-      secure: cookie.secure,
-      httpOnly: cookie.httpOnly,
-      sameSite: cookie.sameSite,
-      session: cookie.session,
-      expirationDate: cookie.expirationDate,
-      partitionKey: cookie.partitionKey,
-    }));
-  await request("/v1/source", { method: "POST", body: JSON.stringify({ cookies: transferable }) });
+async function sendSourceData(imports) {
+  let transferableCookies = [];
+  let transferableHistory = [];
+  if (imports.cookies) {
+    const cookies = await chrome.cookies.getAll({});
+    transferableCookies = cookies
+      .filter((cookie) => !cookie.expirationDate || cookie.expirationDate > Date.now() / 1000)
+      .map((cookie) => ({
+        name: cookie.name,
+        value: cookie.value,
+        domain: cookie.domain,
+        hostOnly: cookie.hostOnly,
+        path: cookie.path,
+        secure: cookie.secure,
+        httpOnly: cookie.httpOnly,
+        sameSite: cookie.sameSite,
+        session: cookie.session,
+        expirationDate: cookie.expirationDate,
+        partitionKey: cookie.partitionKey,
+      }));
+  }
+  if (imports.history) {
+    const history = await chrome.history.search({ text: "", startTime: 0, maxResults: 50_000 });
+    transferableHistory = history
+      .filter((item) => typeof item.url === "string" && /^https?:\/\//.test(item.url))
+      .map((item) => ({ url: item.url }));
+  }
+  await request("/v1/source", {
+    method: "POST",
+    body: JSON.stringify({ cookies: transferableCookies, history: transferableHistory }),
+  });
 }
 
 async function importIntoCodex() {
   const payload = await request("/v1/payload");
-  if (!payload || !Array.isArray(payload.cookies)) return;
+  if (!payload || !Array.isArray(payload.cookies) || !Array.isArray(payload.history)) return;
 
   let imported = 0;
   let failed = 0;
   let skipped = 0;
+  let historyImported = 0;
+  let historyFailed = 0;
+  let historySkipped = 0;
+  const existingHistory = payload.history.length
+    ? await chrome.history.search({ text: "", startTime: 0, maxResults: 50_000 })
+    : [];
+  const existingHistoryURLs = new Set(existingHistory.map((item) => item.url));
   for (const cookie of payload.cookies) {
     try {
       const details = cookieSetDetails(cookie);
@@ -77,9 +99,27 @@ async function importIntoCodex() {
     }
   }
 
+  for (const item of payload.history) {
+    try {
+      if (!item || typeof item.url !== "string" || !/^https?:\/\//.test(item.url)) {
+        historySkipped += 1;
+        continue;
+      }
+      if (existingHistoryURLs.has(item.url)) {
+        historySkipped += 1;
+        continue;
+      }
+      await chrome.history.addUrl({ url: item.url });
+      existingHistoryURLs.add(item.url);
+      historyImported += 1;
+    } catch {
+      historyFailed += 1;
+    }
+  }
+
   await request("/v1/complete", {
     method: "POST",
-    body: JSON.stringify({ imported, failed, skipped }),
+    body: JSON.stringify({ imported, failed, skipped, historyImported, historyFailed, historySkipped }),
   });
 }
 

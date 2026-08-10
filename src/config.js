@@ -6,6 +6,7 @@ import {
   configPath,
   installedExtensionDir,
   projectRoot,
+  SOURCE_BROWSERS,
 } from "./paths.js";
 
 export function readConfig(home) {
@@ -35,14 +36,32 @@ export function installConfig({ home, hour = 9, minute = 0 }) {
     token: existing.token || crypto.randomBytes(32).toString("base64url"),
     port: existing.port || DEFAULT_PORT,
     nodePath: process.execPath,
+    sourceBrowser: SOURCE_BROWSERS.includes(existing.sourceBrowser) ? existing.sourceBrowser : "brave",
+    imports: {
+      cookies: existing.imports?.cookies !== false,
+      passwords: false,
+      history: existing.imports?.history === true,
+    },
     schedule: { hour, minute },
     createdAt: existing.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
   writePrivateJson(target, config);
-  installExtension(config, home, "brave");
-  installExtension(config, home, "codex");
+  for (const browser of SOURCE_BROWSERS) installExtension(config, home, browser, "source");
+  installExtension(config, home, "codex", "target");
+  return config;
+}
+
+export function updatePreferences({ home, cookies, history, sourceBrowser }) {
+  const config = readConfig(home);
+  if (!SOURCE_BROWSERS.includes(sourceBrowser)) {
+    throw new Error(`Unsupported source browser: ${sourceBrowser}`);
+  }
+  config.sourceBrowser = sourceBrowser;
+  config.imports = { cookies: Boolean(cookies), passwords: false, history: Boolean(history) };
+  config.updatedAt = new Date().toISOString();
+  writePrivateJson(configPath(home), config);
   return config;
 }
 
@@ -72,9 +91,9 @@ export function installRuntime(home) {
   return target;
 }
 
-function installExtension(config, home, role) {
+function installExtension(config, home, browser, role) {
   const source = path.join(projectRoot(), "extension-template");
-  const target = installedExtensionDir(home, role);
+  const target = installedExtensionDir(home, browser);
   fs.mkdirSync(target, { recursive: true, mode: 0o700 });
 
   for (const name of ["manifest.json", "background.js"]) {
@@ -84,7 +103,8 @@ function installExtension(config, home, role) {
   const generated = [
     "// Generated locally by brave-codex-cookie-sync. Do not share this file.",
     `globalThis.SYNC_CONFIG = ${JSON.stringify({ token: config.token, port: config.port })};`,
-    `globalThis.SYNC_ROLE = ${JSON.stringify(role === "brave" ? "source" : "target")};`,
+    `globalThis.SYNC_ROLE = ${JSON.stringify(role)};`,
+    `globalThis.SYNC_BROWSER = ${JSON.stringify(browser)};`,
     "",
   ].join("\n");
   fs.writeFileSync(path.join(target, "config.js"), generated, { mode: 0o600 });

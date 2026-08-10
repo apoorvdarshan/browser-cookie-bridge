@@ -16,19 +16,27 @@ test("broker transfers an in-memory payload and clears it after completion", asy
   const sourceResponse = await fetch(`http://127.0.0.1:${port}/v1/source`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ cookies: [secretCookie] }),
+    body: JSON.stringify({ cookies: [secretCookie], history: [{ url: "https://example.test/" }] }),
   });
   assert.equal(sourceResponse.status, 202);
 
   const payload = await fetch(`http://127.0.0.1:${port}/v1/payload`, { headers }).then((response) => response.json());
   assert.deepEqual(payload.cookies, [secretCookie]);
+  assert.deepEqual(payload.history, [{ url: "https://example.test/" }]);
 
   await fetch(`http://127.0.0.1:${port}/v1/complete`, {
     method: "POST",
     headers,
     body: JSON.stringify({ imported: 1, failed: 0, skipped: 0 }),
   });
-  assert.deepEqual(await broker.completion, { imported: 1, failed: 0, skipped: 0 });
+  assert.deepEqual(await broker.completion, {
+    imported: 1,
+    failed: 0,
+    skipped: 0,
+    historyImported: 0,
+    historyFailed: 0,
+    historySkipped: 0,
+  });
 });
 
 test("broker rejects requests without its install token", async () => {
