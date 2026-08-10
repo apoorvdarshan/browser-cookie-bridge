@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
   func windowShouldClose(_ sender: NSWindow) -> Bool {
     sender.orderOut(nil)
+    NSApp.setActivationPolicy(.accessory)
     return false
   }
 
@@ -85,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   @objc private func quitAction() { NSApp.terminate(nil) }
 
   private func showMainWindow() {
+    NSApp.setActivationPolicy(.regular)
     mainWindow?.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
   }
