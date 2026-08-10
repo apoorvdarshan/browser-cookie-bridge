@@ -36,6 +36,12 @@ Wrangler creates and manages only that Custom Domain. `.assetsignore` prevents t
 - `privacy.html` — privacy policy
 - `terms.html` — terms of use
 
+## Search metadata
+
+- `sitemap.xml` lists the three canonical public pages.
+- `robots.txt` allows public crawling and advertises the sitemap.
+- Each page defines a canonical URL, search description, Open Graph and X card metadata, and JSON-LD structured data.
+
 ## Assets
 
 The browser logos are copies of the app's bundled browser assets. The product UI images come from `marketing/`. `hero-transfer.webp` was generated specifically for the website with OpenAI's built-in image-generation tool.
