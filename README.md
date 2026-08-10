@@ -109,6 +109,8 @@ The Codex destination is an intentionally unsupported direct integration. Codex 
 - [Follow @apoorvdarshan on X](https://x.com/apoorvdarshan)
 - Product Hunt voting link coming soon
 
+Product screenshots, the app icon, and Product Hunt gallery artwork are available in the [`marketing/`](marketing/) folder.
+
 ## License
 
 Browser Cookie Bridge is open-source software available under the [MIT License](LICENSE). Copyright © 2026 Apoorv Darshan.
