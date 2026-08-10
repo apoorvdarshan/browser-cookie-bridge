@@ -17,7 +17,7 @@ cd /Users/apoorvdarshan/brave-codex-cookie-sync
 npm test
 npm run check
 npm pack
-npx --yes ./brave-codex-cookie-sync-0.8.0.tgz install-app
+npx --yes ./brave-codex-cookie-sync-0.9.0.tgz install-app
 ```
 
 This builds and installs `Browser ChatGPT Sync.app` into your user Applications folder. The app provides:
@@ -29,6 +29,8 @@ This builds and installs `Browser ChatGPT Sync.app` into your user Applications 
 - Daily sync and sync when you sign in, both enabled by default on a fresh installation
 - Open at login, enabled by default
 - An optional menu-bar helper, off by default; closing the window does not quit the app
+- Endpoint-aware errors that identify which browser did not connect and how to recover
+- A distinct partial-sync warning when individual cookies or history URLs fail
 
 The installer generates an extension folder for every supported browser plus one import-only Codex folder. In the app, select both endpoints, then:
 
@@ -40,10 +42,10 @@ Only the two endpoints selected in the app respond to a transfer. Keep both open
 You can also control preferences and sync from the packed CLI:
 
 ```bash
-npx --yes ./brave-codex-cookie-sync-0.8.0.tgz preferences --source brave --target codex --cookies on --history off --menu-bar off
-npx --yes ./brave-codex-cookie-sync-0.8.0.tgz sync --timeout 300
-npx --yes ./brave-codex-cookie-sync-0.8.0.tgz setup --hour 9 --minute 0
-npx --yes ./brave-codex-cookie-sync-0.8.0.tgz enable-login-sync
+npx --yes ./brave-codex-cookie-sync-0.9.0.tgz preferences --source brave --target codex --cookies on --history off --menu-bar off
+npx --yes ./brave-codex-cookie-sync-0.9.0.tgz sync --timeout 300
+npx --yes ./brave-codex-cookie-sync-0.9.0.tgz setup --hour 9 --minute 0
+npx --yes ./brave-codex-cookie-sync-0.9.0.tgz enable-login-sync
 ```
 
 The fixed daily sync and login sync are independent controls. Login sync runs once when you sign in, not every rolling 24 hours; the fixed daily time therefore never drifts after restarts or sleep. Neither option launches or force-quits a browser. Each run waits up to five minutes for both installed extensions; if a browser is closed, it times out without transferring data.

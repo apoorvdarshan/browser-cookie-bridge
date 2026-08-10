@@ -19,6 +19,8 @@ export function createBroker({
     payload: null,
     completed: false,
     result: null,
+    sourceSeen: false,
+    targetSeen: false,
   };
 
   let resolveCompletion;
@@ -45,6 +47,7 @@ export function createBroker({
 
       const url = new URL(request.url, `http://${host}:${port}`);
       if (request.method === "GET" && url.pathname === "/v1/status") {
+        recordPresence(request, state, sourceBrowser, targetBrowser);
         sendJson(response, 200, {
           runId: state.runId,
           sourceNeeded: state.payload === null,
@@ -53,6 +56,22 @@ export function createBroker({
           sourceBrowser,
           targetBrowser,
         });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/v1/failure") {
+        const body = await readJson(request);
+        const endpoint = body.endpoint === "source" ? "source" : body.endpoint === "target" ? "target" : null;
+        if (!endpoint) throw new ClientError("endpoint must be source or target");
+        const browser = endpoint === "source" ? sourceBrowser : targetBrowser;
+        const detail = safeDetail(body.message);
+        const action = endpoint === "source"
+          ? `${browserName(browser)} could not read the selected data. Reload Browser Data Relay on its Extensions page, allow Cookies/History access, and try again.`
+          : `${browserName(browser)} could not finish the import. Reload Browser Data Relay on its Extensions page, allow site access, and try again.`;
+        const error = new Error(detail ? `${action} Browser message: ${detail}` : action);
+        onEvent({ type: "failure", endpoint, browser, message: error.message });
+        rejectCompletion(error);
+        sendJson(response, 202, { accepted: true });
         return;
       }
 
@@ -106,9 +125,7 @@ export function createBroker({
   });
 
   const timer = setTimeout(() => {
-    const error = new Error(
-      `Timed out waiting for both browser extensions. Keep ${sourceBrowser} and ${targetBrowser} open and verify the extension is installed in both.`,
-    );
+    const error = new Error(timeoutGuidance(state, sourceBrowser, targetBrowser));
     rejectCompletion(error);
     server.close();
   }, timeoutMs);
@@ -147,7 +164,7 @@ function authorized(request, token) {
 
 function setSecurityHeaders(response) {
   response.setHeader("Access-Control-Allow-Origin", EXTENSION_ORIGIN);
-  response.setHeader("Access-Control-Allow-Headers", "authorization, content-type");
+  response.setHeader("Access-Control-Allow-Headers", "authorization, content-type, x-sync-browser, x-sync-role");
   response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   response.setHeader("Cache-Control", "no-store");
   response.setHeader("Content-Security-Policy", "default-src 'none'");
@@ -182,6 +199,51 @@ async function readJson(request) {
 
 function positiveInteger(value) {
   return Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+function recordPresence(request, state, sourceBrowser, targetBrowser) {
+  const browser = request.headers["x-sync-browser"];
+  const role = request.headers["x-sync-role"];
+  if (browser === sourceBrowser && role === "browser") state.sourceSeen = true;
+  const targetRole = targetBrowser === "codex" ? "target" : "browser";
+  if (browser === targetBrowser && role === targetRole) state.targetSeen = true;
+}
+
+function timeoutGuidance(state, sourceBrowser, targetBrowser) {
+  const source = browserName(sourceBrowser);
+  const target = browserName(targetBrowser);
+  if (!state.sourceSeen && !state.targetSeen) {
+    return `Neither endpoint connected. Open ${source} and ${target}, then reload Browser Data Relay on both Extensions pages.`;
+  }
+  if (!state.sourceSeen) {
+    return `${source} did not connect. Open it, then reload Browser Data Relay on its Extensions page.`;
+  }
+  if (!state.targetSeen) {
+    return `${target} did not connect. Open it, then reload Browser Data Relay on its Extensions page.`;
+  }
+  if (state.payload === null) {
+    return `${source} connected but did not provide data. Reload its extension, allow Cookies/History access, and try again.`;
+  }
+  return `${target} connected but did not finish the import. Reload its extension, allow site access, and try again.`;
+}
+
+function browserName(browser) {
+  return ({
+    brave: "Brave",
+    chrome: "Chrome",
+    edge: "Edge",
+    arc: "Arc",
+    vivaldi: "Vivaldi",
+    opera: "Opera",
+    comet: "Comet",
+    atlas: "Atlas",
+    codex: "ChatGPT Codex",
+  })[browser] || browser;
+}
+
+function safeDetail(value) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[\r\n\t]+/g, " ").trim().slice(0, 240);
 }
 
 class ClientError extends Error {}

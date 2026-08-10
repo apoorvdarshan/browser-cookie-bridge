@@ -24,16 +24,43 @@ void runSync();
 async function runSync() {
   if (running || typeof SYNC_CONFIG === "undefined") return;
   running = true;
+  let status;
   try {
-    const status = await request("/v1/status");
-    if (SYNC_ROLE === "browser" && SYNC_BROWSER === status.sourceBrowser && status.sourceNeeded) {
-      await sendSourceData(status.imports);
-    }
-    if (SYNC_BROWSER === status.targetBrowser && status.targetNeeded) await importIntoTarget();
+    status = await request("/v1/status");
   } catch {
     // The broker normally exists only during a scheduled or manual sync.
+    running = false;
+    return;
+  }
+  try {
+    if (SYNC_ROLE === "browser" && SYNC_BROWSER === status.sourceBrowser && status.sourceNeeded) {
+      try {
+        await sendSourceData(status.imports);
+      } catch (error) {
+        await reportFailure("source", error);
+        return;
+      }
+    }
+    if (SYNC_BROWSER === status.targetBrowser && status.targetNeeded) {
+      try {
+        await importIntoTarget();
+      } catch (error) {
+        await reportFailure("target", error);
+      }
+    }
   } finally {
     running = false;
+  }
+}
+
+async function reportFailure(endpoint, error) {
+  try {
+    await request("/v1/failure", {
+      method: "POST",
+      body: JSON.stringify({ endpoint, message: error instanceof Error ? error.message : String(error) }),
+    });
+  } catch {
+    // The broker may already have closed after accepting the failure.
   }
 }
 
@@ -157,6 +184,8 @@ async function request(path, options = {}) {
     headers: {
       Authorization: `Bearer ${SYNC_CONFIG.token}`,
       "Content-Type": "application/json",
+      "X-Sync-Browser": SYNC_BROWSER,
+      "X-Sync-Role": SYNC_ROLE,
       ...(options.headers || {}),
     },
     cache: "no-store",

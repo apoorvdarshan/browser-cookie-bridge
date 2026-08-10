@@ -15,7 +15,7 @@ struct BrowserChoice: Identifiable, Hashable {
 
 @MainActor
 final class SyncModel: ObservableObject {
-  enum State { case ready, syncing, success, error }
+  enum State { case ready, syncing, success, warning, error }
 
   let browsers = [
     BrowserChoice(id: "brave", name: "Brave", bundleIdentifier: "com.brave.Browser", applicationName: "Brave Browser", extensionURL: "brave://extensions"),
@@ -148,8 +148,9 @@ final class SyncModel: ObservableObject {
       guard let self else { return }
       self.isSyncing = false
       if success {
-        self.state = .success
-        self.primaryStatus = "Transfer complete"
+        let partial = output.contains("Partially synced:")
+        self.state = partial ? .warning : .success
+        self.primaryStatus = partial ? "Partially synced" : "Transfer complete"
         self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and \(self.targetName) are up to date"
       } else {
         self.state = .error
@@ -319,7 +320,8 @@ final class SyncModel: ObservableObject {
   }
 
   private func lastMeaningfulLine(_ output: String) -> String? {
-    output.split(separator: "\n").map(String.init).last(where: { !$0.isEmpty })
+    guard let line = output.split(separator: "\n").map(String.init).last(where: { !$0.isEmpty }) else { return nil }
+    return line.hasPrefix("Error: ") ? String(line.dropFirst(7)) : line
   }
 
   private var formattedTime: String {

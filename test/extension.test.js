@@ -31,5 +31,7 @@ test("browser extension routing is selected dynamically by the broker", () => {
   assert.match(background, /SYNC_ROLE === "browser"/);
   assert.match(background, /SYNC_BROWSER === status\.sourceBrowser/);
   assert.match(background, /SYNC_BROWSER === status\.targetBrowser/);
+  assert.match(background, /"X-Sync-Browser": SYNC_BROWSER/);
+  assert.match(background, /reportFailure\("target", error\)/);
   assert.doesNotMatch(background, /importIntoCodex/);
 });

@@ -169,7 +169,18 @@ async function sync(args) {
     },
   });
   await broker.listen();
-  return broker.completion;
+  const result = await broker.completion;
+  console.log(transferSummary(result));
+  return result;
+}
+
+export function transferSummary(result) {
+  const failures = result.failed + result.historyFailed;
+  const imported = result.imported + result.historyImported;
+  const skipped = result.skipped + result.historySkipped;
+  return failures > 0
+    ? `Partially synced: ${imported} imported, ${skipped} skipped, ${failures} failed. Reload the destination extension and try again.`
+    : `Transfer complete: ${imported} imported and ${skipped} skipped.`;
 }
 
 function doctor() {

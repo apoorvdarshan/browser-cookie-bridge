@@ -1,6 +1,6 @@
 {
   "name": "brave-codex-cookie-sync",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Local browser-to-browser and ChatGPT Codex data relay for macOS",
   "type": "module",
   "bin": {

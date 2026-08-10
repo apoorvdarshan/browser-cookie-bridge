@@ -173,7 +173,8 @@ struct SyncPanel: View {
             Text(model.secondaryStatus)
               .font(.system(size: 10.5))
               .foregroundStyle(.secondary)
-              .lineLimit(1)
+              .lineLimit(2)
+              .help(model.secondaryStatus)
           }
           Spacer()
           Button {
@@ -518,11 +519,11 @@ struct StatusIndicator: View {
   }
 
   private var label: String {
-    switch state { case .ready: "Ready"; case .syncing: "Syncing"; case .success: "Synced"; case .error: "Check setup" }
+    switch state { case .ready: "Ready"; case .syncing: "Syncing"; case .success: "Synced"; case .warning: "Partial"; case .error: "Needs action" }
   }
 
   private var color: Color {
-    switch state { case .ready, .syncing, .success: Theme.accent; case .error: .red }
+    switch state { case .ready, .syncing, .success: Theme.accent; case .warning: .orange; case .error: .red }
   }
 }
 
