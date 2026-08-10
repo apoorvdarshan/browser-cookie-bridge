@@ -20,6 +20,16 @@ PORT=4173 npm run web
 
 The site has no runtime dependencies, analytics, forms, or remote font requests. `server.js` uses Node's built-in HTTP server for local preview only; any static host can serve the contents of this folder.
 
+## Deploy
+
+The production site uses Cloudflare Workers Static Assets on `cookiebridge.apoorvdarshan.com`:
+
+```bash
+npm run web:deploy
+```
+
+Wrangler creates and manages only that Custom Domain. `.assetsignore` prevents the local server and project notes from being published as website assets.
+
 ## Pages
 
 - `index.html` — product landing page and documentation overview

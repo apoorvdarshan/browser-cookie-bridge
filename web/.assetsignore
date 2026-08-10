@@ -1,0 +1,5 @@
+README.md
+server.js
+wrangler.jsonc
+.assetsignore
+.DS_Store

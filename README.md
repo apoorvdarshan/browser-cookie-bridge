@@ -206,7 +206,7 @@ Product screenshots, the transparent cookie logo, and launch artwork live in [`m
 
 ## Website
 
-The product landing page, documentation overview, Privacy Policy, and Terms live in [`web/`](web/). Preview them locally at `http://localhost:3000`:
+The product landing page, documentation overview, Privacy Policy, and Terms are live at **[cookiebridge.apoorvdarshan.com](https://cookiebridge.apoorvdarshan.com)** and live in [`web/`](web/). Preview them locally at `http://localhost:3000`:
 
 ```bash
 npm run web
