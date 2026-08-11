@@ -49,7 +49,7 @@
           "image": "https://cookiebridge.apoorvdarshan.com/assets/hero-transfer.webp",
           "applicationCategory": "UtilitiesApplication",
           "operatingSystem": "macOS 13.5 or later",
-          "softwareVersion": "1.2.0",
+          "softwareVersion": "1.3.0",
           "isAccessibleForFree": true,
           "offers": {
             "@type": "Offer",
@@ -107,7 +107,7 @@
       <div class="hero-grain" aria-hidden="true"></div>
       <div class="shell hero-grid">
         <div class="hero-copy" data-reveal>
-          <div class="eyebrow"><span class="live-dot"></span> Native macOS utility · v1.2.0</div>
+          <div class="eyebrow"><span class="live-dot"></span> Native macOS utility · v1.3.0</div>
           <h1>Your browser sessions.<br /><em>Across the browsers you use.</em></h1>
           <p class="hero-lede">Move signed-in sessions locally between Chromium browsers and ChatGPT Codex—or explicitly upload an authenticated profile to your Browserless account. No cookie logs.</p>
 
@@ -257,8 +257,8 @@
           </article>
           <article data-reveal>
             <div class="process-number">3</div>
-            <div><h3>Review the result</h3><p>Success, partial transfer, blocked state, and endpoint errors are surfaced in the app and menu bar.</p></div>
-            <span class="process-note">Actionable status</span>
+            <div><h3>Review the result</h3><p>Browserless uploads show a local size preflight, live progress, elapsed time, cancellation, auto-fit omissions, and cloud-profile verification.</p></div>
+            <span class="process-note">Observable uploads</span>
           </article>
         </div>
 
@@ -288,7 +288,7 @@
           <div><span>Cookie values in logs</span><strong>Never</strong></div>
           <div><span>Password-store access</span><strong>Never</strong></div>
           <div><span>Remote relay for local paths</span><strong>None</strong></div>
-          <div><span>Browserless cloud upload</span><strong>Explicit + manual</strong></div>
+          <div><span>Browserless cloud upload</span><strong>Explicit + verified</strong></div>
           <div><span>Codex pre-change backup</span><strong>Always</strong></div>
           <div><span>Unknown database schema</span><strong>Fail closed</strong></div>
           <div><span>Backups retained</span><strong>14 newest</strong></div>
@@ -306,7 +306,7 @@
           <div class="data-row data-row-head"><span>Data</span><span>Support</span><span>What to expect</span></div>
           <div class="data-row"><strong>Cookies & sessions</strong><span><i class="status-dot status-on"></i> Default</span><p>Supported values, domain, path, expiry, security, SameSite, and partition attributes.</p></div>
           <div class="data-row"><strong>History URLs</strong><span><i class="status-dot status-partial"></i> Optional</span><p>URLs transfer; original visit times and page titles cannot be preserved.</p></div>
-          <div class="data-row"><strong>Local storage & IndexedDB</strong><span><i class="status-dot status-partial"></i> Browserless</span><p>Included only when you explicitly upload an authenticated profile to Browserless Cloud.</p></div>
+          <div class="data-row"><strong>Local storage & IndexedDB</strong><span><i class="status-dot status-partial"></i> Browserless</span><p>Measured locally before capture. Browserless caps the serialized profile at 2 MB, so heavy origins may be omitted and are reported.</p></div>
           <div class="data-row"><strong>Passwords</strong><span><i class="status-dot"></i> Never</span><p>Chromium extensions cannot read the browser password store.</p></div>
           <div class="data-row"><strong>Bookmarks & autofill</strong><span><i class="status-dot"></i> Never</span><p>Bookmarks, payment data, autofill, and iCloud Keychain remain untouched.</p></div>
         </div>
@@ -367,7 +367,7 @@
         <div class="faq-list" data-reveal data-delay="1">
           <details open><summary>Why must Codex be closed?<span></span></summary><p>Codex can overwrite or ignore offline database changes while its Chromium process is running. The app blocks direct import until Codex is completely closed so it can back up, validate, and replace the database safely.</p></details>
           <details><summary>Do other browsers need to be closed?<span></span></summary><p>No for extension-based browser-to-browser transfers. Codex must be closed for its direct local merge. A Browserless upload also requires the source browser to be closed so a consistent temporary profile copy can be captured.</p></details>
-          <details><summary>What leaves my Mac with Browserless?<span></span></summary><p>Only after you select Browserless Cloud and click Upload, cookies, local storage, and IndexedDB from the chosen profile are sent directly to your selected Browserless region. History and saved passwords are excluded. The token stays in macOS Keychain, CLI telemetry is disabled, and cloud uploads never run on a schedule or at login.</p></details>
+          <details><summary>What leaves my Mac with Browserless?<span></span></summary><p>Only after you select Browserless Cloud and click Upload, cookies, local storage, and IndexedDB from the chosen profile are sent directly to your selected Browserless region. The app first measures local sizes without reading their contents, then reports progress and any origins omitted to fit Browserless's 2 MB serialized-profile cap. History and saved passwords are excluded. The token stays in macOS Keychain, CLI telemetry is disabled, and cloud uploads never run on a schedule or at login.</p></details>
           <details><summary>Does this move passwords?<span></span></summary><p>No. Browser extensions cannot access Chromium's password store. Browser Cookie Bridge does not access passwords, Keychain items, payment data, bookmarks, or autofill.</p></details>
           <details><summary>Does it overwrite all destination cookies?<span></span></summary><p>The importer merges selected records using their cookie identity fields. Existing unrelated destination cookies remain in place. Codex is backed up before any replacement.</p></details>
           <details><summary>Will every website stay signed in?<span></span></summary><p>Not always. Some sites bind sessions to a device, browser, IP address, or other risk signals and may ask you to sign in again.</p></details>
