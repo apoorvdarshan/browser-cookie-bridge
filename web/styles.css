@@ -1315,6 +1315,36 @@ h3 {
   padding: 20px 22px 24px;
 }
 
+.dmg-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.dmg-choice {
+  display: grid;
+  gap: 6px;
+  min-height: 108px;
+  padding: 16px;
+  color: var(--paper);
+  background: rgba(238, 233, 223, 0.055);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  text-decoration: none;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.dmg-choice:hover {
+  transform: translateY(-2px);
+  background: rgba(238, 233, 223, 0.09);
+  border-color: rgba(238, 233, 223, 0.28);
+}
+
+.dmg-choice strong { font-size: 14px; }
+.dmg-choice span { color: var(--faint); font-size: 10px; }
+.dmg-choice i { align-self: end; color: var(--amber); font-family: var(--mono); font-size: 9px; font-style: normal; }
+
 .terminal pre {
   margin: 0;
   overflow-x: auto;
@@ -2149,6 +2179,10 @@ h3 {
 
   .data-row-head span:last-child {
     display: none;
+  }
+
+  .dmg-options {
+    grid-template-columns: 1fr;
   }
 
   .terminal pre {

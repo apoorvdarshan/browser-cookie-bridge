@@ -116,6 +116,7 @@ final class SyncModel: ObservableObject {
   }
 
   init() {
+    bootstrapBundledRuntimeIfNeeded()
     let calendar = Calendar.current
     scheduleTime = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     updateCodexRunningStatus()
@@ -127,6 +128,51 @@ final class SyncModel: ObservableObject {
         guard let self, self.autoCheckUpdates else { return }
         self.checkForUpdates()
       }
+    }
+  }
+
+  private func bootstrapBundledRuntimeIfNeeded() {
+    guard let resources = Bundle.main.resourceURL else { return }
+    let bundledRuntime = resources.appending(path: "runtime")
+    let bundledNode = bundledRuntime.appending(path: "node/bin/node")
+    let bundledCLI = bundledRuntime.appending(path: "bin/brave-codex-cookie-sync.js")
+    guard FileManager.default.isExecutableFile(atPath: bundledNode.path),
+          FileManager.default.fileExists(atPath: bundledCLI.path) else { return }
+
+    if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+      state = .warning
+      primaryStatus = "Move the app to Applications"
+      secondaryStatus = "Drag Browser Cookie Bridge onto Applications in the DMG window, then open it there"
+      return
+    }
+
+    let process = Process()
+    let output = Pipe()
+    process.executableURL = bundledNode
+    process.arguments = [
+      bundledCLI.path,
+      "bootstrap-bundled",
+      "--app-path", Bundle.main.bundlePath,
+    ]
+    process.standardOutput = output
+    process.standardError = output
+
+    do {
+      try process.run()
+      process.waitUntilExit()
+      guard process.terminationStatus != 0 else { return }
+      let data = output.fileHandleForReading.readDataToEndOfFile()
+      let message = String(decoding: data, as: UTF8.self)
+        .split(separator: "\n")
+        .map(String.init)
+        .last(where: { !$0.isEmpty })
+      state = .error
+      primaryStatus = "Could not prepare the local runtime"
+      secondaryStatus = message ?? "Move the app to Applications and reopen it"
+    } catch {
+      state = .error
+      primaryStatus = "Could not prepare the local runtime"
+      secondaryStatus = error.localizedDescription
     }
   }
 
@@ -204,11 +250,12 @@ final class SyncModel: ObservableObject {
 
   func checkForUpdates(showAlert: Bool = false) {
     guard !isCheckingForUpdates, !isInstallingUpdate else { return }
-    guard let url = URL(string: "https://registry.npmjs.org/browser-cookie-bridge/latest") else { return }
+    guard let url = URL(string: "https://api.github.com/repos/apoorvdarshan/browser-cookie-bridge/releases/latest") else { return }
     isCheckingForUpdates = true
     postUpdateState()
     var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
     request.setValue("Browser-Cookie-Bridge/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+    request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
     URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
       Task { @MainActor in
         guard let self else { return }
@@ -575,6 +622,16 @@ final class SyncModel: ObservableObject {
 
 private struct PackageRelease: Decodable {
   let version: String
+
+  private enum CodingKeys: String, CodingKey {
+    case tagName = "tag_name"
+  }
+
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    let tag = try values.decode(String.self, forKey: .tagName)
+    version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+  }
 }
 
 private struct UpdateResult: Decodable {

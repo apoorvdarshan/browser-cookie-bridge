@@ -19,6 +19,9 @@ import {
   installedExtensionDir,
   launchAgentPath,
   loginSyncLaunchAgentPath,
+  systemInstalledAppPath,
+  userInstalledAppPath,
+  APP_ID,
   SOURCE_BROWSERS,
   TARGET_BROWSERS,
 } from "./paths.js";
@@ -39,6 +42,7 @@ Local cookie and session transfer between Chromium browsers and into ChatGPT Cod
 Commands:
   setup [--hour 9] [--minute 0] [--no-schedule]
   install-app [--no-open]
+  bootstrap-bundled --app-path /Applications/Browser Cookie Bridge.app
   preferences --source brave --target codex --cookies on --history off --menu-bar on --auto-check-updates on
   sync [--timeout 300]
   doctor
@@ -59,6 +63,8 @@ export async function main(argv) {
       return sync(args);
     case "install-app":
       return installDesktopApp(args);
+    case "bootstrap-bundled":
+      return bootstrapBundledApp(args);
     case "preferences":
       return preferences(args);
     case "install-update":
@@ -97,9 +103,9 @@ function installUpdate(args) {
   console.log(`Update worker started: ${result.workerPID}`);
 }
 
-function performUpdateWorker(args) {
+async function performUpdateWorker(args) {
   assertMacOS();
-  const result = performUpdate({
+  const result = await performUpdate({
     version: stringFlag(args, "--version", ""),
     appPath: stringFlag(args, "--app-path", ""),
     appPID: integerFlag(args, "--app-pid", 0, 2, Number.MAX_SAFE_INTEGER),
@@ -148,6 +154,67 @@ function installDesktopApp(args) {
   console.log(destination.startsWith("/Applications/")
     ? "The app is available in Applications and Spotlight."
     : "The app is available in your user Applications folder and Spotlight.");
+}
+
+function bootstrapBundledApp(args) {
+  assertMacOS();
+  const appPath = path.resolve(stringFlag(args, "--app-path", ""));
+  if (!appPath.endsWith(".app") || !fs.existsSync(appPath)) {
+    throw new Error("--app-path must point to the running Browser Cookie Bridge app");
+  }
+
+  const firstInstall = !fs.existsSync(configPath());
+  const runtime = installRuntime();
+  const existing = firstInstall ? null : readConfig();
+  const config = installConfig({
+    hour: existing?.schedule?.hour ?? 9,
+    minute: existing?.schedule?.minute ?? 0,
+    nodePath: process.execPath,
+  });
+
+  if (config.ui.openAtLogin) {
+    installAppLogin({ appPath, bootstrapNow: false });
+  } else {
+    removeAppLogin();
+  }
+
+  const bundledCLI = path.join(runtime, "bin", "brave-codex-cookie-sync.js");
+  if (firstInstall || fs.existsSync(loginSyncLaunchAgentPath())) {
+    installLoginSync({
+      cliPath: bundledCLI,
+      nodePath: process.execPath,
+    });
+  }
+  if (fs.existsSync(launchAgentPath())) {
+    installSchedule({
+      hour: config.schedule.hour,
+      minute: config.schedule.minute,
+      cliPath: bundledCLI,
+      nodePath: process.execPath,
+    });
+  }
+
+  archiveDuplicateUserApp(appPath);
+
+  console.log(`Bundled runtime ready: ${runtime}`);
+}
+
+function archiveDuplicateUserApp(currentAppPath) {
+  if (path.resolve(currentAppPath) !== path.resolve(systemInstalledAppPath())) return;
+  const duplicate = userInstalledAppPath();
+  if (!fs.existsSync(duplicate)) return;
+  const infoPath = path.join(duplicate, "Contents", "Info.plist");
+  const info = fs.existsSync(infoPath) ? fs.readFileSync(infoPath, "utf8") : "";
+  if (!info.includes(`<string>${APP_ID}</string>`)) return;
+
+  const trash = path.join(os.homedir(), ".Trash");
+  fs.mkdirSync(trash, { recursive: true, mode: 0o700 });
+  let archived = path.join(trash, "Browser Cookie Bridge previous installation.app");
+  for (let suffix = 2; fs.existsSync(archived); suffix += 1) {
+    archived = path.join(trash, `Browser Cookie Bridge previous installation ${suffix}.app`);
+  }
+  fs.renameSync(duplicate, archived);
+  console.log(`Archived duplicate app: ${archived}`);
 }
 
 function setup(args) {

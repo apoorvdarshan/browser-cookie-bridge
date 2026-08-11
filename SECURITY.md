@@ -67,6 +67,8 @@ Timelines may vary with severity and complexity. Please allow a reasonable remed
 - Browser-to-browser transfers use a short-lived broker bound to IPv4 loopback. It validates a random token and the expected extension origin.
 - Cookie values and history URLs are not logged. Browser-to-browser payloads are held in memory.
 - Generated configuration and backup files use user-only filesystem permissions.
+- Release automation builds separate Apple-silicon and Intel DMGs. The updater selects the current architecture and verifies the published SHA-256 file before mounting or installing a release.
+- Public DMGs are currently ad-hoc signed rather than Apple-notarized. Verify the release checksum and download only from this repository's GitHub Releases page.
 - Codex imports create a consistent SQLite backup, modify a working copy, run integrity checks, and replace the destination only after validation.
 - The newest 14 Codex backups are retained under `~/Library/Application Support/BraveCodexCookieSync/backups/codex`.
 - OpenAI's Safe Storage key is protected by a private macOS Keychain access group. Imported Codex cookies therefore use an empty `encrypted_value` and may remain readable to software running as the same macOS user until the website refreshes them.

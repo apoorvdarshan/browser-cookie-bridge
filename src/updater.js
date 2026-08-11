@@ -2,10 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import crypto from "node:crypto";
+import { Readable } from "node:stream";
+import { finished } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import {
   appSupportDir,
-  installedAppPath,
   systemInstalledAppPath,
   userInstalledAppPath,
 } from "./paths.js";
@@ -35,33 +37,28 @@ export function startDetachedUpdate({ version, appPath, appPID, home = os.homedi
   return { workerPID: child.pid, logPath };
 }
 
-export function performUpdate({ version, appPath, appPID, home = os.homedir() }) {
+export async function performUpdate({ version, appPath, appPID, home = os.homedir() }) {
   const destination = validateUpdateRequest({ version, appPath, appPID, home });
-  const resultPath = path.join(appSupportDir(home), "update-result.json");
-  const currentUserApp = installedAppPath(home);
+  const support = appSupportDir(home);
+  const resultPath = path.join(support, "update-result.json");
+  let mounted = null;
   try {
     waitForProcessToExit(appPID, 30_000);
-    const npxPath = findNpx();
-    const result = spawnSync(npxPath, [
-      "--yes",
-      `browser-cookie-bridge@${version}`,
-      "install-app",
-      "--no-open",
-    ], {
-      encoding: "utf8",
-      maxBuffer: 32 * 1024 * 1024,
-      env: { ...process.env, npm_config_yes: "true" },
-    });
-    if (result.status !== 0) {
-      throw new Error(result.stderr.trim() || result.stdout.trim() || `npx exited with status ${result.status}`);
-    }
-    if (!fs.existsSync(currentUserApp)) throw new Error("The downloaded app was not installed");
-    if (destination !== currentUserApp) replaceAppContents(currentUserApp, destination);
+    const release = await downloadReleaseDMG({ version, architecture: process.arch, support });
+    mounted = mountReleaseDMG(release.dmgPath, support);
+    const sourceApp = path.join(mounted.mountPoint, "Browser Cookie Bridge.app");
+    if (!fs.existsSync(sourceApp)) throw new Error("The downloaded DMG does not contain Browser Cookie Bridge.app");
+    replaceAppContents(sourceApp, destination);
     installAppLogin({ appPath: destination, bootstrapNow: false });
     writeUpdateResult(resultPath, { status: "success", version });
+    unmountReleaseDMG(mounted);
+    mounted = null;
+    fs.rmSync(release.dmgPath, { force: true });
+    fs.rmSync(release.checksumPath, { force: true });
     relaunch(destination);
     return { destination, version };
   } catch (error) {
+    if (mounted) unmountReleaseDMG(mounted);
     writeUpdateResult(resultPath, { status: "failed", version, message: error.message });
     if (fs.existsSync(destination)) relaunch(destination);
     throw error;
@@ -104,13 +101,78 @@ export function validateUpdateRequest({ version, appPath, appPID, home = os.home
   return resolved;
 }
 
-function findNpx() {
-  const sibling = path.join(path.dirname(process.execPath), "npx");
-  if (fs.existsSync(sibling)) return sibling;
-  const result = spawnSync("/usr/bin/which", ["npx"], { encoding: "utf8" });
-  const discovered = result.status === 0 ? result.stdout.trim() : "";
-  if (!discovered || !fs.existsSync(discovered)) throw new Error("npx was not found beside the configured Node.js runtime");
-  return discovered;
+export function releaseAssetName(version, architecture = process.arch) {
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version ?? "")) throw new Error("Invalid update version");
+  if (!["arm64", "x64"].includes(architecture)) throw new Error(`Unsupported macOS architecture: ${architecture}`);
+  return `Browser-Cookie-Bridge-${architecture}.dmg`;
+}
+
+export function parseChecksum(text, expectedFilename) {
+  const match = text.trim().match(/^([a-f0-9]{64})\s+\*?(.+)$/i);
+  if (!match || match[2] !== expectedFilename) throw new Error("Invalid release checksum file");
+  return match[1].toLowerCase();
+}
+
+async function downloadReleaseDMG({ version, architecture, support }) {
+  const updates = path.join(support, "updates");
+  fs.mkdirSync(updates, { recursive: true, mode: 0o700 });
+  const filename = releaseAssetName(version, architecture);
+  const base = `https://github.com/apoorvdarshan/browser-cookie-bridge/releases/download/v${version}`;
+  const dmgPath = path.join(updates, filename);
+  const checksumPath = `${dmgPath}.sha256`;
+  await downloadFile(`${base}/${filename}`, dmgPath);
+  await downloadFile(`${base}/${filename}.sha256`, checksumPath);
+  const expected = parseChecksum(fs.readFileSync(checksumPath, "utf8"), filename);
+  const actual = await fileSHA256(dmgPath);
+  if (actual !== expected) throw new Error("The downloaded update failed its SHA-256 verification");
+  return { dmgPath, checksumPath };
+}
+
+async function downloadFile(url, target) {
+  const response = await fetch(url, {
+    headers: { "User-Agent": "Browser-Cookie-Bridge-Updater" },
+    redirect: "follow",
+  });
+  if (!response.ok || !response.body) throw new Error(`Could not download update (${response.status})`);
+  const temporary = `${target}.${process.pid}.tmp`;
+  const output = fs.createWriteStream(temporary, { mode: 0o600 });
+  try {
+    await finished(Readable.fromWeb(response.body).pipe(output));
+    fs.renameSync(temporary, target);
+  } catch (error) {
+    fs.rmSync(temporary, { force: true });
+    throw error;
+  }
+}
+
+async function fileSHA256(target) {
+  const hash = crypto.createHash("sha256");
+  const input = fs.createReadStream(target);
+  input.on("data", (chunk) => hash.update(chunk));
+  await finished(input);
+  return hash.digest("hex");
+}
+
+function mountReleaseDMG(dmgPath, support) {
+  const mountPoint = path.join(support, "updates", `mounted-${process.pid}`);
+  fs.rmSync(mountPoint, { recursive: true, force: true });
+  fs.mkdirSync(mountPoint, { recursive: true, mode: 0o700 });
+  const result = spawnSync("/usr/bin/hdiutil", [
+    "attach", dmgPath,
+    "-mountpoint", mountPoint,
+    "-nobrowse",
+    "-readonly",
+  ], { encoding: "utf8" });
+  if (result.status !== 0) {
+    fs.rmSync(mountPoint, { recursive: true, force: true });
+    throw new Error(result.stderr.trim() || "The update DMG could not be mounted");
+  }
+  return { mountPoint };
+}
+
+function unmountReleaseDMG({ mountPoint }) {
+  spawnSync("/usr/bin/hdiutil", ["detach", mountPoint, "-force"], { stdio: "ignore" });
+  fs.rmSync(mountPoint, { recursive: true, force: true });
 }
 
 function waitForProcessToExit(pid, timeoutMilliseconds) {

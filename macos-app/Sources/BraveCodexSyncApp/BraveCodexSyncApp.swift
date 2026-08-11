@@ -3,6 +3,7 @@ import SwiftUI
 
 private enum ProjectLinks {
   static let repository = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge")!
+  static let downloads = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest")!
   static let npm = URL(string: "https://www.npmjs.com/package/browser-cookie-bridge")!
   static let issues = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml")!
   static let license = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/LICENSE")!
@@ -169,6 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   private func addProjectLinks(to menu: NSMenu) {
     menu.addItem(.separator())
     addLink("Open-source repository", url: ProjectLinks.repository, to: menu)
+    addLink("Download latest DMG", url: ProjectLinks.downloads, to: menu)
     addLink("View on npm", url: ProjectLinks.npm, to: menu)
     addLink("Report a bug…", url: ProjectLinks.issues, to: menu)
     addLink("MIT license", url: ProjectLinks.license, to: menu)
@@ -504,6 +506,8 @@ struct PreferencesPanel: View {
 
         SectionLabel(title: "Project & support", detail: "Open source", separated: true)
         ProjectLinkRow(icon: "chevron.left.forwardslash.chevron.right", title: "Open-source repository", detail: "View the code on GitHub", url: ProjectLinks.repository)
+        RowDivider()
+        ProjectLinkRow(icon: "arrow.down.circle", title: "Download latest DMG", detail: "Apple silicon and Intel builds", url: ProjectLinks.downloads)
         RowDivider()
         ProjectLinkRow(icon: "shippingbox", title: "View on npm", detail: "Install the latest public release", url: ProjectLinks.npm)
         RowDivider()

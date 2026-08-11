@@ -22,7 +22,7 @@ export function readConfig(home) {
   return config;
 }
 
-export function installConfig({ home, hour = 9, minute = 0 }) {
+export function installConfig({ home, hour = 9, minute = 0, nodePath = process.execPath }) {
   const target = configPath(home);
   const support = path.dirname(target);
   fs.mkdirSync(support, { recursive: true, mode: 0o700 });
@@ -38,7 +38,7 @@ export function installConfig({ home, hour = 9, minute = 0 }) {
     version: 1,
     token: existing.token || crypto.randomBytes(32).toString("base64url"),
     port: existing.port || DEFAULT_PORT,
-    nodePath: process.execPath,
+    nodePath,
     sourceBrowser,
     targetBrowser: configuredTarget === sourceBrowser ? "codex" : configuredTarget,
     imports: {
@@ -87,8 +87,7 @@ export function updatePreferences({ home, cookies, history, sourceBrowser, targe
   return config;
 }
 
-export function installRuntime(home) {
-  const source = projectRoot();
+export function installRuntime(home, source = projectRoot()) {
   const target = path.join(path.dirname(configPath(home)), "runtime");
   if (path.resolve(source) === path.resolve(target)) return target;
 
@@ -100,12 +99,14 @@ export function installRuntime(home) {
   const appSource = path.join(source, "macos-app");
   const appTarget = path.join(target, "macos-app");
   fs.rmSync(appTarget, { recursive: true, force: true });
-  fs.mkdirSync(appTarget, { recursive: true, mode: 0o700 });
-  for (const name of ["Sources", "Resources"]) {
-    fs.cpSync(path.join(appSource, name), path.join(appTarget, name), { recursive: true, force: true });
-  }
-  for (const name of ["Package.swift", "Info.plist"]) {
-    fs.copyFileSync(path.join(appSource, name), path.join(appTarget, name));
+  if (fs.existsSync(appSource)) {
+    fs.mkdirSync(appTarget, { recursive: true, mode: 0o700 });
+    for (const name of ["Sources", "Resources"]) {
+      fs.cpSync(path.join(appSource, name), path.join(appTarget, name), { recursive: true, force: true });
+    }
+    for (const name of ["Package.swift", "Info.plist"]) {
+      fs.copyFileSync(path.join(appSource, name), path.join(appTarget, name));
+    }
   }
   for (const name of ["package.json", "README.md", "LICENSE"]) {
     fs.copyFileSync(path.join(source, name), path.join(target, name));

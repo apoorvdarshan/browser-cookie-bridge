@@ -9,7 +9,7 @@
 <p>Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Comet · browser-to-browser transfer · import into ChatGPT Codex.</p>
 
 <p>
-  <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple&logoColor=white" alt="macOS 13+" />
+  <img src="https://img.shields.io/badge/macOS-13.5%2B-111111?logo=apple&logoColor=white" alt="macOS 13.5+" />
   <img src="https://img.shields.io/badge/Swift-6-8E2735?logo=swift&logoColor=white" alt="Swift 6" />
   <img src="https://img.shields.io/badge/Node.js-22.5%2B-3C873A?logo=nodedotjs&logoColor=white" alt="Node.js 22.5+" />
   <a href="https://www.npmjs.com/package/browser-cookie-bridge"><img src="https://img.shields.io/npm/v/browser-cookie-bridge?logo=npm&color=CB3837" alt="browser-cookie-bridge on npm" /></a>
@@ -21,6 +21,7 @@
 
 <p>
   <a href="#installation"><b>Install</b></a> ·
+  <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest">DMG</a> ·
   <a href="https://www.npmjs.com/package/browser-cookie-bridge">npm</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#security--privacy">Security</a> ·
@@ -30,7 +31,10 @@
   <a href="#support">Support</a>
 </p>
 
-<p><code>npx browser-cookie-bridge install-app</code></p>
+<p>
+  <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-arm64.dmg"><b>Download for Apple silicon</b></a>
+  · <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-x64.dmg">Download for Intel</a>
+</p>
 
 <br />
 
@@ -40,7 +44,7 @@
 
 ---
 
-> **Version 1.0.0 is available on npm.** Importing into ChatGPT Codex is an intentionally unsupported direct integration and requires Codex to be completely closed.
+> **Version 1.1.0 adds self-contained DMG downloads.** Importing into ChatGPT Codex is an intentionally unsupported direct integration and requires Codex to be completely closed.
 
 ## Why Browser Cookie Bridge
 
@@ -56,7 +60,7 @@ Browser Cookie Bridge gives those local browser profiles a small, native control
 - 🕘 **Background automation** — sync when you sign in, at a fixed daily time, or whenever you choose.
 - ◉ **Native menu-bar app** — closing the window removes the Dock icon while the helper continues running.
 - 🧯 **Backup and rollback** — Codex's database is backed up, modified on a separate copy, integrity-checked, and restored if replacement fails.
-- ⬆️ **Built-in updates** — automatically checks npm release metadata and can install an update and relaunch the app.
+- ⬆️ **Built-in updates** — checks for GitHub releases, verifies the DMG checksum, installs in place, and relaunches the app.
 - 🔒 **Local-first** — no account, analytics, cloud service, cookie logs, or remote relay.
 
 ## What it transfers
@@ -73,12 +77,19 @@ Some websites bind sessions to a specific device or browser and may ask you to s
 
 ## Requirements
 
-- **macOS 13 (Ventura)+**
-- **Node.js 22.5+**
-- **Xcode Command Line Tools** — install with `xcode-select --install`
+- **macOS 13.5+**
 - A supported Chromium browser, or ChatGPT Codex as the destination
 
+The DMG is self-contained. Node.js 22.5+ and Xcode Command Line Tools are required only for npm or source installation.
+
 ## Installation
+
+### Download a DMG — recommended
+
+- **[Apple silicon DMG](https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-arm64.dmg)** — M1, M2, M3, M4, and newer
+- **[Intel DMG](https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-x64.dmg)** — Intel-based Macs
+
+Open the DMG, drag **Browser Cookie Bridge** onto **Applications**, then open it from Applications. The current public build is checksum-verified and ad-hoc signed but not Apple-notarized, so macOS may require **Control-click → Open** on first launch. It does not require Node.js, Xcode, Terminal, or an administrator password.
 
 ### Via npm
 
@@ -89,6 +100,8 @@ npx browser-cookie-bridge install-app
 ```
 
 No administrator password is needed. The app is built from source on your Mac and installed in your user Applications folder unless an existing writable system Applications copy is being updated.
+
+Both installation methods use the same bundle identifier and the same settings under `~/Library/Application Support/BraveCodexCookieSync`. Installing the DMG after npm does not create a separate product identity: the system Applications copy becomes canonical, and a stale matching user Applications copy is moved to the Trash on launch. Future updates replace that same app in place.
 
 **[View `browser-cookie-bridge` on npm →](https://www.npmjs.com/package/browser-cookie-bridge)**
 
@@ -139,7 +152,7 @@ Generated extensions live under `~/Library/Application Support/BraveCodexCookieS
 | **Sync at login** | Runs once whenever you sign in; on by default |
 | **Open at login** | Starts the background app after macOS login; on by default |
 | **Show in menu bar** | Keeps sync, status, updates, and support actions close at hand |
-| **Check for updates** | Finds a newer npm release and offers install + relaunch |
+| **Check for updates** | Finds a newer GitHub release, verifies its DMG, and offers install + relaunch |
 
 Automation always uses the source, destination, and data choices currently saved in the app. A scheduled Codex sync safely exits without making changes when Codex is open.
 
@@ -184,7 +197,7 @@ Found a vulnerability? Read [SECURITY.md](SECURITY.md) and report it privately. 
 
 ## Releases
 
-Pushing a semantic version tag runs tests, validates that package and app versions match, publishes to npm, and creates a GitHub Release with the tarball attached.
+Pushing a semantic version tag runs tests, validates that package and app versions match, builds separate Apple-silicon and Intel DMGs, publishes to npm, and creates a GitHub Release with the tarball, DMGs, and SHA-256 files attached.
 
 ```bash
 npm run release:check
@@ -203,6 +216,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for local setu
 If Browser Cookie Bridge is useful to you:
 
 - ⭐ **Star** the repository
+- ⬇️ **[Download the latest DMG](https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest)**
 - 📦 **[Install from npm](https://www.npmjs.com/package/browser-cookie-bridge)**
 - 🐛 **[Report a bug](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml)** — never include cookie values or tokens
 - ☕ **[Support on Ko-fi](https://ko-fi.com/apoorvdarshan)**

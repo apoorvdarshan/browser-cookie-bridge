@@ -14,8 +14,50 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build-dmg:
+    name: Build macOS DMG (${{ matrix.arch }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
+
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Validate release versions
+        run: npm run release:check
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+
+      - name: Run tests
+        run: npm test
+
+      - name: Check JavaScript syntax
+        run: npm run check
+
+      - name: Build self-contained DMG
+        run: npm run build:dmg -- --arch "${{ matrix.arch }}"
+
+      - name: Upload DMG artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg-${{ matrix.arch }}
+          path: |
+            dist/Browser-Cookie-Bridge-${{ matrix.arch }}.dmg
+            dist/Browser-Cookie-Bridge-${{ matrix.arch }}.dmg.sha256
+          if-no-files-found: error
+
   publish:
     name: Publish npm package and GitHub Release
+    needs: build-dmg
     if: github.repository == 'apoorvdarshan/browser-cookie-bridge'
     runs-on: ubuntu-latest
 
@@ -43,8 +85,15 @@ jobs:
 
       - name: Pack npm artifact
         run: |
-          package_file="$(npm pack --json | node -e 'let input=""; process.stdin.on("data", chunk => input += chunk); process.stdin.on("end", () => process.stdout.write(JSON.parse(input)[0].filename));')"
+          package_file="$(npm pack --json | node -e 'let input=""; process.stdin.on("data", chunk => input += chunk); process.stdin.on("end", () => { const parsed = JSON.parse(input); const item = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0]; process.stdout.write(item.filename); });')"
           echo "PACKAGE_FILE=$package_file" >> "$GITHUB_ENV"
+
+      - name: Download DMG artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: dmg-*
+          path: release-assets
+          merge-multiple: true
 
       - name: Publish to npm
         run: npm publish "$PACKAGE_FILE"
@@ -52,11 +101,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
-        run: >-
-          gh release create "$GITHUB_REF_NAME"
-          "${PACKAGE_FILE}#npm package"
-          --verify-tag
-          --generate-notes
-          --title "Browser Cookie Bridge ${GITHUB_REF_NAME#v}"
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "${PACKAGE_FILE}#npm package" \
+            release-assets/* \
+            --verify-tag \
+            --generate-notes \
+            --title "Browser Cookie Bridge ${GITHUB_REF_NAME#v}"
         env:
           GH_TOKEN: ${{ github.token }}

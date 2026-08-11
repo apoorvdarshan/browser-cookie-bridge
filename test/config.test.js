@@ -3,18 +3,19 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { installConfig, readConfig, updatePreferences } from "../src/config.js";
+import { installConfig, installRuntime, readConfig, updatePreferences } from "../src/config.js";
 import { installedExtensionDir, SOURCE_BROWSERS } from "../src/paths.js";
 
 test("preferences default to cookies and persist source and history choices", () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-codex-sync-"));
   try {
     fs.mkdirSync(installedExtensionDir(home, "atlas"), { recursive: true });
-    const installed = installConfig({ home, hour: 9, minute: 15 });
+    const installed = installConfig({ home, hour: 9, minute: 15, nodePath: "/Applications/Browser Cookie Bridge.app/Contents/Resources/runtime/node/bin/node" });
     assert.equal(installed.sourceBrowser, "brave");
     assert.equal(installed.targetBrowser, "codex");
     assert.deepEqual(installed.imports, { cookies: true, passwords: false, history: false });
     assert.deepEqual(installed.ui, { menuBar: true, openAtLogin: true, autoCheckUpdates: true });
+    assert.equal(installed.nodePath, "/Applications/Browser Cookie Bridge.app/Contents/Resources/runtime/node/bin/node");
     for (const browser of SOURCE_BROWSERS) {
       assert.equal(fs.existsSync(path.join(installedExtensionDir(home, browser), "manifest.json")), true);
     }
@@ -56,5 +57,27 @@ test("a browser cannot import into itself", () => {
     }), /must be different/);
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("a bundled runtime installs without Swift or Xcode source files", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-codex-sync-home-"));
+  const source = fs.mkdtempSync(path.join(os.tmpdir(), "browser-codex-sync-bundle-"));
+  try {
+    for (const directory of ["bin", "src", "extension-template"]) {
+      fs.mkdirSync(path.join(source, directory), { recursive: true });
+      fs.writeFileSync(path.join(source, directory, "placeholder"), directory);
+    }
+    fs.writeFileSync(path.join(source, "bin", "brave-codex-cookie-sync.js"), "#!/usr/bin/env node\n");
+    for (const file of ["package.json", "README.md", "LICENSE"]) {
+      fs.writeFileSync(path.join(source, file), file);
+    }
+
+    const installed = installRuntime(home, source);
+    assert.equal(fs.existsSync(path.join(installed, "bin", "brave-codex-cookie-sync.js")), true);
+    assert.equal(fs.existsSync(path.join(installed, "macos-app")), false);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(source, { recursive: true, force: true });
   }
 });

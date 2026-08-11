@@ -13,7 +13,7 @@ Never include real cookie values, session tokens, browser profiles, generated ex
 
 ## Development requirements
 
-- macOS 13 or newer
+- macOS 13.5 or newer
 - Node.js 22.5 or newer
 - Xcode Command Line Tools: `xcode-select --install`
 - At least one supported Chromium browser for manual transfer testing
@@ -46,6 +46,7 @@ The app is installed as `~/Applications/Browser Cookie Bridge.app`. This command
 | `bin/` | CLI entry point |
 | `test/` | Node test suite |
 | `marketing/` | Screenshots, logo, and launch artwork |
+| `scripts/build-dmg.js` | Reproducible self-contained Apple-silicon or Intel DMG builder |
 | `.github/` | Release workflow, issue forms, and funding metadata |
 
 ## Make a change
@@ -72,6 +73,14 @@ For native UI changes, also build and open the app:
 ```bash
 npm run build:app
 ```
+
+To validate self-contained distribution on the current architecture:
+
+```bash
+npm run build:dmg -- --arch arm64
+```
+
+Use `--arch x64` for the Intel artifact. The builder downloads the pinned official Node runtime, verifies Node's published checksum, builds the matching Swift architecture, ad-hoc signs the app by default, and writes a DMG plus SHA-256 file under `dist/`. Set `MACOS_SIGNING_IDENTITY` only when an authorized Developer ID identity is available.
 
 Check the UI in both light and dark appearances where relevant. Verify labels, keyboard focus, VoiceOver descriptions, disabled states, progress states, and error messages. Include a screenshot or short recording in the pull request for visible UI changes, but remove all private browser data first.
 
@@ -114,7 +123,7 @@ Maintainers may ask for a smaller scope, additional tests, or manual verificatio
 
 ## Releases
 
-Releases are performed by maintainers. Do not create or push a version tag from a contribution branch. A release tag must match the versions in `package.json`, `extension-template/manifest.json`, and `macos-app/Info.plist`; the release workflow then runs tests, publishes to npm, and creates the GitHub Release.
+Releases are performed by maintainers. Do not create or push a version tag from a contribution branch. A release tag must match the versions in `package.json`, `extension-template/manifest.json`, and `macos-app/Info.plist`; the release workflow then runs tests, builds both DMGs, publishes to npm, and creates the GitHub Release with checksums.
 
 ## License
 
