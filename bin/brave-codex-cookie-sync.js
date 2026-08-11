@@ -2,7 +2,15 @@
 
 import { main } from "../src/cli.js";
 
-main(process.argv.slice(2)).catch((error) => {
+const controller = new AbortController();
+const cancel = () => controller.abort();
+process.once("SIGINT", cancel);
+process.once("SIGTERM", cancel);
+
+main(process.argv.slice(2), { signal: controller.signal }).catch((error) => {
   console.error(`Error: ${error.message}`);
-  process.exitCode = 1;
+  process.exitCode = controller.signal.aborted ? 130 : 1;
+}).finally(() => {
+  process.removeListener("SIGINT", cancel);
+  process.removeListener("SIGTERM", cancel);
 });

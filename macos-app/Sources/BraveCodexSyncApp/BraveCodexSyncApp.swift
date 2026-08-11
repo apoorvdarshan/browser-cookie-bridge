@@ -35,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   weak var model: SyncModel?
   private weak var mainWindow: NSWindow?
   private var statusItem: NSStatusItem?
+  private var syncMenuItem: NSMenuItem?
   private var updateMenuItem: NSMenuItem?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -54,6 +55,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       self,
       selector: #selector(updateStateChanged(_:)),
       name: .updateStateChanged,
+      object: nil
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(syncStateChanged(_:)),
+      name: .syncStateChanged,
       object: nil
     )
   }
@@ -94,7 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       item.button?.imageScaling = .scaleProportionallyDown
       let menu = NSMenu()
       menu.addItem(withTitle: "Show Browser Cookie Bridge", action: #selector(showMainWindowAction), keyEquivalent: "")
-      menu.addItem(withTitle: "Sync now", action: #selector(syncNowAction), keyEquivalent: "")
+      syncMenuItem = menu.addItem(withTitle: "Sync now", action: #selector(syncNowAction), keyEquivalent: "")
       let updateItem = menu.addItem(withTitle: "Check for Updates…", action: #selector(updateAction), keyEquivalent: "")
       updateMenuItem = updateItem
       addProjectLinks(to: menu)
@@ -106,6 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     } else if let statusItem {
       NSStatusBar.system.removeStatusItem(statusItem)
       self.statusItem = nil
+      syncMenuItem = nil
       updateMenuItem = nil
     }
   }
@@ -116,7 +124,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   }
 
   @objc private func showMainWindowAction() { showMainWindow() }
-  @objc private func syncNowAction() { model?.syncNow(showMenuBarAlert: true) }
+  @objc private func syncNowAction() {
+    if model?.isBrowserlessTarget == true, model?.isSyncing == true { model?.cancelSync() }
+    else { model?.syncNow(showMenuBarAlert: true) }
+  }
   @objc private func updateAction() {
     if model?.availableUpdateVersion != nil { model?.installAvailableUpdate() }
     else { model?.checkForUpdates(showAlert: true) }
@@ -158,6 +169,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     } else {
       updateMenuItem?.title = "Check for Updates…"
       updateMenuItem?.isEnabled = true
+    }
+  }
+
+  @objc private func syncStateChanged(_ notification: Notification) {
+    guard let payload = notification.object as? SyncMenuState else { return }
+    if payload.canceling {
+      syncMenuItem?.title = "Canceling upload…"
+      syncMenuItem?.isEnabled = false
+    } else if payload.uploading {
+      syncMenuItem?.title = "Cancel upload"
+      syncMenuItem?.isEnabled = true
+    } else {
+      syncMenuItem?.title = "Sync now"
+      syncMenuItem?.isEnabled = true
     }
   }
 
@@ -290,35 +315,57 @@ struct SyncPanel: View {
           TargetPicker()
         }
         Divider().opacity(0.65)
-        HStack(spacing: 12) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text(model.primaryStatus)
-              .font(.system(size: 13, weight: .semibold))
-            Text(model.secondaryStatus)
-              .font(.system(size: 10.5))
-              .foregroundStyle(.secondary)
-              .lineLimit(2)
-              .help(model.secondaryStatus)
-          }
-          Spacer()
-          Button {
-            if model.isBrowserlessTarget && !model.browserlessConfigured {
-              model.showingBrowserlessSetup = true
-            } else {
-              model.syncNow()
+        VStack(spacing: 8) {
+          HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+              Text(model.primaryStatus)
+                .font(.system(size: 13, weight: .semibold))
+              Text(model.secondaryStatus)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .help(model.secondaryStatus)
             }
-          } label: {
-            HStack(spacing: 7) {
-              if model.isSyncing { ProgressView().controlSize(.small) }
-              else { Image(systemName: syncButtonIcon) }
-              Text(syncButtonTitle)
+            Spacer()
+            Button {
+              if model.isBrowserlessTarget && model.isSyncing {
+                model.cancelSync()
+              } else if model.isBrowserlessTarget && !model.browserlessConfigured {
+                model.showingBrowserlessSetup = true
+              } else {
+                model.syncNow()
+              }
+            } label: {
+              HStack(spacing: 7) {
+                if model.isSyncing && !model.isBrowserlessTarget { ProgressView().controlSize(.small) }
+                else { Image(systemName: syncButtonIcon) }
+                Text(syncButtonTitle)
+              }
+              .frame(minWidth: model.syncBlocked ? 116 : 92)
             }
-            .frame(minWidth: model.syncBlocked ? 116 : 92)
+            .buttonStyle(.borderedProminent)
+            .tint(model.isBrowserlessTarget && model.isSyncing ? Theme.active : Theme.accent)
+            .disabled(
+              model.uploadCanceling
+                || (model.isSyncing && !model.isBrowserlessTarget)
+                || (!model.isSyncing && model.syncBlocked && !(model.isBrowserlessTarget && !model.browserlessConfigured))
+            )
+            .keyboardShortcut(.return, modifiers: .command)
           }
-          .buttonStyle(.borderedProminent)
-          .tint(Theme.accent)
-          .disabled(model.isSyncing || (model.syncBlocked && !(model.isBrowserlessTarget && !model.browserlessConfigured)))
-          .keyboardShortcut(.return, modifiers: .command)
+          if model.isBrowserlessTarget && model.isSyncing {
+            HStack(spacing: 9) {
+              ProgressView(value: model.uploadProgress, total: 1)
+                .progressViewStyle(.linear)
+                .tint(Theme.active)
+              Text(model.formattedUploadElapsed)
+                .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(width: 34, alignment: .trailing)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Browserless upload progress")
+            .accessibilityValue("\(Int(model.uploadProgress * 100)) percent, \(model.formattedUploadElapsed) elapsed")
+          }
         }
         .padding(model.syncBlocked ? 7 : 0)
         .background(
@@ -336,7 +383,9 @@ struct SyncPanel: View {
   }
 
   private var syncButtonTitle: String {
-    if model.isSyncing { return model.isBrowserlessTarget ? "Uploading…" : "Syncing…" }
+    if model.isBrowserlessTarget && model.uploadCanceling { return "Canceling…" }
+    if model.isBrowserlessTarget && model.isSyncing { return "Cancel upload" }
+    if model.isSyncing { return "Syncing…" }
     if model.codexBlocked { return "Close Codex first" }
     if model.isBrowserlessTarget && !model.browserlessConfigured { return "Connect Browserless" }
     if model.isBrowserlessTarget && model.selectedSourceID == "comet" { return "Choose another browser" }
@@ -345,6 +394,7 @@ struct SyncPanel: View {
   }
 
   private var syncButtonIcon: String {
+    if model.isBrowserlessTarget && model.isSyncing { return "xmark.circle.fill" }
     if model.syncBlocked { return model.isBrowserlessTarget && !model.browserlessConfigured ? "key.fill" : "xmark.circle.fill" }
     return model.isBrowserlessTarget ? "icloud.and.arrow.up.fill" : "arrow.triangle.2.circlepath"
   }
@@ -499,6 +549,21 @@ struct PreferencesPanel: View {
             }
             .controlSize(.small)
           }
+          RowDivider()
+          PreferenceRow(icon: "externaldrive.badge.magnifyingglass", color: Theme.accent, title: "Local profile preflight", detail: browserlessPreflightDetail) {
+            HStack(spacing: 7) {
+              ProfileSizeBadge(severity: model.browserlessAssessment?.severity, scanning: model.isInspectingBrowserlessProfile)
+              Button {
+                model.refreshBrowserlessPreflight(force: true)
+              } label: {
+                Image(systemName: "arrow.clockwise")
+              }
+              .buttonStyle(.plain)
+              .foregroundStyle(.secondary)
+              .disabled(model.isInspectingBrowserlessProfile || model.isSyncing)
+              .help("Rescan local profile size")
+            }
+          }
         } else {
           PreferenceRow(icon: "network", color: Theme.accent, title: "Cookies", detail: "Site sessions and sign-ins") {
             Toggle("", isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }))
@@ -579,6 +644,16 @@ struct PreferencesPanel: View {
       }
     }
   }
+
+  private var browserlessPreflightDetail: String {
+    if model.isInspectingBrowserlessProfile { return "Measuring profile, local storage, and IndexedDB without reading their contents" }
+    if let assessment = model.browserlessAssessment {
+      return assessment.temporarySpaceWarning
+        ? "\(assessment.summary) · free space may be too low for the temporary copy"
+        : assessment.summary
+    }
+    return "Calculated locally before upload; Browserless cloud artifacts are capped at 2 MB"
+  }
 }
 
 struct FixedBadge: View {
@@ -592,6 +667,40 @@ struct FixedBadge: View {
       .foregroundStyle(.tertiary)
       .padding(.horizontal, 8).padding(.vertical, 4)
       .background(Color.secondary.opacity(0.08), in: Capsule())
+  }
+}
+
+struct ProfileSizeBadge: View {
+  let severity: String?
+  let scanning: Bool
+
+  var body: some View {
+    Text(label)
+      .font(.system(size: 9.5, weight: .semibold))
+      .foregroundStyle(color)
+      .padding(.horizontal, 8).padding(.vertical, 4)
+      .background(color.opacity(0.10), in: Capsule())
+  }
+
+  private var label: String {
+    if scanning { return "Scanning" }
+    switch severity {
+    case "elevated": return "Large"
+    case "high": return "Very large"
+    case "extreme": return "Extreme"
+    case "normal": return "Ready"
+    default: return "Not scanned"
+    }
+  }
+
+  private var color: Color {
+    if scanning { return .secondary }
+    switch severity {
+    case "elevated": return .orange
+    case "high", "extreme": return Theme.active
+    case "normal": return Theme.accent
+    default: return .secondary
+    }
   }
 }
 
@@ -904,11 +1013,11 @@ struct StatusIndicator: View {
   }
 
   private var label: String {
-    switch state { case .ready: "Ready"; case .syncing: "Syncing"; case .success: "Synced"; case .warning: "Partial"; case .error: "Needs action" }
+    switch state { case .ready: "Ready"; case .syncing: "Syncing"; case .success: "Synced"; case .canceled: "Canceled"; case .warning: "Partial"; case .error: "Needs action" }
   }
 
   private var color: Color {
-    switch state { case .ready, .syncing, .success: Theme.accent; case .warning: .orange; case .error: .red }
+    switch state { case .ready, .syncing, .success: Theme.accent; case .canceled: .secondary; case .warning: .orange; case .error: .red }
   }
 }
 

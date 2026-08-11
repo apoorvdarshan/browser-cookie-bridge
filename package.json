@@ -1,6 +1,6 @@
 {
   "name": "browser-cookie-bridge",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Local-first cookie and session transfer for macOS with optional Browserless upload",
   "type": "module",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
-    "check": "node --check bin/brave-codex-cookie-sync.js && node --check src/app-installer.js && node --check src/browserless.js && node --check src/browserless-runner.js && node --check src/broker.js && node --check src/chromium-reader.js && node --check src/cli.js && node --check src/codex-direct-import.js && node --check src/config.js && node --check src/paths.js && node --check src/scheduler.js && node --check src/updater.js && node --check scripts/build-dmg.js && node --check extension-template/background.js && node --check web/server.js && node --check web/script.js",
+    "check": "node --check bin/brave-codex-cookie-sync.js && node --check src/app-installer.js && node --check src/browserless.js && node --check src/browserless-preflight.js && node --check src/browserless-runner.js && node --check src/broker.js && node --check src/chromium-reader.js && node --check src/cli.js && node --check src/codex-direct-import.js && node --check src/config.js && node --check src/paths.js && node --check src/scheduler.js && node --check src/updater.js && node --check scripts/build-dmg.js && node --check extension-template/background.js && node --check web/server.js && node --check web/script.js",
     "release:check": "node scripts/check-release-version.js",
     "build:app": "node bin/brave-codex-cookie-sync.js install-app --no-open",
     "build:dmg": "node scripts/build-dmg.js",

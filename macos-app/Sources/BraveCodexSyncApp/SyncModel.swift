@@ -6,6 +6,7 @@ extension Notification.Name {
   static let menuBarVisibilityChanged = Notification.Name("BraveCodexSync.menuBarVisibilityChanged")
   static let nativeAlert = Notification.Name("BraveCodexSync.nativeAlert")
   static let updateStateChanged = Notification.Name("BraveCodexSync.updateStateChanged")
+  static let syncStateChanged = Notification.Name("BraveCodexSync.syncStateChanged")
 }
 
 struct NativeAlert {
@@ -21,6 +22,31 @@ struct UpdateMenuState {
   let installing: Bool
 }
 
+struct SyncMenuState {
+  let uploading: Bool
+  let canceling: Bool
+}
+
+struct BrowserlessProfileAssessment: Decodable {
+  let browser: String?
+  let profileName: String?
+  let profileBytes: Int64
+  let indexedDBBytes: Int64
+  let localStorageBytes: Int64
+  let freeBytes: Int64?
+  let severity: String
+  let temporarySpaceWarning: Bool
+  let serverArtifactCapBytes: Int64
+  let summary: String
+}
+
+private struct BrowserlessProgressEvent: Decodable {
+  let phase: String
+  let fraction: Double?
+  let detail: String?
+  let assessment: BrowserlessProfileAssessment?
+}
+
 struct BrowserChoice: Identifiable, Hashable {
   let id: String
   let name: String
@@ -31,7 +57,7 @@ struct BrowserChoice: Identifiable, Hashable {
 
 @MainActor
 final class SyncModel: ObservableObject {
-  enum State { case ready, syncing, success, warning, error }
+  enum State { case ready, syncing, success, canceled, warning, error }
 
   let browsers = [
     BrowserChoice(id: "brave", name: "Brave", bundleIdentifier: "com.brave.Browser", applicationName: "Brave Browser", extensionURL: "brave://extensions"),
@@ -67,6 +93,11 @@ final class SyncModel: ObservableObject {
   @Published var browserlessRegion = "sfo"
   @Published var browserlessOnlyDomains = ""
   @Published var showingBrowserlessSetup = false
+  @Published var browserlessAssessment: BrowserlessProfileAssessment?
+  @Published var isInspectingBrowserlessProfile = false
+  @Published var uploadProgress = 0.0
+  @Published var uploadElapsedSeconds = 0
+  @Published var uploadCanceling = false
   @Published var primaryStatus = "Ready to sync"
   @Published var secondaryStatus = "Choose what to move, then start a transfer"
 
@@ -80,6 +111,10 @@ final class SyncModel: ObservableObject {
   private var updateTimer: Timer?
   private var didCheckAfterLaunch = false
   private var didConsumeUpdateResult = false
+  private var assessedBrowserID: String?
+  private var activeSyncProcess: Process?
+  private var uploadTimer: Timer?
+  private var uploadStartedAt: Date?
 
   var selectedBrowser: BrowserChoice {
     browsers.first(where: { $0.id == selectedSourceID }) ?? browsers[0]
@@ -98,6 +133,11 @@ final class SyncModel: ObservableObject {
     isBrowserlessTarget && (!browserlessConfigured || sourceBrowserRunning || selectedSourceID == "comet")
   }
   var syncBlocked: Bool { codexBlocked || browserlessBlocked }
+  var formattedUploadElapsed: String {
+    let minutes = uploadElapsedSeconds / 60
+    let seconds = uploadElapsedSeconds % 60
+    return String(format: "%d:%02d", minutes, seconds)
+  }
   var sourceIcon: NSImage { browserIcon(selectedBrowser) }
   var targetIcon: NSImage {
     isBrowserlessTarget ? browserlessIcon : selectedTargetBrowser.map(browserIcon) ?? codexIcon
@@ -141,6 +181,7 @@ final class SyncModel: ObservableObject {
     let calendar = Calendar.current
     scheduleTime = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     updateEndpointRunningStatus()
+    refreshBrowserlessPreflight()
     endpointStatusTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
       Task { @MainActor in self?.updateEndpointRunningStatus() }
     }
@@ -230,6 +271,7 @@ final class SyncModel: ObservableObject {
       FileManager.default.fileExists(atPath: support.appending(path: "extension-\($0)/manifest.json").path)
     }
     updateEndpointRunningStatus()
+    refreshBrowserlessPreflight()
     consumeUpdateResultIfNeeded()
     if autoCheckUpdates && !didCheckAfterLaunch {
       didCheckAfterLaunch = true
@@ -240,6 +282,8 @@ final class SyncModel: ObservableObject {
   func selectSource(_ id: String) {
     guard browsers.contains(where: { $0.id == id }), id != selectedSourceID, id != selectedTargetID else { return }
     selectedSourceID = id
+    browserlessAssessment = nil
+    assessedBrowserID = nil
     persistPreferences(successMessage: "Export source changed to \(selectedBrowser.name)")
   }
 
@@ -250,6 +294,7 @@ final class SyncModel: ObservableObject {
     persistPreferences(successMessage: "Import destination changed to \(targetName)")
     updateEndpointRunningStatus()
     if id == "browserless" && !browserlessConfigured { showingBrowserlessSetup = true }
+    if id == "browserless" { refreshBrowserlessPreflight() }
   }
 
   func setCookiesEnabled(_ enabled: Bool) {
@@ -277,6 +322,7 @@ final class SyncModel: ObservableObject {
       browserlessOnlyDomains = onlyDomains
       showingBrowserlessSetup = false
       persistPreferences(successMessage: "Browserless connected — uploads remain manual")
+      refreshBrowserlessPreflight(force: true)
     } catch {
       postNativeAlert(title: "Could not save Browserless token", message: error.localizedDescription, kind: .error)
     }
@@ -387,6 +433,10 @@ final class SyncModel: ObservableObject {
 
   func syncNow(showMenuBarAlert: Bool = false) {
     guard !isSyncing else {
+      if isBrowserlessTarget {
+        cancelSync()
+        return
+      }
       if showMenuBarAlert {
         postNativeAlert(title: "Sync already running", message: "Wait for the current transfer to finish.", kind: .information)
       }
@@ -400,6 +450,7 @@ final class SyncModel: ObservableObject {
       return
     }
     isSyncing = true
+    uploadCanceling = false
     state = .syncing
     primaryStatus = isBrowserlessTarget ? "Uploading authenticated state" : "Transferring selected data"
     secondaryStatus = selectedTargetID == "codex"
@@ -408,7 +459,7 @@ final class SyncModel: ObservableObject {
         ? "Sending \(selectedBrowser.name) to Browserless \(browserlessRegion.uppercased()) only for this request…"
         : "Waiting for \(selectedBrowser.name) and \(targetName)…"
     var environment: [String: String] = [:]
-    var arguments = ["sync", "--timeout", "300"]
+    var arguments = ["sync", "--timeout", isBrowserlessTarget ? "900" : "300"]
     if isBrowserlessTarget {
       guard let token = BrowserlessCredentialStore.read() else {
         isSyncing = false
@@ -418,15 +469,30 @@ final class SyncModel: ObservableObject {
       }
       environment["BROWSERLESS_TOKEN"] = token
       arguments.append("--allow-cloud-upload")
+      beginUploadTracking()
     }
-    runCLI(arguments, environment: environment) { [weak self] success, output in
+    activeSyncProcess = runCLI(arguments, environment: environment, onLine: { [weak self] line in
+      self?.handleBrowserlessProgress(line)
+    }) { [weak self] success, output in
       guard let self else { return }
+      self.activeSyncProcess = nil
       self.isSyncing = false
-      let partial = success && (output.contains("Partially synced:") || output.contains("with warnings"))
-      if success {
+      self.finishUploadTracking()
+      let partial = success && (
+        output.contains("Partially synced:")
+          || output.contains("with warnings")
+          || output.contains("omitted to fit")
+          || output.contains("could not be captured")
+      )
+      let canceled = output.contains("Browserless upload canceled") || output.contains("Temporary profile data was removed")
+      if canceled {
+        self.state = .canceled
+        self.primaryStatus = "Browserless upload canceled"
+        self.secondaryStatus = "No cloud profile was changed; temporary profile data was removed"
+      } else if success {
         self.state = partial ? .warning : .success
         self.primaryStatus = self.isBrowserlessTarget
-          ? "Browserless profile uploaded"
+          ? (partial ? "Browserless profile uploaded with omissions" : "Browserless profile uploaded")
           : self.selectedTargetID == "codex"
           ? (partial ? "Codex sync completed with warnings" : "Codex sessions updated")
           : (partial ? "Partially synced" : "Transfer complete")
@@ -445,8 +511,36 @@ final class SyncModel: ObservableObject {
         self.postNativeAlert(
           title: self.primaryStatus,
           message: self.secondaryStatus,
-          kind: success ? (partial ? .warning : .information) : .error
+          kind: canceled ? .information : success ? (partial ? .warning : .information) : .error
         )
+      }
+    }
+  }
+
+  func cancelSync() {
+    guard isBrowserlessTarget, isSyncing, !uploadCanceling else { return }
+    uploadCanceling = true
+    primaryStatus = "Canceling Browserless upload"
+    secondaryStatus = "Stopping the temporary browser and removing its isolated workspace…"
+    postSyncState()
+    activeSyncProcess?.terminate()
+  }
+
+  func refreshBrowserlessPreflight(force: Bool = false) {
+    guard isBrowserlessTarget, selectedSourceID != "comet", !isInspectingBrowserlessProfile else { return }
+    if !force, assessedBrowserID == selectedSourceID, browserlessAssessment != nil { return }
+    isInspectingBrowserlessProfile = true
+    let sourceAtStart = selectedSourceID
+    runCLI(["browserless-preflight"]) { [weak self] success, output in
+      guard let self else { return }
+      self.isInspectingBrowserlessProfile = false
+      guard self.selectedSourceID == sourceAtStart else { return }
+      if success, let assessment = self.decodeLastJSON(BrowserlessProfileAssessment.self, from: output) {
+        self.browserlessAssessment = assessment
+        self.assessedBrowserID = sourceAtStart
+      } else if force {
+        self.browserlessAssessment = nil
+        self.assessedBrowserID = nil
       }
     }
   }
@@ -556,6 +650,7 @@ final class SyncModel: ObservableObject {
         FileManager.default.fileExists(atPath: self.support.appending(path: "extension-\($0)/manifest.json").path)
       }
       self.updateEndpointRunningStatus()
+      self.refreshBrowserlessPreflight()
     }
   }
 
@@ -584,27 +679,48 @@ final class SyncModel: ObservableObject {
     }
   }
 
-  private func runCLI(_ arguments: [String], environment: [String: String] = [:], completion: @escaping @MainActor (Bool, String) -> Void) {
+  @discardableResult
+  private func runCLI(
+    _ arguments: [String],
+    environment: [String: String] = [:],
+    onLine: (@MainActor (String) -> Void)? = nil,
+    completion: @escaping @MainActor (Bool, String) -> Void
+  ) -> Process? {
     guard let config = loadConfig() else {
       completion(false, "Configuration missing. Run install-app again.")
-      return
+      return nil
     }
     let process = Process()
     let output = Pipe()
+    let collector = ProcessOutputCollector()
     process.executableURL = URL(fileURLWithPath: config.nodePath)
     process.arguments = [runtimeCLI.path] + arguments
     process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
     process.standardOutput = output
     process.standardError = output
+    output.fileHandleForReading.readabilityHandler = { handle in
+      let data = handle.availableData
+      guard !data.isEmpty else { return }
+      let lines = collector.append(data)
+      guard let onLine, !lines.isEmpty else { return }
+      Task { @MainActor in lines.forEach(onLine) }
+    }
     process.terminationHandler = { process in
-      let data = output.fileHandleForReading.readDataToEndOfFile()
-      let text = String(decoding: data, as: UTF8.self)
-      Task { @MainActor in completion(process.terminationStatus == 0, text) }
+      output.fileHandleForReading.readabilityHandler = nil
+      let remainder = output.fileHandleForReading.readDataToEndOfFile()
+      let lines = collector.append(remainder, finish: true)
+      let text = collector.text
+      Task { @MainActor in
+        if let onLine { lines.forEach(onLine) }
+        completion(process.terminationStatus == 0, text)
+      }
     }
     do {
       try process.run()
+      return process
     } catch {
       completion(false, error.localizedDescription)
+      return nil
     }
   }
 
@@ -629,6 +745,69 @@ final class SyncModel: ObservableObject {
   private func lastMeaningfulLine(_ output: String) -> String? {
     guard let line = output.split(separator: "\n").map(String.init).last(where: { !$0.isEmpty }) else { return nil }
     return line.hasPrefix("Error: ") ? String(line.dropFirst(7)) : line
+  }
+
+  private func decodeLastJSON<T: Decodable>(_ type: T.Type, from output: String) -> T? {
+    for line in output.split(separator: "\n").reversed() {
+      guard let data = String(line).data(using: .utf8),
+            let value = try? JSONDecoder().decode(type, from: data) else { continue }
+      return value
+    }
+    return nil
+  }
+
+  private func beginUploadTracking() {
+    uploadProgress = 0.01
+    uploadElapsedSeconds = 0
+    uploadStartedAt = Date()
+    uploadTimer?.invalidate()
+    uploadTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+      Task { @MainActor in
+        guard let self, let started = self.uploadStartedAt else { return }
+        self.uploadElapsedSeconds = max(0, Int(Date().timeIntervalSince(started)))
+      }
+    }
+    postSyncState()
+  }
+
+  private func finishUploadTracking() {
+    uploadTimer?.invalidate()
+    uploadTimer = nil
+    uploadStartedAt = nil
+    uploadCanceling = false
+    postSyncState()
+  }
+
+  private func handleBrowserlessProgress(_ line: String) {
+    guard line.hasPrefix("BCB_PROGRESS "),
+          let data = String(line.dropFirst("BCB_PROGRESS ".count)).data(using: .utf8),
+          let event = try? JSONDecoder().decode(BrowserlessProgressEvent.self, from: data) else { return }
+    if let fraction = event.fraction { uploadProgress = min(max(fraction, uploadProgress), 1) }
+    if let assessment = event.assessment {
+      browserlessAssessment = assessment
+      assessedBrowserID = selectedSourceID
+    }
+    guard !uploadCanceling else { return }
+    primaryStatus = switch event.phase {
+    case "preflight": "Inspecting the local profile"
+    case "preflight-complete": "Profile preflight complete"
+    case "validating": "Checking Browserless profile"
+    case "copying": "Preparing an isolated profile copy"
+    case "launching", "waiting": "Starting the temporary browser"
+    case "capturing": "Capturing authenticated state"
+    case "uploading": "Uploading fitted profile state"
+    case "verifying": "Verifying the Browserless profile"
+    case "complete": "Browserless profile uploaded"
+    default: "Uploading authenticated state"
+    }
+    if let detail = event.detail { secondaryStatus = detail }
+  }
+
+  private func postSyncState() {
+    NotificationCenter.default.post(
+      name: .syncStateChanged,
+      object: SyncMenuState(uploading: isBrowserlessTarget && isSyncing, canceling: uploadCanceling)
+    )
   }
 
   private var formattedTime: String {
@@ -825,5 +1004,29 @@ private enum BrowserlessCredentialStore {
       kSecAttrAccount as String: account,
     ]
     SecItemDelete(query as CFDictionary)
+  }
+}
+
+private final class ProcessOutputCollector: @unchecked Sendable {
+  private let lock = NSLock()
+  private var bytes = Data()
+  private var pending = ""
+
+  var text: String {
+    lock.withLock { String(decoding: bytes, as: UTF8.self) }
+  }
+
+  func append(_ data: Data, finish: Bool = false) -> [String] {
+    lock.withLock {
+      bytes.append(data)
+      pending += String(decoding: data, as: UTF8.self)
+      var lines = pending.components(separatedBy: .newlines)
+      if finish {
+        pending = ""
+        return lines.filter { !$0.isEmpty }
+      }
+      pending = lines.popLast() ?? ""
+      return lines.filter { !$0.isEmpty }
+    }
   }
 }

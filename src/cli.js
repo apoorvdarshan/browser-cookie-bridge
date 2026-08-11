@@ -10,6 +10,7 @@ import {
 } from "./codex-direct-import.js";
 import { readChromiumProfile } from "./chromium-reader.js";
 import { uploadBrowserlessProfile } from "./browserless.js";
+import { inspectBrowserlessProfile } from "./browserless-preflight.js";
 import { installConfig, installRuntime, readConfig, updatePreferences } from "./config.js";
 import {
   braveCookiePaths,
@@ -46,6 +47,7 @@ Commands:
   bootstrap-bundled --app-path /Applications/Browser Cookie Bridge.app
   preferences --source brave --target codex --cookies on --history off --menu-bar on --auto-check-updates on
   sync [--timeout 300] [--allow-cloud-upload]
+  browserless-preflight
   doctor
   enable-login-sync
   disable-login-sync
@@ -55,13 +57,15 @@ Commands:
   help
 `;
 
-export async function main(argv) {
+export async function main(argv, { signal } = {}) {
   const [command = "help", ...args] = argv;
   switch (command) {
     case "setup":
       return setup(args);
     case "sync":
-      return sync(args);
+      return sync(args, { signal });
+    case "browserless-preflight":
+      return browserlessPreflight();
     case "install-app":
       return installDesktopApp(args);
     case "bootstrap-bundled":
@@ -259,11 +263,11 @@ function setup(args) {
     : "Cookie values are transferred in memory and are not written to logs or disk.");
 }
 
-async function sync(args) {
+async function sync(args, { signal } = {}) {
   assertMacOS();
-  const seconds = integerFlag(args, "--timeout", 300, 5, 3600);
   const config = readConfig();
   const target = config.targetBrowser || "codex";
+  const seconds = integerFlag(args, "--timeout", target === "browserless" ? 900 : 300, 5, 3600);
   const isCodexTarget = target === "codex";
   if (target === "browserless") {
     if (!args.includes("--allow-cloud-upload")) {
@@ -271,6 +275,15 @@ async function sync(args) {
     }
     const source = config.sourceBrowser || "brave";
     const local = readChromiumProfile({ browser: source, imports: { cookies: false, history: false } });
+    emitBrowserlessProgress({ phase: "preflight", fraction: 0.03, detail: "Inspecting the local profile…" });
+    const assessment = inspectBrowserlessProfile({ profilePath: local.profilePath });
+    emitBrowserlessProgress({
+      phase: "preflight-complete",
+      fraction: 0.06,
+      detail: assessment.summary,
+      assessment,
+    });
+    console.log(`Profile preflight: ${assessment.summary}`);
     console.log(`Preparing ${source} profile ${local.profileName} for an explicit Browserless cloud upload…`);
     const result = await uploadBrowserlessProfile({
       browser: source,
@@ -278,7 +291,11 @@ async function sync(args) {
       profileName: config.browserless?.profileName || "browser-cookie-bridge",
       region: config.browserless?.region || "sfo",
       onlyDomains: config.browserless?.onlyDomains || [],
+      timeoutMs: seconds * 1000,
+      signal,
+      onProgress: emitBrowserlessProgress,
     });
+    emitBrowserlessProgress({ phase: "complete", fraction: 1, detail: result.summary });
     console.log(result.summary);
     return result;
   }
@@ -320,6 +337,21 @@ async function sync(args) {
   const result = await broker.completion;
   console.log(transferSummary(result));
   return result;
+}
+
+function browserlessPreflight() {
+  assertMacOS();
+  const config = readConfig();
+  const source = config.sourceBrowser || "brave";
+  if (source === "comet") throw new Error("Comet is not supported by Browserless profile capture yet.");
+  const local = readChromiumProfile({ browser: source, imports: { cookies: false, history: false } });
+  const assessment = inspectBrowserlessProfile({ profilePath: local.profilePath });
+  console.log(JSON.stringify({ browser: source, profileName: local.profileName, ...assessment }));
+  return assessment;
+}
+
+function emitBrowserlessProgress(event) {
+  console.log(`BCB_PROGRESS ${JSON.stringify(event)}`);
 }
 
 export function directCodexSummary(result) {

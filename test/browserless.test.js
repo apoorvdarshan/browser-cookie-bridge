@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { uploadBrowserlessProfile } from "../src/browserless.js";
+import { progressParser, runBrowserlessCLI, uploadBrowserlessProfile } from "../src/browserless.js";
 
 test("creates a missing Browserless profile with explicit privacy controls", async () => {
   const calls = [];
@@ -25,7 +25,9 @@ test("creates a missing Browserless profile with explicit privacy controls", asy
   });
 
   assert.equal(result.operation, "upload");
+  assert.equal(result.verified, true);
   assert.match(result.summary, /12 cookies, 3 origins/);
+  assert.match(result.summary, /verified/);
   assert.deepEqual(calls[1].args, [
     "profile", "upload", "--browser", "brave", "--profile", "Default",
     "--name", "bridge-test", "--region", "ams", "--json", "--accept-terms",
@@ -36,6 +38,58 @@ test("creates a missing Browserless profile with explicit privacy controls", asy
   assert.equal(calls[1].environment.DO_NOT_TRACK, "1");
   assert.equal(calls[1].environment.BROWSERLESS_DISABLE_KEYCHAIN, "1");
   assert(!calls[1].args.includes("secret-token"));
+  assert.equal(calls.length, 3);
+});
+
+test("parses live Browserless capture progress across split output chunks", () => {
+  const progress = [];
+  const parse = progressParser((event) => progress.push(event));
+  parse("copying profile data…\nlaunching headless browser…\ncapturing per-origin storage…\n  2/10  https://exa");
+  parse("mple.com\n> Uploading to Browserless\n");
+  assert.deepEqual(progress.map((event) => event.phase), ["copying", "launching", "capturing", "capturing", "uploading"]);
+  assert.equal(progress[3].current, 2);
+  assert.equal(progress[3].total, 10);
+  assert.match(progress[3].detail, /example\.com/);
+});
+
+test("cancellation terminates the Browserless process group and removes its temporary workspace", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "browserless-cancel-test-"));
+  const fakeCLI = path.join(directory, "fake-cli.mjs");
+  const controller = new AbortController();
+  let temporaryRoot = "";
+  try {
+    fs.writeFileSync(fakeCLI, `
+      console.log("TMPDIR=" + process.env.TMPDIR);
+      setInterval(() => {}, 1_000);
+      await new Promise(() => {});
+    `);
+    const output = [];
+    const promise = runBrowserlessCLI(
+      fakeCLI,
+      ["profile", "upload"],
+      { ...process.env, BROWSERLESS_TOKEN: "keychain-secret" },
+      path.resolve("src/browserless-runner.js"),
+      {
+        signal: controller.signal,
+        timeoutMs: 5_000,
+        onOutput(chunk) {
+          output.push(chunk);
+          const match = output.join("").match(/TMPDIR=(.+)/);
+          if (match) {
+            temporaryRoot = match[1].trim();
+            controller.abort();
+          }
+        },
+      },
+    );
+    const result = await promise;
+    assert.equal(result.status, 130);
+    assert.equal(result.canceled, true);
+    assert(temporaryRoot.includes("browser-cookie-bridge-browserless-"));
+    assert.equal(fs.existsSync(temporaryRoot), false);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("refreshes an existing Browserless profile and rejects unsupported sources", async () => {
@@ -76,6 +130,60 @@ test("does not turn authentication failures into create attempts", async () => {
     /Token rejected/,
   );
   assert.equal(calls, 1);
+});
+
+test("turns Browserless network failures into actionable retry guidance", async () => {
+  let calls = 0;
+  await assert.rejects(
+    uploadBrowserlessProfile({
+      browser: "brave",
+      localProfile: "Default",
+      profileName: "network-test",
+      token: "token",
+      runner: async () => {
+        calls += 1;
+        return calls === 1
+          ? { status: 1, output: "Profile not found (404)" }
+          : { status: 5, output: "TypeError: fetch failed (ECONNRESET)" };
+      },
+    }),
+    /could not be reached.*internet connection.*region/i,
+  );
+  assert.equal(calls, 2);
+});
+
+test("timeout terminates the Browserless process group and removes its temporary workspace", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "browserless-timeout-test-"));
+  const fakeCLI = path.join(directory, "fake-cli.mjs");
+  let temporaryRoot = "";
+  try {
+    fs.writeFileSync(fakeCLI, `
+      console.log("TMPDIR=" + process.env.TMPDIR);
+      setInterval(() => {}, 1_000);
+      await new Promise(() => {});
+    `);
+    const output = [];
+    const result = await runBrowserlessCLI(
+      fakeCLI,
+      ["profile", "upload"],
+      { ...process.env, BROWSERLESS_TOKEN: "keychain-secret" },
+      path.resolve("src/browserless-runner.js"),
+      {
+        timeoutMs: 75,
+        onOutput(chunk) {
+          output.push(chunk);
+          const match = output.join("").match(/TMPDIR=(.+)/);
+          if (match) temporaryRoot = match[1].trim();
+        },
+      },
+    );
+    assert.equal(result.status, 124);
+    assert.equal(result.timedOut, true);
+    assert(temporaryRoot.includes("browser-cookie-bridge-browserless-"));
+    assert.equal(fs.existsSync(temporaryRoot), false);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("removes the API token from the environment before loading the capture CLI", () => {

@@ -44,7 +44,7 @@
 
 ---
 
-> **Version 1.2.0 adds an optional Browserless Cloud destination.** It is destination-only, manual-only, and visually separated from local transfers. Importing into ChatGPT Codex remains an intentionally unsupported direct integration and requires Codex to be completely closed.
+> **Version 1.3.0 makes large Browserless uploads observable and recoverable.** The app measures the local profile and IndexedDB without reading their contents, streams capture progress and elapsed time, supports cancellation with deterministic temporary-data cleanup, reports auto-fit omissions, and verifies the cloud profile after upload.
 
 ## Why Browser Cookie Bridge
 
@@ -57,7 +57,7 @@ Browser Cookie Bridge gives those browser profiles a small, native control panel
 - 🍪 **Cookie and session transfer** — cookies are enabled by default, including supported domain, path, expiry, security, `SameSite`, and partition attributes.
 - 🌐 **Seven Chromium browsers** — Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Perplexity Comet can be sources or destinations.
 - ✨ **ChatGPT Codex import** — merge selected local browser data into Codex's built-in browser; Codex is destination-only.
-- ☁️ **Optional Browserless upload** — create or refresh a Browserless authenticated profile with cookies, local storage, and IndexedDB; Browserless is destination-only and manual-only.
+- ☁️ **Optional Browserless upload** — create or refresh a Browserless authenticated profile with cookies, local storage, and IndexedDB; see a local size preflight, live progress, cancellation, and post-upload verification.
 - 🕘 **Background automation** — sync when you sign in, at a fixed daily time, or whenever you choose.
 - ◉ **Native menu-bar app** — closing the window removes the Dock icon while the helper continues running.
 - 🧯 **Backup and rollback** — Codex's database is backed up, modified on a separate copy, integrity-checked, and restored if replacement fails.
@@ -151,7 +151,11 @@ This path uses the official Browserless CLI and is deliberately separate from lo
 3. Quit the selected source browser so its profile can be copied consistently.
 4. Review the cloud warning and click **Upload now**.
 
-The upload creates the named Browserless profile the first time and refreshes it on later runs. It may contain cookies, local storage, and IndexedDB; history and saved passwords are excluded. Browserless uploads never run from Daily sync or Sync at login. Browser Cookie Bridge disables Browserless CLI telemetry for this integration. Comet is not currently supported by the Browserless capture CLI.
+The upload creates the named Browserless profile the first time and refreshes it on later runs. It may contain cookies, local storage, and IndexedDB; history and saved passwords are excluded. The app measures the profile, IndexedDB, local storage, and available disk space locally before capture. Progress and elapsed time remain visible, Cancel upload terminates the isolated capture process group, and the dedicated temporary workspace is removed after success, failure, timeout, or cancellation.
+
+Browserless currently caps the serialized authenticated-profile artifact at **2 MB**. A large on-disk IndexedDB does not mean all of it will be uploaded: the official CLI's `--auto-fit` behavior drops the heaviest origins until the artifact fits while keeping cookies. Browser Cookie Bridge reports those omissions in the final result and verifies that the named cloud profile can be read back after upload. Use the domain allowlist when you need specific sites or want a faster, smaller capture.
+
+Browserless uploads never run from Daily sync or Sync at login. Browser Cookie Bridge disables Browserless CLI telemetry for this integration. Comet is not currently supported by the Browserless capture CLI. The default cloud timeout is 15 minutes; `--timeout` can override it.
 
 The official CLI records the Browserless upload-disclaimer acceptance timestamp in `~/.browserless/config.json`. Browser Cookie Bridge does not store its API token there.
 
@@ -178,6 +182,7 @@ browser-cookie-bridge install-app [--no-open]
 browser-cookie-bridge setup [--hour 9] [--minute 0] [--no-schedule]
 browser-cookie-bridge preferences --source brave --target codex --cookies on --history off
 browser-cookie-bridge sync [--timeout 300] [--allow-cloud-upload]
+browser-cookie-bridge browserless-preflight
 browser-cookie-bridge doctor
 browser-cookie-bridge enable-login-sync
 browser-cookie-bridge disable-login-sync
