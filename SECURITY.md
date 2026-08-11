@@ -40,6 +40,7 @@ Never submit real cookie values, generated `config.js` contents, broker tokens, 
 Examples include:
 
 - Cookie or history data leaving the local Mac unexpectedly
+- A Browserless upload occurring without the explicit manual cloud-upload action, or leaking its API token
 - Cookie values, history URLs, or broker tokens appearing in logs
 - Authentication or origin-validation bypasses in the local broker
 - Another local user being able to read generated configuration, backups, or transferred data
@@ -65,6 +66,9 @@ Timelines may vary with severity and complexity. Please allow a reasonable remed
 ## Security model and limitations
 
 - Browser-to-browser transfers use a short-lived broker bound to IPv4 loopback. It validates a random token and the expected extension origin.
+- Browserless is an optional, destination-only cloud integration. Its uploads are manual-only, require an explicit consented action, and never run from Daily sync or Sync at login.
+- Browserless API tokens are stored in macOS Keychain. A short-lived adapter reads the token, removes it from the environment before temporary Chromium starts, and invokes the official CLI without exposing the token in the OS command line or app configuration. Browserless CLI telemetry is disabled by the app.
+- Browserless uploads contain cookies, local storage, and IndexedDB from a temporary copy of the selected closed profile. History and saved passwords are excluded; optional domain allowlisting can narrow the capture.
 - Cookie values and history URLs are not logged. Browser-to-browser payloads are held in memory.
 - Generated configuration and backup files use user-only filesystem permissions.
 - Release automation builds separate Apple-silicon and Intel DMGs. The updater selects the current architecture and verifies the published SHA-256 file before mounting or installing a release.

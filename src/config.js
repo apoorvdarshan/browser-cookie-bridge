@@ -35,7 +35,7 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
   const sourceBrowser = SOURCE_BROWSERS.includes(existing.sourceBrowser) ? existing.sourceBrowser : "brave";
   const configuredTarget = TARGET_BROWSERS.includes(existing.targetBrowser) ? existing.targetBrowser : "codex";
   const config = {
-    version: 1,
+    version: 2,
     token: existing.token || crypto.randomBytes(32).toString("base64url"),
     port: existing.port || DEFAULT_PORT,
     nodePath,
@@ -51,6 +51,11 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
       openAtLogin: existing.ui?.openAtLogin !== false,
       autoCheckUpdates: existing.ui?.autoCheckUpdates !== false,
     },
+    browserless: {
+      profileName: cleanProfileName(existing.browserless?.profileName) || "browser-cookie-bridge",
+      region: ["sfo", "lon", "ams"].includes(existing.browserless?.region) ? existing.browserless.region : "sfo",
+      onlyDomains: cleanDomains(existing.browserless?.onlyDomains),
+    },
     schedule: { hour, minute },
     createdAt: existing.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -63,7 +68,19 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
   return config;
 }
 
-export function updatePreferences({ home, cookies, history, sourceBrowser, targetBrowser, menuBar, openAtLogin, autoCheckUpdates }) {
+export function updatePreferences({
+  home,
+  cookies,
+  history,
+  sourceBrowser,
+  targetBrowser,
+  menuBar,
+  openAtLogin,
+  autoCheckUpdates,
+  browserlessProfileName,
+  browserlessRegion,
+  browserlessOnlyDomains,
+}) {
   const config = readConfig(home);
   if (!SOURCE_BROWSERS.includes(sourceBrowser)) {
     throw new Error(`Unsupported source browser: ${sourceBrowser}`);
@@ -82,6 +99,13 @@ export function updatePreferences({ home, cookies, history, sourceBrowser, targe
     openAtLogin: Boolean(openAtLogin),
     autoCheckUpdates: Boolean(autoCheckUpdates),
   };
+  const region = browserlessRegion ?? config.browserless?.region ?? "sfo";
+  if (!["sfo", "lon", "ams"].includes(region)) throw new Error("Browserless region must be sfo, lon, or ams");
+  config.browserless = {
+    profileName: cleanProfileName(browserlessProfileName ?? config.browserless?.profileName) || "browser-cookie-bridge",
+    region,
+    onlyDomains: cleanDomains(browserlessOnlyDomains ?? config.browserless?.onlyDomains),
+  };
   config.updatedAt = new Date().toISOString();
   writePrivateJson(configPath(home), config);
   return config;
@@ -92,10 +116,11 @@ export function installRuntime(home, source = projectRoot()) {
   if (path.resolve(source) === path.resolve(target)) return target;
 
   fs.mkdirSync(target, { recursive: true, mode: 0o700 });
-  for (const name of ["bin", "src", "extension-template"]) {
+  for (const name of ["bin", "src", "extension-template", "node_modules"]) {
     fs.rmSync(path.join(target, name), { recursive: true, force: true });
     fs.cpSync(path.join(source, name), path.join(target, name), { recursive: true, force: true });
   }
+  fs.rmSync(path.join(target, "node_modules", ".bin"), { recursive: true, force: true });
   const appSource = path.join(source, "macos-app");
   const appTarget = path.join(target, "macos-app");
   fs.rmSync(appTarget, { recursive: true, force: true });
@@ -108,11 +133,20 @@ export function installRuntime(home, source = projectRoot()) {
       fs.copyFileSync(path.join(appSource, name), path.join(appTarget, name));
     }
   }
-  for (const name of ["package.json", "README.md", "LICENSE"]) {
+  for (const name of ["package.json", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"]) {
     fs.copyFileSync(path.join(source, name), path.join(target, name));
   }
   fs.chmodSync(path.join(target, "bin", "brave-codex-cookie-sync.js"), 0o700);
   return target;
+}
+
+function cleanProfileName(value) {
+  return typeof value === "string" ? value.trim().slice(0, 100) : "";
+}
+
+function cleanDomains(value) {
+  const items = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
+  return [...new Set(items.map((item) => String(item).trim().toLowerCase()).filter(Boolean))].slice(0, 50);
 }
 
 function installExtension(config, home, browser, role) {

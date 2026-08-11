@@ -37,6 +37,9 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Run tests
         run: npm test
 
@@ -76,6 +79,9 @@ jobs:
         run: npm run release:check
         env:
           RELEASE_TAG: ${{ github.ref_name }}
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Run tests
         run: npm test

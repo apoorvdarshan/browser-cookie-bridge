@@ -50,10 +50,11 @@ fs.chmodSync(path.join(macos, "BraveCodexSyncApp"), 0o755);
 fs.copyFileSync(path.join(root, "macos-app", "Info.plist"), path.join(contents, "Info.plist"));
 fs.cpSync(path.join(root, "macos-app", "Resources"), resources, { recursive: true, force: true });
 
-for (const name of ["bin", "src", "extension-template"]) {
+for (const name of ["bin", "src", "extension-template", "node_modules"]) {
   fs.cpSync(path.join(root, name), path.join(runtime, name), { recursive: true, force: true });
 }
-for (const name of ["package.json", "README.md", "LICENSE"]) {
+fs.rmSync(path.join(runtime, "node_modules", ".bin"), { recursive: true, force: true });
+for (const name of ["package.json", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"]) {
   fs.copyFileSync(path.join(root, name), path.join(runtime, name));
 }
 const bundledNode = path.join(runtime, "node", "bin", "node");

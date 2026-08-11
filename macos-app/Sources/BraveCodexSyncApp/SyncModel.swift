@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Security
 
 extension Notification.Name {
   static let menuBarVisibilityChanged = Notification.Name("BraveCodexSync.menuBarVisibilityChanged")
@@ -60,6 +61,12 @@ final class SyncModel: ObservableObject {
   @Published var selectedSourceID = "brave"
   @Published var selectedTargetID = "codex"
   @Published var codexRunning = false
+  @Published var sourceBrowserRunning = false
+  @Published var browserlessConfigured = false
+  @Published var browserlessProfileName = "browser-cookie-bridge"
+  @Published var browserlessRegion = "sfo"
+  @Published var browserlessOnlyDomains = ""
+  @Published var showingBrowserlessSetup = false
   @Published var primaryStatus = "Ready to sync"
   @Published var secondaryStatus = "Choose what to move, then start a transfer"
 
@@ -69,7 +76,7 @@ final class SyncModel: ObservableObject {
   private var launchAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.plist") }
   private var loginSyncAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.login-sync.plist") }
   private var appLoginAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.app-login.plist") }
-  private var codexStatusTimer: Timer?
+  private var endpointStatusTimer: Timer?
   private var updateTimer: Timer?
   private var didCheckAfterLaunch = false
   private var didConsumeUpdateResult = false
@@ -82,10 +89,24 @@ final class SyncModel: ObservableObject {
     browsers.first(where: { $0.id == selectedTargetID })
   }
 
-  var targetName: String { selectedTargetBrowser?.name ?? "ChatGPT Codex" }
+  var isBrowserlessTarget: Bool { selectedTargetID == "browserless" }
+  var targetName: String {
+    isBrowserlessTarget ? "Browserless Cloud" : selectedTargetBrowser?.name ?? "ChatGPT Codex"
+  }
   var codexBlocked: Bool { selectedTargetID == "codex" && codexRunning }
+  var browserlessBlocked: Bool {
+    isBrowserlessTarget && (!browserlessConfigured || sourceBrowserRunning || selectedSourceID == "comet")
+  }
+  var syncBlocked: Bool { codexBlocked || browserlessBlocked }
   var sourceIcon: NSImage { browserIcon(selectedBrowser) }
-  var targetIcon: NSImage { selectedTargetBrowser.map(browserIcon) ?? codexIcon }
+  var targetIcon: NSImage {
+    isBrowserlessTarget ? browserlessIcon : selectedTargetBrowser.map(browserIcon) ?? codexIcon
+  }
+  var browserlessIcon: NSImage {
+    bundledIcon("browserless")
+      ?? NSImage(systemSymbolName: "cloud.fill", accessibilityDescription: "Browserless Cloud")
+      ?? NSImage()
+  }
   var codexIcon: NSImage {
     bundledIcon("chatgpt-codex")
       ?? chatGPTResource("app.icns")
@@ -119,9 +140,9 @@ final class SyncModel: ObservableObject {
     bootstrapBundledRuntimeIfNeeded()
     let calendar = Calendar.current
     scheduleTime = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
-    updateCodexRunningStatus()
-    codexStatusTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-      Task { @MainActor in self?.updateCodexRunningStatus() }
+    updateEndpointRunningStatus()
+    endpointStatusTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+      Task { @MainActor in self?.updateEndpointRunningStatus() }
     }
     updateTimer = Timer.scheduledTimer(withTimeInterval: 24 * 60 * 60, repeats: true) { [weak self] _ in
       Task { @MainActor in
@@ -191,7 +212,7 @@ final class SyncModel: ObservableObject {
       let configuredSource = config.sourceBrowser ?? "brave"
       selectedSourceID = browsers.contains(where: { $0.id == configuredSource }) ? configuredSource : "brave"
       let configuredTarget = config.targetBrowser ?? "codex"
-      selectedTargetID = configuredTarget == "codex" || browsers.contains(where: { $0.id == configuredTarget })
+      selectedTargetID = configuredTarget == "codex" || configuredTarget == "browserless" || browsers.contains(where: { $0.id == configuredTarget })
         ? configuredTarget
         : "codex"
       if selectedTargetID == selectedSourceID { selectedTargetID = "codex" }
@@ -199,12 +220,16 @@ final class SyncModel: ObservableObject {
       historyEnabled = config.imports?.history ?? false
       menuBarEnabled = config.ui?.menuBar ?? true
       autoCheckUpdates = config.ui?.autoCheckUpdates ?? true
+      browserlessProfileName = config.browserless?.profileName ?? "browser-cookie-bridge"
+      browserlessRegion = config.browserless?.region ?? "sfo"
+      browserlessOnlyDomains = (config.browserless?.onlyDomains ?? []).joined(separator: ", ")
     }
+    browserlessConfigured = BrowserlessCredentialStore.read() != nil
     NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: menuBarEnabled)
     extensionsReady = requiredExtensionIDs.allSatisfy {
       FileManager.default.fileExists(atPath: support.appending(path: "extension-\($0)/manifest.json").path)
     }
-    updateCodexRunningStatus()
+    updateEndpointRunningStatus()
     consumeUpdateResultIfNeeded()
     if autoCheckUpdates && !didCheckAfterLaunch {
       didCheckAfterLaunch = true
@@ -219,11 +244,12 @@ final class SyncModel: ObservableObject {
   }
 
   func selectTarget(_ id: String) {
-    let validTarget = id == "codex" || browsers.contains(where: { $0.id == id })
+    let validTarget = id == "codex" || id == "browserless" || browsers.contains(where: { $0.id == id })
     guard validTarget, id != selectedTargetID, id != selectedSourceID else { return }
     selectedTargetID = id
     persistPreferences(successMessage: "Import destination changed to \(targetName)")
-    updateCodexRunningStatus()
+    updateEndpointRunningStatus()
+    if id == "browserless" && !browserlessConfigured { showingBrowserlessSetup = true }
   }
 
   func setCookiesEnabled(_ enabled: Bool) {
@@ -234,6 +260,33 @@ final class SyncModel: ObservableObject {
   func setHistoryEnabled(_ enabled: Bool) {
     historyEnabled = enabled
     persistPreferences(successMessage: enabled ? "History URL import enabled" : "History import disabled")
+  }
+
+  func saveBrowserlessSettings(token: String, profileName: String, region: String, onlyDomains: String) {
+    let cleanedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+    let cleanedName = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !cleanedName.isEmpty, !cleanedToken.isEmpty || BrowserlessCredentialStore.read() != nil else {
+      postNativeAlert(title: "Browserless connection incomplete", message: "Enter an API token and cloud profile name.", kind: .warning)
+      return
+    }
+    do {
+      if !cleanedToken.isEmpty { try BrowserlessCredentialStore.save(cleanedToken) }
+      browserlessConfigured = true
+      browserlessProfileName = cleanedName
+      browserlessRegion = region
+      browserlessOnlyDomains = onlyDomains
+      showingBrowserlessSetup = false
+      persistPreferences(successMessage: "Browserless connected — uploads remain manual")
+    } catch {
+      postNativeAlert(title: "Could not save Browserless token", message: error.localizedDescription, kind: .error)
+    }
+  }
+
+  func disconnectBrowserless() {
+    BrowserlessCredentialStore.delete()
+    browserlessConfigured = false
+    showingBrowserlessSetup = false
+    updateEndpointRunningStatus()
   }
 
   func setMenuBarEnabled(_ enabled: Bool) {
@@ -339,8 +392,8 @@ final class SyncModel: ObservableObject {
       }
       return
     }
-    updateCodexRunningStatus()
-    guard !codexBlocked else {
+    updateEndpointRunningStatus()
+    guard !syncBlocked else {
       if showMenuBarAlert {
         postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: .warning)
       }
@@ -348,17 +401,33 @@ final class SyncModel: ObservableObject {
     }
     isSyncing = true
     state = .syncing
-    primaryStatus = "Transferring selected data"
+    primaryStatus = isBrowserlessTarget ? "Uploading authenticated state" : "Transferring selected data"
     secondaryStatus = selectedTargetID == "codex"
       ? "Backing up Codex and merging \(selectedBrowser.name) locally…"
-      : "Waiting for \(selectedBrowser.name) and \(targetName)…"
-    runCLI(["sync", "--timeout", "300"]) { [weak self] success, output in
+      : isBrowserlessTarget
+        ? "Sending \(selectedBrowser.name) to Browserless \(browserlessRegion.uppercased()) only for this request…"
+        : "Waiting for \(selectedBrowser.name) and \(targetName)…"
+    var environment: [String: String] = [:]
+    var arguments = ["sync", "--timeout", "300"]
+    if isBrowserlessTarget {
+      guard let token = BrowserlessCredentialStore.read() else {
+        isSyncing = false
+        browserlessConfigured = false
+        updateEndpointRunningStatus()
+        return
+      }
+      environment["BROWSERLESS_TOKEN"] = token
+      arguments.append("--allow-cloud-upload")
+    }
+    runCLI(arguments, environment: environment) { [weak self] success, output in
       guard let self else { return }
       self.isSyncing = false
       let partial = success && (output.contains("Partially synced:") || output.contains("with warnings"))
       if success {
         self.state = partial ? .warning : .success
-        self.primaryStatus = self.selectedTargetID == "codex"
+        self.primaryStatus = self.isBrowserlessTarget
+          ? "Browserless profile uploaded"
+          : self.selectedTargetID == "codex"
           ? (partial ? "Codex sync completed with warnings" : "Codex sessions updated")
           : (partial ? "Partially synced" : "Transfer complete")
         self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and \(self.targetName) are up to date"
@@ -367,9 +436,11 @@ final class SyncModel: ObservableObject {
         self.primaryStatus = "Sync did not finish"
         self.secondaryStatus = self.lastMeaningfulLine(output) ?? (self.selectedTargetID == "codex"
           ? "Quit Codex completely, then try again"
+          : self.isBrowserlessTarget
+            ? "Check the API token, close the source browser, and try again"
           : "Keep both browsers open and check the extensions")
       }
-      self.updateCodexRunningStatus()
+      self.updateEndpointRunningStatus()
       if showMenuBarAlert {
         self.postNativeAlert(
           title: self.primaryStatus,
@@ -381,6 +452,10 @@ final class SyncModel: ObservableObject {
   }
 
   func setDailyEnabled(_ enabled: Bool) {
+    guard !isBrowserlessTarget else {
+      postNativeAlert(title: "Cloud uploads are manual-only", message: "Browser Cookie Bridge will never schedule Browserless uploads in the background.", kind: .information)
+      return
+    }
     dailyEnabled = enabled
     applySchedule(enabled)
   }
@@ -390,6 +465,10 @@ final class SyncModel: ObservableObject {
   }
 
   func setLoginSyncEnabled(_ enabled: Bool) {
+    guard !isBrowserlessTarget else {
+      postNativeAlert(title: "Cloud uploads are manual-only", message: "Login sync does not send authenticated state to Browserless.", kind: .information)
+      return
+    }
     loginSyncEnabled = enabled
     isWorking = true
     runCLI([enabled ? "enable-login-sync" : "disable-login-sync"]) { [weak self] success, output in
@@ -453,7 +532,10 @@ final class SyncModel: ObservableObject {
       "--cookies", cookiesEnabled ? "on" : "off",
       "--history", historyEnabled ? "on" : "off",
       "--menu-bar", menuBarEnabled ? "on" : "off",
-      "--auto-check-updates", autoCheckUpdates ? "on" : "off"
+      "--auto-check-updates", autoCheckUpdates ? "on" : "off",
+      "--browserless-profile", browserlessProfileName,
+      "--browserless-region", browserlessRegion,
+      "--browserless-domains", browserlessOnlyDomains,
     ]
     runCLI(arguments) { [weak self] success, output in
       guard let self else { return }
@@ -461,7 +543,9 @@ final class SyncModel: ObservableObject {
       if success {
         self.state = .ready
         self.primaryStatus = successMessage
-        self.secondaryStatus = "This choice is saved for manual and daily syncs"
+        self.secondaryStatus = self.isBrowserlessTarget
+          ? "Cloud uploads run only after you click Upload"
+          : "This choice is saved for manual and daily syncs"
       } else {
         self.state = .error
         self.primaryStatus = "Could not save import settings"
@@ -471,7 +555,7 @@ final class SyncModel: ObservableObject {
       self.extensionsReady = self.requiredExtensionIDs.allSatisfy {
         FileManager.default.fileExists(atPath: self.support.appending(path: "extension-\($0)/manifest.json").path)
       }
-      self.updateCodexRunningStatus()
+      self.updateEndpointRunningStatus()
     }
   }
 
@@ -500,7 +584,7 @@ final class SyncModel: ObservableObject {
     }
   }
 
-  private func runCLI(_ arguments: [String], completion: @escaping @MainActor (Bool, String) -> Void) {
+  private func runCLI(_ arguments: [String], environment: [String: String] = [:], completion: @escaping @MainActor (Bool, String) -> Void) {
     guard let config = loadConfig() else {
       completion(false, "Configuration missing. Run install-app again.")
       return
@@ -509,6 +593,7 @@ final class SyncModel: ObservableObject {
     let output = Pipe()
     process.executableURL = URL(fileURLWithPath: config.nodePath)
     process.arguments = [runtimeCLI.path] + arguments
+    process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
     process.standardOutput = output
     process.standardError = output
     process.terminationHandler = { process in
@@ -551,23 +636,44 @@ final class SyncModel: ObservableObject {
   }
 
   private var requiredExtensionIDs: [String] {
-    selectedTargetID == "codex" ? [] : [selectedSourceID, selectedTargetID]
+    selectedTargetID == "codex" || selectedTargetID == "browserless" ? [] : [selectedSourceID, selectedTargetID]
   }
 
-  private func updateCodexRunningStatus() {
+  private func updateEndpointRunningStatus() {
     let wasRunning = codexRunning
     codexRunning = NSWorkspace.shared.runningApplications.contains {
       $0.bundleIdentifier == "com.openai.codex"
     }
-    guard selectedTargetID == "codex", !isSyncing else { return }
-    if codexRunning {
+    sourceBrowserRunning = NSWorkspace.shared.runningApplications.contains {
+      $0.bundleIdentifier == selectedBrowser.bundleIdentifier
+    }
+    guard !isSyncing else { return }
+    if selectedTargetID == "codex" && codexRunning {
       state = .warning
       primaryStatus = "Quit Codex before syncing"
       secondaryStatus = "Close ChatGPT Codex completely so its local cookie database can be updated safely"
-    } else if wasRunning && primaryStatus == "Quit Codex before syncing" {
+    } else if selectedTargetID == "codex" && wasRunning && primaryStatus == "Quit Codex before syncing" {
       state = .ready
       primaryStatus = "Ready to sync directly"
       secondaryStatus = "Codex is closed — a backup will be created before anything changes"
+    } else if isBrowserlessTarget {
+      if selectedSourceID == "comet" {
+        state = .warning
+        primaryStatus = "Comet capture is not supported"
+        secondaryStatus = "Choose Brave, Chrome, Edge, Arc, Vivaldi, or Opera for Browserless"
+      } else if !browserlessConfigured {
+        state = .warning
+        primaryStatus = "Connect Browserless"
+        secondaryStatus = "Your API token will be stored in macOS Keychain, never in the app configuration"
+      } else if sourceBrowserRunning {
+        state = .warning
+        primaryStatus = "Quit \(selectedBrowser.name) before uploading"
+        secondaryStatus = "Browserless captures a temporary copy of the closed profile, including local storage and IndexedDB"
+      } else {
+        state = .ready
+        primaryStatus = "Ready for an explicit cloud upload"
+        secondaryStatus = "Only this click sends authenticated state to Browserless \(browserlessRegion.uppercased())"
+      }
     }
   }
 
@@ -647,6 +753,7 @@ private struct AppConfig: Decodable {
   let targetBrowser: String?
   let imports: Imports?
   let ui: UISettings?
+  let browserless: BrowserlessSettings?
 
   struct Schedule: Decodable {
     let hour: Int
@@ -662,5 +769,61 @@ private struct AppConfig: Decodable {
     let menuBar: Bool?
     let openAtLogin: Bool?
     let autoCheckUpdates: Bool?
+  }
+
+  struct BrowserlessSettings: Decodable {
+    let profileName: String?
+    let region: String?
+    let onlyDomains: [String]?
+  }
+}
+
+private enum BrowserlessCredentialStore {
+  private static let service = "com.apoorvdarshan.browser-cookie-bridge.browserless"
+  private static let account = "api-token"
+
+  static func save(_ token: String) throws {
+    let identity: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: service,
+      kSecAttrAccount as String: account,
+    ]
+    let update: [String: Any] = [kSecValueData as String: Data(token.utf8)]
+    let updateStatus = SecItemUpdate(identity as CFDictionary, update as CFDictionary)
+    if updateStatus == errSecSuccess { return }
+    guard updateStatus == errSecItemNotFound else {
+      throw NSError(domain: NSOSStatusErrorDomain, code: Int(updateStatus), userInfo: nil)
+    }
+    let item: [String: Any] = identity.merging([
+      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+      kSecValueData as String: Data(token.utf8),
+    ]) { _, new in new }
+    let status = SecItemAdd(item as CFDictionary, nil)
+    guard status == errSecSuccess else {
+      throw NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: nil)
+    }
+  }
+
+  static func read() -> String? {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: service,
+      kSecAttrAccount as String: account,
+      kSecReturnData as String: true,
+      kSecMatchLimit as String: kSecMatchLimitOne,
+    ]
+    var result: CFTypeRef?
+    guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+          let data = result as? Data else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
+
+  static func delete() {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: service,
+      kSecAttrAccount as String: account,
+    ]
+    SecItemDelete(query as CFDictionary)
   }
 }

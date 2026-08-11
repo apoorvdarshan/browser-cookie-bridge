@@ -213,6 +213,9 @@ struct ContentView: View {
     .sheet(isPresented: $showingSetup) {
       ExtensionSetupSheet().environmentObject(model)
     }
+    .sheet(isPresented: $model.showingBrowserlessSetup) {
+      BrowserlessSetupSheet().environmentObject(model)
+    }
   }
 
   private var header: some View {
@@ -238,7 +241,10 @@ struct ContentView: View {
 
   private var footer: some View {
     HStack(spacing: 10) {
-      Label("Data stays on this Mac", systemImage: "lock.shield.fill")
+      Label(
+        model.isBrowserlessTarget ? "Cloud upload only when you choose it" : "Data stays on this Mac",
+        systemImage: model.isBrowserlessTarget ? "cloud.fill" : "lock.shield.fill"
+      )
         .foregroundStyle(.secondary)
       Spacer()
       if let version = model.availableUpdateVersion {
@@ -262,7 +268,7 @@ struct ContentView: View {
       .buttonStyle(.plain)
       .foregroundStyle(.secondary)
       .help("Refresh status")
-      if model.selectedTargetID != "codex" {
+      if model.selectedTargetID != "codex" && !model.isBrowserlessTarget {
         Button("Extension setup…") { showingSetup = true }
           .controlSize(.small)
       }
@@ -295,32 +301,52 @@ struct SyncPanel: View {
               .help(model.secondaryStatus)
           }
           Spacer()
-          Button { model.syncNow() } label: {
+          Button {
+            if model.isBrowserlessTarget && !model.browserlessConfigured {
+              model.showingBrowserlessSetup = true
+            } else {
+              model.syncNow()
+            }
+          } label: {
             HStack(spacing: 7) {
               if model.isSyncing { ProgressView().controlSize(.small) }
-              else { Image(systemName: model.codexBlocked ? "xmark.circle.fill" : "arrow.triangle.2.circlepath") }
-              Text(model.isSyncing ? "Syncing…" : (model.codexBlocked ? "Close Codex first" : "Sync now"))
+              else { Image(systemName: syncButtonIcon) }
+              Text(syncButtonTitle)
             }
-            .frame(minWidth: model.codexBlocked ? 116 : 92)
+            .frame(minWidth: model.syncBlocked ? 116 : 92)
           }
           .buttonStyle(.borderedProminent)
           .tint(Theme.accent)
-          .disabled(model.isSyncing || model.codexBlocked)
+          .disabled(model.isSyncing || (model.syncBlocked && !(model.isBrowserlessTarget && !model.browserlessConfigured)))
           .keyboardShortcut(.return, modifiers: .command)
         }
-        .padding(model.codexBlocked ? 7 : 0)
+        .padding(model.syncBlocked ? 7 : 0)
         .background(
-          model.codexBlocked ? Theme.active.opacity(0.10) : Color.clear,
+          model.syncBlocked ? Theme.active.opacity(0.10) : Color.clear,
           in: RoundedRectangle(cornerRadius: 9, style: .continuous)
         )
         .overlay {
-          if model.codexBlocked {
+          if model.syncBlocked {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
               .stroke(Theme.active.opacity(0.38), lineWidth: 1)
           }
         }
       }
     }
+  }
+
+  private var syncButtonTitle: String {
+    if model.isSyncing { return model.isBrowserlessTarget ? "Uploading…" : "Syncing…" }
+    if model.codexBlocked { return "Close Codex first" }
+    if model.isBrowserlessTarget && !model.browserlessConfigured { return "Connect Browserless" }
+    if model.isBrowserlessTarget && model.selectedSourceID == "comet" { return "Choose another browser" }
+    if model.isBrowserlessTarget && model.sourceBrowserRunning { return "Close \(model.selectedBrowser.name) first" }
+    return model.isBrowserlessTarget ? "Upload now" : "Sync now"
+  }
+
+  private var syncButtonIcon: String {
+    if model.syncBlocked { return model.isBrowserlessTarget && !model.browserlessConfigured ? "key.fill" : "xmark.circle.fill" }
+    return model.isBrowserlessTarget ? "icloud.and.arrow.up.fill" : "arrow.triangle.2.circlepath"
   }
 
 }
@@ -378,7 +404,12 @@ struct TargetPicker: View {
       VStack(spacing: 5) {
         HStack(spacing: 5) {
           ForEach(Array(model.browsers.prefix(4))) { browser in targetButton(browser) }
-          Color.clear.frame(width: 19, height: 40)
+          EndpointButton(
+            icon: model.browserlessIcon,
+            name: "Browserless Cloud",
+            selected: model.selectedTargetID == "browserless",
+            disabled: model.isWorking || model.isSyncing || model.selectedSourceID == "comet"
+          ) { model.selectTarget("browserless") }
         }
         HStack(spacing: 5) {
           ForEach(Array(model.browsers.dropFirst(4))) { browser in targetButton(browser) }
@@ -449,44 +480,69 @@ struct PreferencesPanel: View {
     Surface(padding: 0) {
       VStack(spacing: 0) {
         SectionLabel(title: "Sync data", detail: "Saved automatically")
-        PreferenceRow(icon: "network", color: Theme.accent, title: "Cookies", detail: "Site sessions and sign-ins") {
-          Toggle("", isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
-        }
-        RowDivider()
-        PreferenceRow(icon: "clock.arrow.circlepath", color: Theme.accent, title: "History URLs", detail: "Original visit times are not preserved") {
-          Toggle("", isOn: Binding(get: { model.historyEnabled }, set: { model.setHistoryEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
-        }
-        RowDivider()
-        PreferenceRow(icon: "key.slash", color: .secondary, title: "Passwords", detail: "Browser extensions cannot access passwords", muted: true) {
-          Text("Unavailable")
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            .background(Color.secondary.opacity(0.08), in: Capsule())
+        if model.isBrowserlessTarget {
+          PreferenceRow(icon: "person.crop.circle.badge.checkmark", color: Theme.accent, title: "Authenticated state", detail: "Cookies, local storage, and IndexedDB") {
+            FixedBadge("Included")
+          }
+          RowDivider()
+          PreferenceRow(icon: "clock.arrow.circlepath", color: .secondary, title: "History URLs", detail: "Not included in Browserless profiles", muted: true) {
+            FixedBadge("Excluded")
+          }
+          RowDivider()
+          PreferenceRow(icon: "key.slash", color: .secondary, title: "Saved passwords", detail: "Never read or uploaded", muted: true) {
+            FixedBadge("Excluded")
+          }
+          RowDivider()
+          PreferenceRow(icon: "cloud.fill", color: Theme.accent, title: "Browserless connection", detail: model.browserlessConfigured ? "\(model.browserlessProfileName) · \(model.browserlessRegion.uppercased()) · token in Keychain" : "Not connected") {
+            Button(model.browserlessConfigured ? "Configure…" : "Connect…") {
+              model.showingBrowserlessSetup = true
+            }
+            .controlSize(.small)
+          }
+        } else {
+          PreferenceRow(icon: "network", color: Theme.accent, title: "Cookies", detail: "Site sessions and sign-ins") {
+            Toggle("", isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }))
+              .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
+          }
+          RowDivider()
+          PreferenceRow(icon: "clock.arrow.circlepath", color: Theme.accent, title: "History URLs", detail: "Original visit times are not preserved") {
+            Toggle("", isOn: Binding(get: { model.historyEnabled }, set: { model.setHistoryEnabled($0) }))
+              .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
+          }
+          RowDivider()
+          PreferenceRow(icon: "key.slash", color: .secondary, title: "Passwords", detail: "Browser extensions cannot access passwords", muted: true) {
+            FixedBadge("Unavailable")
+          }
         }
 
         SectionLabel(title: "Automation", detail: "Runs in the background", separated: true)
-        PreferenceRow(icon: "clock.badge.checkmark", color: Theme.accent, title: "Daily sync", detail: model.dailyEnabled ? "At the selected local time" : "Off") {
-          HStack(spacing: 8) {
-            DatePicker("", selection: $model.scheduleTime, displayedComponents: .hourAndMinute)
-              .labelsHidden()
-              .datePickerStyle(.field)
-              .controlSize(.regular)
-              .disabled(!model.dailyEnabled || model.isWorking)
-              .frame(width: 112, alignment: .center)
-              .onChange(of: model.scheduleTime) { _ in
-                if model.dailyEnabled && !model.isWorking { model.saveSchedule() }
-              }
-            Toggle("", isOn: Binding(get: { model.dailyEnabled }, set: { model.setDailyEnabled($0) }))
-              .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
+        PreferenceRow(icon: "clock.badge.checkmark", color: Theme.accent, title: "Daily sync", detail: model.isBrowserlessTarget ? "Unavailable for cloud uploads" : (model.dailyEnabled ? "At the selected local time" : "Off")) {
+          if model.isBrowserlessTarget {
+            FixedBadge("Manual only")
+          } else {
+            HStack(spacing: 8) {
+              DatePicker("", selection: $model.scheduleTime, displayedComponents: .hourAndMinute)
+                .labelsHidden()
+                .datePickerStyle(.field)
+                .controlSize(.regular)
+                .disabled(!model.dailyEnabled || model.isWorking)
+                .frame(width: 112, alignment: .center)
+                .onChange(of: model.scheduleTime) { _ in
+                  if model.dailyEnabled && !model.isWorking { model.saveSchedule() }
+                }
+              Toggle("", isOn: Binding(get: { model.dailyEnabled }, set: { model.setDailyEnabled($0) }))
+                .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
+            }
           }
         }
         RowDivider()
-        PreferenceRow(icon: "sunrise.fill", color: Theme.accent, title: "Sync at login", detail: model.loginSyncEnabled ? "Once whenever you sign in" : "Off") {
-          Toggle("", isOn: Binding(get: { model.loginSyncEnabled }, set: { model.setLoginSyncEnabled($0) }))
-            .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
+        PreferenceRow(icon: "sunrise.fill", color: Theme.accent, title: "Sync at login", detail: model.isBrowserlessTarget ? "Unavailable for cloud uploads" : (model.loginSyncEnabled ? "Once whenever you sign in" : "Off")) {
+          if model.isBrowserlessTarget {
+            FixedBadge("Manual only")
+          } else {
+            Toggle("", isOn: Binding(get: { model.loginSyncEnabled }, set: { model.setLoginSyncEnabled($0) }))
+              .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
+          }
         }
         RowDivider()
         PreferenceRow(icon: "power", color: Theme.accent, title: "Open at login", detail: "Start the app after you sign in") {
@@ -521,6 +577,121 @@ struct PreferencesPanel: View {
         RowDivider()
         ProjectLinkRow(icon: "megaphone", title: "View on Product Hunt", detail: "Follow the launch and leave feedback", url: ProjectLinks.productHunt)
       }
+    }
+  }
+}
+
+struct FixedBadge: View {
+  let title: String
+
+  init(_ title: String) { self.title = title }
+
+  var body: some View {
+    Text(title)
+      .font(.system(size: 10, weight: .semibold))
+      .foregroundStyle(.tertiary)
+      .padding(.horizontal, 8).padding(.vertical, 4)
+      .background(Color.secondary.opacity(0.08), in: Capsule())
+  }
+}
+
+struct BrowserlessSetupSheet: View {
+  @EnvironmentObject private var model: SyncModel
+  @Environment(\.dismiss) private var dismiss
+  @State private var token = ""
+  @State private var profileName = "browser-cookie-bridge"
+  @State private var region = "sfo"
+  @State private var onlyDomains = ""
+  @State private var cloudConsent = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 17) {
+      HStack(alignment: .top, spacing: 12) {
+        Image(nsImage: model.browserlessIcon)
+          .resizable()
+          .scaledToFit()
+          .frame(width: 24, height: 24)
+          .frame(width: 40, height: 40)
+          .background(Theme.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+        VStack(alignment: .leading, spacing: 3) {
+          Text("Connect Browserless Cloud")
+            .font(.system(size: 18, weight: .bold, design: .rounded))
+          Text("Optional authenticated-profile upload")
+            .font(.system(size: 11.5)).foregroundStyle(.secondary)
+        }
+        Spacer()
+        FixedBadge(model.browserlessConfigured ? "Connected" : "Not connected")
+      }
+
+      VStack(alignment: .leading, spacing: 12) {
+        LabeledContent("API token") {
+          SecureField(model.browserlessConfigured ? "Saved in Keychain — leave blank to keep" : "Browserless API token", text: $token)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 270)
+        }
+        LabeledContent("Cloud profile") {
+          TextField("browser-cookie-bridge", text: $profileName)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 270)
+        }
+        LabeledContent("Region") {
+          Picker("", selection: $region) {
+            Text("San Francisco (SFO)").tag("sfo")
+            Text("London (LON)").tag("lon")
+            Text("Amsterdam (AMS)").tag("ams")
+          }
+          .labelsHidden()
+          .frame(width: 270)
+        }
+        LabeledContent("Only domains") {
+          TextField("Optional: example.com, app.example.com", text: $onlyDomains)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 270)
+        }
+      }
+      .font(.system(size: 11.5, weight: .medium))
+      .padding(14)
+      .background(Color(nsColor: .controlBackgroundColor).opacity(0.72), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+      .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.08)))
+
+      HStack(alignment: .top, spacing: 10) {
+        Image(systemName: "exclamationmark.cloud.fill")
+          .foregroundStyle(Theme.active)
+        Text("This destination is not local. Clicking Upload sends cookies, local storage, and IndexedDB from a temporary profile copy to Browserless. Upload only profiles you are authorized to share; use the domain allowlist for sensitive profiles. Background and login sync never perform cloud uploads. CLI telemetry is disabled.")
+          .font(.system(size: 10.5))
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      .padding(12)
+      .background(Theme.active.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+      Toggle("I understand the upload contents, have authority to share them, and accept responsibility for the Browserless copy.", isOn: $cloudConsent)
+        .toggleStyle(.checkbox)
+        .font(.system(size: 10.5, weight: .medium))
+
+      HStack {
+        Link("Get a Browserless API token", destination: URL(string: "https://www.browserless.io/account")!)
+          .font(.system(size: 10.5, weight: .medium))
+        Link("Privacy", destination: URL(string: "https://www.browserless.io/privacy-policy")!)
+          .font(.system(size: 10.5, weight: .medium))
+        if model.browserlessConfigured {
+          Button("Disconnect", role: .destructive) { model.disconnectBrowserless() }
+        }
+        Spacer()
+        Button("Cancel") { dismiss() }
+        Button("Save connection") {
+          model.saveBrowserlessSettings(token: token, profileName: profileName, region: region, onlyDomains: onlyDomains)
+        }
+        .keyboardShortcut(.defaultAction)
+        .disabled(profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !cloudConsent)
+      }
+    }
+    .padding(22)
+    .frame(width: 520)
+    .onAppear {
+      profileName = model.browserlessProfileName
+      region = model.browserlessRegion
+      onlyDomains = model.browserlessOnlyDomains
     }
   }
 }

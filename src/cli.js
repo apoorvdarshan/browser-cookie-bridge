@@ -9,6 +9,7 @@ import {
   isCodexRunning,
 } from "./codex-direct-import.js";
 import { readChromiumProfile } from "./chromium-reader.js";
+import { uploadBrowserlessProfile } from "./browserless.js";
 import { installConfig, installRuntime, readConfig, updatePreferences } from "./config.js";
 import {
   braveCookiePaths,
@@ -44,7 +45,7 @@ Commands:
   install-app [--no-open]
   bootstrap-bundled --app-path /Applications/Browser Cookie Bridge.app
   preferences --source brave --target codex --cookies on --history off --menu-bar on --auto-check-updates on
-  sync [--timeout 300]
+  sync [--timeout 300] [--allow-cloud-upload]
   doctor
   enable-login-sync
   disable-login-sync
@@ -123,6 +124,9 @@ function preferences(args) {
     menuBar: booleanFlag(args, "--menu-bar", existing.ui?.menuBar === true),
     openAtLogin: booleanFlag(args, "--open-at-login", existing.ui?.openAtLogin !== false),
     autoCheckUpdates: booleanFlag(args, "--auto-check-updates", existing.ui?.autoCheckUpdates !== false),
+    browserlessProfileName: stringFlag(args, "--browserless-profile", existing.browserless?.profileName || "browser-cookie-bridge"),
+    browserlessRegion: stringFlag(args, "--browserless-region", existing.browserless?.region || "sfo"),
+    browserlessOnlyDomains: optionalStringFlag(args, "--browserless-domains", (existing.browserless?.onlyDomains || []).join(",")),
   });
   console.log(
     `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}, auto-check-updates=${config.ui.autoCheckUpdates ? "on" : "off"}`,
@@ -239,6 +243,10 @@ function setup(args) {
   if (config.targetBrowser === "codex") {
     console.log(`Source browser: ${config.sourceBrowser} (read locally; no extension required)`);
     console.log("Target integration: direct local Codex merge (Codex must be closed)");
+  } else if (config.targetBrowser === "browserless") {
+    console.log(`Source browser: ${config.sourceBrowser} (captured locally by the Browserless CLI)`);
+    console.log(`Cloud destination: Browserless ${config.browserless?.region || "sfo"} / ${config.browserless?.profileName || "browser-cookie-bridge"}`);
+    console.log("Browserless uploads are manual-only and require --allow-cloud-upload.");
   } else {
     console.log(`Source extension (${config.sourceBrowser}): ${installedExtensionDir(undefined, config.sourceBrowser)}`);
     console.log(`Target extension (${config.targetBrowser}): ${installedExtensionDir(undefined, config.targetBrowser)}`);
@@ -255,7 +263,25 @@ async function sync(args) {
   assertMacOS();
   const seconds = integerFlag(args, "--timeout", 300, 5, 3600);
   const config = readConfig();
-  const isCodexTarget = (config.targetBrowser || "codex") === "codex";
+  const target = config.targetBrowser || "codex";
+  const isCodexTarget = target === "codex";
+  if (target === "browserless") {
+    if (!args.includes("--allow-cloud-upload")) {
+      throw new Error("Browserless cloud uploads are manual-only. Start one from the app or pass --allow-cloud-upload explicitly.");
+    }
+    const source = config.sourceBrowser || "brave";
+    const local = readChromiumProfile({ browser: source, imports: { cookies: false, history: false } });
+    console.log(`Preparing ${source} profile ${local.profileName} for an explicit Browserless cloud upload…`);
+    const result = await uploadBrowserlessProfile({
+      browser: source,
+      localProfile: local.profileName,
+      profileName: config.browserless?.profileName || "browser-cookie-bridge",
+      region: config.browserless?.region || "sfo",
+      onlyDomains: config.browserless?.onlyDomains || [],
+    });
+    console.log(result.summary);
+    return result;
+  }
   if (isCodexTarget) {
     if (isCodexRunning()) throw new Error(CODEX_RUNNING_ERROR);
     const payload = readChromiumProfile({
@@ -331,6 +357,8 @@ function doctor() {
   console.log(
     target === "codex"
       ? "Target integration: direct local Codex merge (Codex must be closed)"
+      : target === "browserless"
+        ? `Target integration: optional Browserless cloud upload (${config?.browserless?.region || "sfo"}); manual only`
       : `Target extension: ${status(installedExtensionDir(home, target))}`,
   );
   console.log(`Daily schedule: ${status(launchAgentPath(home))}`);
@@ -355,6 +383,8 @@ function enableLoginSync() {
   const config = readConfig();
   console.log(config.targetBrowser === "codex"
     ? "A sync starts when you sign in and updates Codex only when Codex is closed."
+    : config.targetBrowser === "browserless"
+      ? "Browserless uploads remain manual-only; login sync will not send data to the cloud."
     : "A sync starts when you sign in and waits up to five minutes for both browser extensions.");
 }
 
@@ -373,6 +403,9 @@ function setAppLogin(enabled) {
     menuBar: existing.ui?.menuBar === true,
     openAtLogin: enabled,
     autoCheckUpdates: existing.ui?.autoCheckUpdates !== false,
+    browserlessProfileName: existing.browserless?.profileName,
+    browserlessRegion: existing.browserless?.region,
+    browserlessOnlyDomains: existing.browserless?.onlyDomains,
   });
   if (enabled) {
     const appPath = installedAppPath();
@@ -420,6 +453,11 @@ function stringFlag(args, name, fallback) {
     throw new Error(`${name} must be one of: ${TARGET_BROWSERS.join(", ")}`);
   }
   return value;
+}
+
+function optionalStringFlag(args, name, fallback) {
+  const index = args.indexOf(name);
+  return index === -1 ? fallback : (args[index + 1] ?? "");
 }
 
 function existing(paths) {

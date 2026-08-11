@@ -14,7 +14,7 @@ Never include real cookie values, session tokens, browser profiles, generated ex
 ## Development requirements
 
 - macOS 13.5 or newer
-- Node.js 22.5 or newer
+- Node.js 24 or newer
 - Xcode Command Line Tools: `xcode-select --install`
 - At least one supported Chromium browser for manual transfer testing
 - ChatGPT Codex only when testing the direct Codex destination

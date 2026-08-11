@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#151514" />
-  <meta name="description" content="Browser Cookie Bridge moves cookies and signed-in sessions between Chromium browsers and into ChatGPT Codex—locally on your Mac." />
+  <meta name="description" content="Browser Cookie Bridge moves signed-in sessions locally between Chromium browsers and ChatGPT Codex, with an optional explicit Browserless Cloud upload." />
   <meta name="author" content="Apoorv Darshan" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta property="og:site_name" content="Browser Cookie Bridge" />
   <meta property="og:title" content="Browser Cookie Bridge — Local session transfer for macOS" />
-  <meta property="og:description" content="Move browser cookies and signed-in sessions locally between Chromium browsers and ChatGPT Codex on macOS." />
+  <meta property="og:description" content="Local-first browser session transfer on macOS with an optional Browserless Cloud destination." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://cookiebridge.apoorvdarshan.com/" />
   <meta property="og:image" content="https://cookiebridge.apoorvdarshan.com/assets/hero-transfer.webp" />
@@ -20,7 +20,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:creator" content="@apoorvdarshan" />
   <meta name="twitter:title" content="Browser Cookie Bridge — Local session transfer for macOS" />
-  <meta name="twitter:description" content="Move browser cookies and signed-in sessions locally between Chromium browsers and ChatGPT Codex on macOS." />
+  <meta name="twitter:description" content="Local-first browser session transfer on macOS with an optional Browserless Cloud destination." />
   <meta name="twitter:image" content="https://cookiebridge.apoorvdarshan.com/assets/hero-transfer.webp" />
   <meta name="twitter:image:alt" content="Browser Cookie Bridge transferring a browser session locally on macOS" />
   <title>Browser Cookie Bridge — Local session transfer for macOS</title>
@@ -45,11 +45,11 @@
           "@id": "https://cookiebridge.apoorvdarshan.com/#software",
           "name": "Browser Cookie Bridge",
           "url": "https://cookiebridge.apoorvdarshan.com/",
-          "description": "A native macOS utility for transferring cookies and signed-in sessions locally between supported Chromium browsers and ChatGPT Codex.",
+          "description": "A native macOS utility for local-first session transfer between Chromium browsers and ChatGPT Codex, with an optional Browserless Cloud upload.",
           "image": "https://cookiebridge.apoorvdarshan.com/assets/hero-transfer.webp",
           "applicationCategory": "UtilitiesApplication",
           "operatingSystem": "macOS 13.5 or later",
-          "softwareVersion": "1.1.0",
+          "softwareVersion": "1.2.0",
           "isAccessibleForFree": true,
           "offers": {
             "@type": "Offer",
@@ -107,9 +107,9 @@
       <div class="hero-grain" aria-hidden="true"></div>
       <div class="shell hero-grid">
         <div class="hero-copy" data-reveal>
-          <div class="eyebrow"><span class="live-dot"></span> Native macOS utility · v1.1.0</div>
+          <div class="eyebrow"><span class="live-dot"></span> Native macOS utility · v1.2.0</div>
           <h1>Your browser sessions.<br /><em>Across the browsers you use.</em></h1>
-          <p class="hero-lede">Move cookies and signed-in sessions between Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Comet—or import them into ChatGPT Codex. No cloud relay. No cookie logs.</p>
+          <p class="hero-lede">Move signed-in sessions locally between Chromium browsers and ChatGPT Codex—or explicitly upload an authenticated profile to your Browserless account. No cookie logs.</p>
 
           <div class="hero-actions">
             <a class="button button-primary" href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-arm64.dmg">Download for Apple silicon <span aria-hidden="true">↓</span></a>
@@ -177,9 +177,9 @@
         <div class="section-heading split-heading" data-reveal>
           <div>
             <p class="kicker">What it solves</p>
-            <h2>One login.<br />Seven browsers.<br /><span>Zero cloud relay.</span></h2>
+            <h2>One login.<br />Seven browsers.<br /><span>Cloud only by choice.</span></h2>
           </div>
-          <p>Signing into the same sites across browser profiles is repetitive. Browser Cookie Bridge gives your local profiles a small, native control panel: choose the source, destination, and data—then move it directly.</p>
+          <p>Signing into the same sites across browser profiles is repetitive. Local transfers remain the default; Browserless appears as a separate, optional cloud destination with an explicit warning.</p>
         </div>
 
         <div class="browser-marquee" data-reveal aria-label="Supported browsers">
@@ -192,6 +192,7 @@
             <article><img src="assets/browsers/opera.svg" alt="" /><span>Opera</span></article>
             <article><img src="assets/browsers/comet.svg" alt="" /><span>Comet</span></article>
             <article class="codex-browser"><img src="assets/browsers/chatgpt-codex.svg" alt="" /><span>ChatGPT Codex <small>Import only</small></span></article>
+            <article class="codex-browser"><img src="assets/browsers/browserless.svg" alt="" /><span>Browserless <small>Optional cloud</small></span></article>
           </div>
         </div>
 
@@ -246,7 +247,7 @@
         <div class="process-list">
           <article data-reveal>
             <div class="process-number">1</div>
-            <div><h3>Choose both endpoints</h3><p>Select a source browser and a different browser—or ChatGPT Codex—as the destination.</p></div>
+            <div><h3>Choose both endpoints</h3><p>Select a source browser and a local destination, ChatGPT Codex, or the clearly marked Browserless Cloud option.</p></div>
             <span class="process-note">Saved automatically</span>
           </article>
           <article data-reveal>
@@ -286,7 +287,8 @@
           <div class="ledger-head"><span>Transfer ledger</span><span>Policy</span></div>
           <div><span>Cookie values in logs</span><strong>Never</strong></div>
           <div><span>Password-store access</span><strong>Never</strong></div>
-          <div><span>Remote relay</span><strong>None</strong></div>
+          <div><span>Remote relay for local paths</span><strong>None</strong></div>
+          <div><span>Browserless cloud upload</span><strong>Explicit + manual</strong></div>
           <div><span>Codex pre-change backup</span><strong>Always</strong></div>
           <div><span>Unknown database schema</span><strong>Fail closed</strong></div>
           <div><span>Backups retained</span><strong>14 newest</strong></div>
@@ -304,6 +306,7 @@
           <div class="data-row data-row-head"><span>Data</span><span>Support</span><span>What to expect</span></div>
           <div class="data-row"><strong>Cookies & sessions</strong><span><i class="status-dot status-on"></i> Default</span><p>Supported values, domain, path, expiry, security, SameSite, and partition attributes.</p></div>
           <div class="data-row"><strong>History URLs</strong><span><i class="status-dot status-partial"></i> Optional</span><p>URLs transfer; original visit times and page titles cannot be preserved.</p></div>
+          <div class="data-row"><strong>Local storage & IndexedDB</strong><span><i class="status-dot status-partial"></i> Browserless</span><p>Included only when you explicitly upload an authenticated profile to Browserless Cloud.</p></div>
           <div class="data-row"><strong>Passwords</strong><span><i class="status-dot"></i> Never</span><p>Chromium extensions cannot read the browser password store.</p></div>
           <div class="data-row"><strong>Bookmarks & autofill</strong><span><i class="status-dot"></i> Never</span><p>Bookmarks, payment data, autofill, and iCloud Keychain remain untouched.</p></div>
         </div>
@@ -344,7 +347,7 @@
           </div>
           <div class="terminal-panel" id="npm-panel" role="tabpanel" aria-labelledby="npm-tab" data-install-panel="npm" hidden>
             <pre><code><span class="prompt">$</span> npx browser-cookie-bridge install-app</code></pre>
-            <p class="terminal-note"><a href="https://www.npmjs.com/package/browser-cookie-bridge" target="_blank" rel="noreferrer">Version 1.1.0 on npm · Node.js and Xcode required ↗</a></p>
+            <p class="terminal-note"><a href="https://www.npmjs.com/package/browser-cookie-bridge" target="_blank" rel="noreferrer">Latest public release on npm · Node.js 24 and Xcode required ↗</a></p>
             <button class="copy-button" type="button" data-copy="npx browser-cookie-bridge install-app"><span>Copy command</span></button>
           </div>
           <div class="terminal-result"><span>→</span> One app identity · shared settings · updates in place</div>
@@ -363,7 +366,8 @@
 
         <div class="faq-list" data-reveal data-delay="1">
           <details open><summary>Why must Codex be closed?<span></span></summary><p>Codex can overwrite or ignore offline database changes while its Chromium process is running. The app blocks direct import until Codex is completely closed so it can back up, validate, and replace the database safely.</p></details>
-          <details><summary>Do other browsers need to be closed?<span></span></summary><p>No for extension-based browser-to-browser transfers. Those browsers should be open so their installed extensions can receive the request. Codex is the exception because it uses a direct local database merge.</p></details>
+          <details><summary>Do other browsers need to be closed?<span></span></summary><p>No for extension-based browser-to-browser transfers. Codex must be closed for its direct local merge. A Browserless upload also requires the source browser to be closed so a consistent temporary profile copy can be captured.</p></details>
+          <details><summary>What leaves my Mac with Browserless?<span></span></summary><p>Only after you select Browserless Cloud and click Upload, cookies, local storage, and IndexedDB from the chosen profile are sent directly to your selected Browserless region. History and saved passwords are excluded. The token stays in macOS Keychain, CLI telemetry is disabled, and cloud uploads never run on a schedule or at login.</p></details>
           <details><summary>Does this move passwords?<span></span></summary><p>No. Browser extensions cannot access Chromium's password store. Browser Cookie Bridge does not access passwords, Keychain items, payment data, bookmarks, or autofill.</p></details>
           <details><summary>Does it overwrite all destination cookies?<span></span></summary><p>The importer merges selected records using their cookie identity fields. Existing unrelated destination cookies remain in place. Codex is backed up before any replacement.</p></details>
           <details><summary>Will every website stay signed in?<span></span></summary><p>Not always. Some sites bind sessions to a device, browser, IP address, or other risk signals and may ask you to sign in again.</p></details>

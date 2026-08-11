@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f5f1e9" />
-  <meta name="description" content="Learn how Browser Cookie Bridge processes selected browser cookies and history locally on your Mac without a cloud relay or analytics SDK." />
+  <meta name="description" content="Learn how Browser Cookie Bridge handles local transfers and its optional, explicit Browserless Cloud profile upload." />
   <meta name="author" content="Apoorv Darshan" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta property="og:site_name" content="Browser Cookie Bridge" />
   <meta property="og:title" content="Privacy Policy — Browser Cookie Bridge" />
-  <meta property="og:description" content="How Browser Cookie Bridge processes selected browser data locally on your Mac without a cloud relay or analytics SDK." />
+  <meta property="og:description" content="How Browser Cookie Bridge handles local transfers and optional Browserless Cloud uploads." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://cookiebridge.apoorvdarshan.com/privacy/" />
   <meta property="og:image" content="https://cookiebridge.apoorvdarshan.com/assets/hero-transfer.webp" />
@@ -20,7 +20,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:creator" content="@apoorvdarshan" />
   <meta name="twitter:title" content="Privacy Policy — Browser Cookie Bridge" />
-  <meta name="twitter:description" content="How Browser Cookie Bridge processes selected browser data locally on your Mac." />
+  <meta name="twitter:description" content="How Browser Cookie Bridge handles local transfers and optional Browserless Cloud uploads." />
   <meta name="twitter:image" content="https://cookiebridge.apoorvdarshan.com/assets/hero-transfer.webp" />
   <title>Privacy — Browser Cookie Bridge</title>
   <link rel="canonical" href="https://cookiebridge.apoorvdarshan.com/privacy/" />
@@ -71,8 +71,8 @@
       <div class="shell">
         <p class="kicker">Policy</p>
         <h1>Privacy, in plain language.</h1>
-        <p>Browser Cookie Bridge is built to move selected browser data locally. The app has no user account, analytics SDK, cloud relay, or developer-operated cookie database.</p>
-        <div class="legal-meta">Effective August 10, 2026 · Version 1.0</div>
+        <p>Browser Cookie Bridge is local-first. Local browser and Codex transfers stay on your Mac; Browserless Cloud is a separate optional destination that uploads only after an explicit action.</p>
+        <div class="legal-meta">Effective August 11, 2026 · Version 1.1</div>
       </div>
     </section>
 
@@ -85,7 +85,7 @@
       <article class="legal-content">
         <section id="summary">
           <h2>Summary</h2>
-          <div class="legal-callout"><p><strong>The short version:</strong> selected cookie and history data is processed on your Mac for the transfer you request. Browser Cookie Bridge does not send that browser data to the developer or a hosted service.</p></div>
+          <div class="legal-callout"><p><strong>The short version:</strong> local transfers do not send browser data to the developer or a remote relay. If you explicitly select Browserless Cloud and click Upload, authenticated profile state is sent directly to Browserless under its policies.</p></div>
         </section>
 
         <section id="app-data">
@@ -106,6 +106,10 @@
 
           <h3>ChatGPT Codex import</h3>
           <p>For a Codex destination, the app reads the selected local Chromium profile and works with Codex's local SQLite data while Codex is closed. It creates a backup and a separate working copy, validates the result, and replaces the destination only after integrity checks pass.</p>
+
+          <h3>Optional Browserless Cloud upload</h3>
+          <p>When you select Browserless Cloud, connect an account, review the warning, and click Upload, the app uses the official Browserless CLI to send cookies, local storage, and IndexedDB from the selected closed browser profile to the region and profile name you chose. History and saved passwords are not included. This is a direct request to Browserless, not a developer-operated relay.</p>
+          <p>The Browserless API token is stored in macOS Keychain. A short-lived adapter reads it, removes it from the environment before temporary Chromium starts, and invokes the official CLI without exposing the token in the OS command line or app configuration. Browser Cookie Bridge disables Browserless CLI telemetry. Browserless uploads are manual-only and do not run from Daily sync or Sync at login.</p>
         </section>
 
         <section id="website">
@@ -116,14 +120,16 @@
 
         <section id="storage">
           <h2>Local storage and retention</h2>
-          <p>Configuration, generated extensions, the pinned runtime, and Codex backups are stored under <code>~/Library/Application Support/BraveCodexCookieSync/</code>. Configuration and generated token files use user-only filesystem permissions.</p>
+          <p>Configuration, generated extensions, the pinned runtime, and Codex backups are stored under <code>~/Library/Application Support/BraveCodexCookieSync/</code>. Configuration and generated token files use user-only filesystem permissions. A Browserless API token, if provided, is stored separately in macOS Keychain.</p>
+          <p>The official Browserless CLI records the upload-disclaimer acceptance timestamp in <code>~/.browserless/config.json</code>. Browser Cookie Bridge does not place the API token in that file.</p>
           <p>The newest 14 Codex pre-change backups are retained. You control the Mac account and can remove local app data by uninstalling the app and deleting its Application Support folder after confirming you no longer need the backups.</p>
         </section>
 
         <section id="sharing">
           <h2>Sharing and sale</h2>
-          <p>Browser Cookie Bridge does not sell personal information. It does not send cookie values, history URLs, generated tokens, or browser databases to the developer, advertisers, data brokers, or a remote relay.</p>
+          <p>Browser Cookie Bridge does not sell personal information. It does not send cookie values, history URLs, generated tokens, or browser databases to the developer, advertisers, or data brokers.</p>
           <p>Your selected destination browser receives the data you explicitly transfer. The destination browser and websites you visit remain governed by their own privacy practices.</p>
+          <p>If you select Browserless Cloud, Browserless receives the authenticated profile state you explicitly upload. Browserless's terms, privacy policy, account controls, retention, and infrastructure govern that copy.</p>
         </section>
 
         <section id="choices">
@@ -134,6 +140,7 @@
             <li>Daily sync can remain off or run at a local time you choose.</li>
             <li>Sync at login, Open at login, menu-bar visibility, and automatic update checks can each be disabled.</li>
             <li>You decide which source and destination browsers participate.</li>
+            <li>Browserless Cloud is optional, destination-only, and manual-only; you can disconnect it and remove its Keychain token at any time.</li>
             <li>You can stop using the app and remove its local files at any time.</li>
           </ul>
         </section>
