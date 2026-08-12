@@ -12,6 +12,7 @@
   <img src="https://img.shields.io/badge/macOS-13.5%2B-111111?logo=apple&logoColor=white" alt="macOS 13.5+" />
   <img src="https://img.shields.io/badge/Swift-6-8E2735?logo=swift&logoColor=white" alt="Swift 6" />
   <img src="https://img.shields.io/badge/Node.js-24%2B-3C873A?logo=nodedotjs&logoColor=white" alt="Node.js 24+" />
+  <img src="https://img.shields.io/badge/Homebrew-Cask-FBB040?logo=homebrew&logoColor=black" alt="Homebrew Cask" />
   <a href="https://www.npmjs.com/package/browser-cookie-bridge"><img src="https://img.shields.io/npm/v/browser-cookie-bridge?logo=npm&color=CB3837" alt="browser-cookie-bridge on npm" /></a>
   <img src="https://img.shields.io/badge/local--first-cloud%20optional-C68B3C" alt="Local-first, cloud optional" />
   <img src="https://img.shields.io/github/stars/apoorvdarshan/browser-cookie-bridge?logo=github&color=C68B3C" alt="GitHub stars" />
@@ -22,6 +23,7 @@
 
 <p>
   <a href="#installation"><b>Install</b></a> ·
+  <a href="https://github.com/apoorvdarshan/homebrew-tap">Homebrew</a> ·
   <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest">DMG</a> ·
   <a href="https://www.npmjs.com/package/browser-cookie-bridge">npm</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -93,6 +95,15 @@ The DMG is self-contained. Node.js 24+ and Xcode Command Line Tools are required
 
 ## Installation
 
+### Via Homebrew — recommended
+
+```bash
+brew install --cask apoorvdarshan/tap/browser-cookie-bridge
+```
+
+Homebrew selects the correct Apple-silicon or Intel DMG, verifies its SHA-256
+checksum, and installs the signed and notarized app into `/Applications`.
+
 ### Download a DMG — recommended
 
 - **[Apple silicon DMG](https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-arm64.dmg)** — M1, M2, M3, M4, and newer
@@ -110,7 +121,11 @@ npx browser-cookie-bridge install-app
 
 No administrator password is needed. The app is built from source on your Mac and installed in your user Applications folder. If a signed `/Applications/Browser Cookie Bridge.app` already exists, the CLI preserves it instead of replacing its Developer ID signature with an ad-hoc local build; use the app's built-in updater for signed releases.
 
-Both installation methods use the same bundle identifier and the same settings under `~/Library/Application Support/BraveCodexCookieSync`. Installing the DMG after npm does not create a separate product identity: the system Applications copy becomes canonical, and a stale matching user Applications copy is moved to the Trash on launch. Future updates replace that same app in place.
+All installation methods use the same bundle identifier and settings under
+`~/Library/Application Support/BraveCodexCookieSync`. Homebrew and the DMG
+install the canonical system Applications copy. Installing either after npm
+does not create a separate product identity: a stale matching user Applications
+copy is moved to Trash on launch, and future updates replace the same app.
 
 **[View `browser-cookie-bridge` on npm →](https://www.npmjs.com/package/browser-cookie-bridge)**
 
@@ -247,6 +262,7 @@ If Browser Cookie Bridge is useful to you:
 
 - ⭐ **Star** the repository
 - ⬇️ **[Download the latest DMG](https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest)**
+- 🍺 **[Install from Homebrew](https://github.com/apoorvdarshan/homebrew-tap)**
 - 📦 **[Install from npm](https://www.npmjs.com/package/browser-cookie-bridge)**
 - 🐛 **[Report a bug](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml)** — never include cookie values or tokens
 - ☕ **[Support on Ko-fi](https://ko-fi.com/apoorvdarshan)**

@@ -319,7 +319,7 @@
         <div class="install-copy" data-reveal>
           <p class="kicker">Download for macOS</p>
           <h2>Drag. Drop.<br />Your sessions stay local.</h2>
-          <p>The self-contained app needs no Node.js, Xcode, Terminal, or administrator password. Download the build for your Mac, drag it to Applications, and keep receiving updates in place.</p>
+          <p>The self-contained app needs no Node.js or Xcode. Install the verified Homebrew Cask with one command, or download the build for your Mac and drag it to Applications.</p>
           <div class="requirements">
             <span>macOS 13.5+</span><span>Apple silicon + Intel</span><span>Free and open source</span>
           </div>
@@ -328,11 +328,17 @@
         <div class="terminal" data-reveal data-delay="1">
           <div class="terminal-bar"><span class="terminal-dots"><i></i><i></i><i></i></span><span>Terminal — install</span><span></span></div>
           <div class="install-tabs" role="tablist" aria-label="Installation method">
-            <button type="button" role="tab" aria-selected="true" aria-controls="dmg-panel" id="dmg-tab" data-install-tab="dmg">DMG <small>recommended</small></button>
+            <button type="button" role="tab" aria-selected="true" aria-controls="homebrew-panel" id="homebrew-tab" data-install-tab="homebrew">Homebrew <small>recommended</small></button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="dmg-panel" id="dmg-tab" data-install-tab="dmg">DMG</button>
             <button type="button" role="tab" aria-selected="false" aria-controls="npm-panel" id="npm-tab" data-install-tab="npm">npm</button>
             <button type="button" role="tab" aria-selected="false" aria-controls="source-panel" id="source-tab" data-install-tab="source">From source</button>
           </div>
-          <div class="terminal-panel" id="dmg-panel" role="tabpanel" aria-labelledby="dmg-tab" data-install-panel="dmg">
+          <div class="terminal-panel" id="homebrew-panel" role="tabpanel" aria-labelledby="homebrew-tab" data-install-panel="homebrew">
+            <pre><code><span class="prompt">$</span> brew install --cask apoorvdarshan/tap/browser-cookie-bridge</code></pre>
+            <p class="terminal-note"><a href="https://github.com/apoorvdarshan/homebrew-tap" target="_blank" rel="noreferrer">Verified Cask · automatically selects Apple silicon or Intel ↗</a></p>
+            <button class="copy-button" type="button" data-copy="brew install --cask apoorvdarshan/tap/browser-cookie-bridge"><span>Copy command</span></button>
+          </div>
+          <div class="terminal-panel" id="dmg-panel" role="tabpanel" aria-labelledby="dmg-tab" data-install-panel="dmg" hidden>
             <div class="dmg-options">
               <a class="dmg-choice" href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-arm64.dmg"><strong>Apple silicon</strong><span>M1, M2, M3, M4 and newer</span><i>Download ↓</i></a>
               <a class="dmg-choice" href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-x64.dmg"><strong>Intel</strong><span>Intel-based Macs</span><i>Download ↓</i></a>
@@ -386,7 +392,7 @@
           <details><summary>Does this move passwords?<span></span></summary><p>No. Browser extensions cannot access Chromium's password store. Browser Cookie Bridge does not access passwords, Keychain items, payment data, bookmarks, or autofill.</p></details>
           <details><summary>Does it overwrite all destination cookies?<span></span></summary><p>The importer merges selected records using their cookie identity fields. Existing unrelated destination cookies remain in place. Codex is backed up before any replacement.</p></details>
           <details><summary>Will every website stay signed in?<span></span></summary><p>Not always. Some sites bind sessions to a device, browser, IP address, or other risk signals and may ask you to sign in again.</p></details>
-          <details><summary>Do I need Node.js or Xcode?<span></span></summary><p>No when you use the recommended DMG. Node.js and Xcode Command Line Tools are needed only for the npm and source installation methods.</p></details>
+          <details><summary>Do I need Node.js or Xcode?<span></span></summary><p>No when you use Homebrew or the DMG. Node.js and Xcode Command Line Tools are needed only for the npm and source installation methods.</p></details>
           <details><summary>Will macOS trust the downloaded app?<span></span></summary><p>Yes. Public DMGs are SHA-256 verified, signed with the project's Apple Developer ID, and notarized by Apple. Open the DMG, drag the app to Applications, and launch it normally.</p></details>
           <details><summary>What if I previously installed through npm?<span></span></summary><p>The DMG and npm build share the same bundle ID, settings, and updater. The Applications copy becomes canonical; a stale matching copy in your user Applications folder is moved to the Trash instead of running twice.</p></details>
           <details><summary>Is the npm package live?<span></span></summary><p>Yes. Install the latest public release with <code>npx browser-cookie-bridge install-app</code> or inspect it on <a href="https://www.npmjs.com/package/browser-cookie-bridge" target="_blank" rel="noreferrer">npm</a>.</p></details>
@@ -415,7 +421,7 @@
         <p>Local cookie and session transfer for macOS.</p>
         <span>MIT licensed · © <span data-year>2026</span> Apoorv Darshan</span>
       </div>
-      <div class="footer-column"><strong>Project</strong><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest">Download DMG</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge">GitHub</a><a href="https://www.npmjs.com/package/browser-cookie-bridge">npm</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge#readme">Documentation</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/CONTRIBUTING.md">Contributing</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">Security</a><a href="sitemap.xml">Sitemap</a></div>
+      <div class="footer-column"><strong>Project</strong><a href="https://github.com/apoorvdarshan/homebrew-tap">Homebrew</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest">Download DMG</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge">GitHub</a><a href="https://www.npmjs.com/package/browser-cookie-bridge">npm</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge#readme">Documentation</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/CONTRIBUTING.md">Contributing</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">Security</a><a href="sitemap.xml">Sitemap</a></div>
       <div class="footer-column"><strong>Support</strong><a href="https://tally.so/r/J9j0D4">Windows waitlist</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a><a href="https://ko-fi.com/apoorvdarshan">Ko-fi</a><a href="https://x.com/apoorvdarshan">Follow on X</a><a href="https://www.producthunt.com/products/browser-cookie-bridge">Product Hunt</a></div>
       <div class="footer-column"><strong>Legal</strong><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/LICENSE">MIT License</a></div>
     </div>
