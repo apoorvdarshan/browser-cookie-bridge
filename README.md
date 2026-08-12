@@ -16,6 +16,7 @@
   <img src="https://img.shields.io/badge/local--first-cloud%20optional-C68B3C" alt="Local-first, cloud optional" />
   <img src="https://img.shields.io/github/stars/apoorvdarshan/browser-cookie-bridge?logo=github&color=C68B3C" alt="GitHub stars" />
   <a href="https://www.producthunt.com/products/browser-cookie-bridge"><img src="https://img.shields.io/badge/Product%20Hunt-View%20launch-DA552F?logo=producthunt&logoColor=white" alt="Browser Cookie Bridge on Product Hunt" /></a>
+  <a href="https://tally.so/r/J9j0D4"><img src="https://img.shields.io/badge/Windows-Join%20waitlist-8E2735?logo=windows&logoColor=white" alt="Join the Browser Cookie Bridge Windows waitlist" /></a>
   <img src="https://img.shields.io/badge/license-MIT-3DA639" alt="MIT License" />
 </p>
 
@@ -28,6 +29,7 @@
   <a href="CONTRIBUTING.md">Contribute</a> ·
   <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a> ·
   <a href="https://www.producthunt.com/products/browser-cookie-bridge">Product Hunt</a> ·
+  <a href="https://tally.so/r/J9j0D4">Windows waitlist</a> ·
   <a href="#support">Support</a>
 </p>
 
@@ -51,6 +53,10 @@
 Signing into the same sites across several browsers is repetitive. Export files are awkward, password managers do not move active sessions, and ChatGPT Codex does not currently offer a Brave import button.
 
 Browser Cookie Bridge gives those browser profiles a small, native control panel. Local browser and Codex transfers stay on the Mac. If you explicitly select Browserless Cloud and click Upload, the app can instead send authenticated profile state to your own Browserless account.
+
+## Windows waitlist
+
+Browser Cookie Bridge currently ships for macOS. A separate Windows app is being explored, with demand guiding whether it moves into active development. If you use Windows, [join the early-access waitlist](https://tally.so/r/J9j0D4) and tell us which browsers and transfer paths matter to you.
 
 ## Features
 

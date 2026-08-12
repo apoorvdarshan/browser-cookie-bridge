@@ -1395,6 +1395,55 @@ h3 {
   color: var(--green);
 }
 
+.windows-waitlist {
+  padding: 0 0 110px;
+  background: var(--graphite);
+}
+
+.windows-waitlist-inner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 30px;
+  align-items: center;
+  padding: 34px 38px;
+  background: linear-gradient(135deg, rgba(238, 233, 223, 0.065), rgba(238, 233, 223, 0.025));
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+}
+
+.windows-mark {
+  display: grid;
+  grid-template-columns: repeat(2, 17px);
+  grid-template-rows: repeat(2, 17px);
+  gap: 3px;
+  padding: 16px;
+  background: rgba(238, 233, 223, 0.055);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.windows-mark span {
+  background: var(--bone);
+  border-radius: 2px;
+  opacity: 0.88;
+}
+
+.windows-waitlist-copy h2 {
+  margin: 2px 0 8px;
+  font-size: clamp(24px, 3vw, 38px);
+}
+
+.windows-waitlist-copy > p:last-child {
+  max-width: 690px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.windows-waitlist .button {
+  white-space: nowrap;
+}
+
 .faq-section {
   background: #1a1918;
   border-top: 1px solid var(--line);
@@ -1965,6 +2014,15 @@ h3 {
     position: static;
   }
 
+  .windows-waitlist-inner {
+    grid-template-columns: auto 1fr;
+  }
+
+  .windows-waitlist .button {
+    grid-column: 2;
+    justify-self: start;
+  }
+
   .footer-grid {
     grid-template-columns: 1.5fr 1fr 1fr;
   }
@@ -2183,6 +2241,24 @@ h3 {
 
   .dmg-options {
     grid-template-columns: 1fr;
+  }
+
+  .windows-waitlist {
+    padding-bottom: 80px;
+  }
+
+  .windows-waitlist-inner {
+    grid-template-columns: 1fr;
+    padding: 28px;
+  }
+
+  .windows-mark {
+    width: fit-content;
+  }
+
+  .windows-waitlist .button {
+    grid-column: auto;
+    width: 100%;
   }
 
   .terminal pre {
