@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Browser Cookie Bridge",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Transfers selected browser data locally between supported browsers and into ChatGPT Codex.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5o6lDkXzU/23Jm2QRk4mfuxNnr3VlEIjRHcZr93Gdo7PI7asHJQhigaMGT6UOz0lkaTn1F+TGIPlsJo9GNBSsxbCfxWoBSXcFQFrPolY5LEfKaMtZQQ6eb4UAnp+bbUwb1den4On0piWU47Yzl6i0Jcdg4EG5H1kCSF/6nJsbKgF7OTaR/3drULu40yRvflzSXRhly3UDO7c5mgHJsaMwVV+VILsxbcPOoRINjuo3zDC737HFs67dpf38xF3tjSVL0HURAWKKobMvfABiDfVEm5O0Lvf+57d1Ib12QLT2qtVXNDy3iYwX+w2S0wH2vIMsfvoFPlRdmeqft70kZOqXwIDAQAB",
   "permissions": ["alarms", "cookies", "history"],
