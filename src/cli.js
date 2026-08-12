@@ -45,7 +45,7 @@ Commands:
   setup [--hour 9] [--minute 0] [--no-schedule]
   install-app [--no-open]
   bootstrap-bundled --app-path /Applications/Browser Cookie Bridge.app
-  preferences --source brave --target codex --cookies on --history off --menu-bar on --auto-check-updates on
+  preferences --source brave --target codex --cookies on --history off --menu-bar on --auto-check-updates on --auto-restart-codex off
   sync [--timeout 300] [--allow-cloud-upload]
   browserless-preflight
   doctor
@@ -128,12 +128,13 @@ function preferences(args) {
     menuBar: booleanFlag(args, "--menu-bar", existing.ui?.menuBar === true),
     openAtLogin: booleanFlag(args, "--open-at-login", existing.ui?.openAtLogin !== false),
     autoCheckUpdates: booleanFlag(args, "--auto-check-updates", existing.ui?.autoCheckUpdates !== false),
+    autoRestartCodex: booleanFlag(args, "--auto-restart-codex", existing.ui?.autoRestartCodex === true),
     browserlessProfileName: stringFlag(args, "--browserless-profile", existing.browserless?.profileName || "browser-cookie-bridge"),
     browserlessRegion: stringFlag(args, "--browserless-region", existing.browserless?.region || "sfo"),
     browserlessOnlyDomains: optionalStringFlag(args, "--browserless-domains", (existing.browserless?.onlyDomains || []).join(",")),
   });
   console.log(
-    `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}, auto-check-updates=${config.ui.autoCheckUpdates ? "on" : "off"}`,
+    `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}, auto-check-updates=${config.ui.autoCheckUpdates ? "on" : "off"}, auto-restart-codex=${config.ui.autoRestartCodex ? "on" : "off"}`,
   );
 }
 
@@ -435,6 +436,7 @@ function setAppLogin(enabled) {
     menuBar: existing.ui?.menuBar === true,
     openAtLogin: enabled,
     autoCheckUpdates: existing.ui?.autoCheckUpdates !== false,
+    autoRestartCodex: existing.ui?.autoRestartCodex === true,
     browserlessProfileName: existing.browserless?.profileName,
     browserlessRegion: existing.browserless?.region,
     browserlessOnlyDomains: existing.browserless?.onlyDomains,

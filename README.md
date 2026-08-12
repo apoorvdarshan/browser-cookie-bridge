@@ -57,6 +57,7 @@ Browser Cookie Bridge gives those browser profiles a small, native control panel
 - 🍪 **Cookie and session transfer** — cookies are enabled by default, including supported domain, path, expiry, security, `SameSite`, and partition attributes.
 - 🌐 **Seven Chromium browsers** — Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Perplexity Comet can be sources or destinations.
 - ✨ **ChatGPT Codex import** — merge selected local browser data into Codex's built-in browser; Codex is destination-only.
+- 🔁 **Optional Codex restart** — manual Sync can force quit a running Codex instance and reopen it only after a successful local transfer; off by default.
 - ☁️ **Optional Browserless upload** — create or refresh a Browserless authenticated profile with cookies, local storage, and IndexedDB; see a local size preflight, live progress, cancellation, and post-upload verification.
 - 🕘 **Background automation** — sync when you sign in, at a fixed daily time, or whenever you choose.
 - ◉ **Native menu-bar app** — closing the window removes the Dock icon while the helper continues running.
@@ -125,11 +126,11 @@ The final command compiles the native SwiftUI app, enables **Open at login**, **
 No browser extension is needed for this path.
 
 1. Select a source browser and **ChatGPT Codex** as the destination.
-2. Quit Codex completely. Closing only its browser panel is not enough.
+2. Quit Codex completely, or enable **Restart Codex automatically**. Closing only its browser panel is not enough.
 3. Choose **Cookies** and, optionally, **History URLs**.
-4. Press **Sync now** and reopen Codex after the success message.
+4. Press **Sync now** and reopen Codex after the success message if automatic restart is off.
 
-If Codex is open, the app blocks the transfer and tells you what to close. It never force-quits Codex.
+By default, an open Codex blocks the transfer. The optional **Restart Codex automatically** setting applies only to a manual Sync: it force quits Codex, waits for its database to close, and reopens Codex only after the transfer succeeds. Scheduled and login syncs never force quit it.
 
 ### Browser → browser
 
@@ -171,6 +172,7 @@ The official CLI records the Browserless upload-disclaimer acceptance timestamp 
 | **Sync at login** | Runs once whenever you sign in; on by default |
 | **Open at login** | Starts the background app after macOS login; on by default |
 | **Show in menu bar** | Keeps sync, status, updates, and support actions close at hand |
+| **Restart Codex automatically** | Force quits Codex for a manual sync and reopens it only after success; off by default |
 | **Check for updates** | Finds a newer GitHub release, verifies its DMG, and offers install + relaunch |
 
 Automation uses the saved source, destination, and data choices for local transfers. A scheduled Codex sync safely exits without making changes when Codex is open. Browserless cloud uploads are always manual and require an explicit upload action.
@@ -180,7 +182,7 @@ Automation uses the saved source, destination, and data choices for local transf
 ```bash
 browser-cookie-bridge install-app [--no-open]
 browser-cookie-bridge setup [--hour 9] [--minute 0] [--no-schedule]
-browser-cookie-bridge preferences --source brave --target codex --cookies on --history off
+browser-cookie-bridge preferences --source brave --target codex --cookies on --history off --auto-restart-codex off
 browser-cookie-bridge sync [--timeout 300] [--allow-cloud-upload]
 browser-cookie-bridge browserless-preflight
 browser-cookie-bridge doctor

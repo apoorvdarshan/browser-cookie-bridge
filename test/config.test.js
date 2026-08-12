@@ -14,7 +14,7 @@ test("preferences default to cookies and persist source and history choices", ()
     assert.equal(installed.sourceBrowser, "brave");
     assert.equal(installed.targetBrowser, "codex");
     assert.deepEqual(installed.imports, { cookies: true, passwords: false, history: false });
-    assert.deepEqual(installed.ui, { menuBar: true, openAtLogin: true, autoCheckUpdates: true });
+    assert.deepEqual(installed.ui, { menuBar: true, openAtLogin: true, autoCheckUpdates: true, autoRestartCodex: false });
     assert.deepEqual(installed.browserless, { profileName: "browser-cookie-bridge", region: "sfo", onlyDomains: [] });
     assert.equal(installed.nodePath, "/Applications/Browser Cookie Bridge.app/Contents/Resources/runtime/node/bin/node");
     for (const browser of SOURCE_BROWSERS) {
@@ -32,6 +32,7 @@ test("preferences default to cookies and persist source and history choices", ()
       menuBar: true,
       openAtLogin: false,
       autoCheckUpdates: false,
+      autoRestartCodex: true,
       browserlessProfileName: "work-session",
       browserlessRegion: "ams",
       browserlessOnlyDomains: "example.com, app.example.com",
@@ -40,12 +41,14 @@ test("preferences default to cookies and persist source and history choices", ()
     assert.equal(updated.sourceBrowser, "edge");
     assert.equal(updated.targetBrowser, "chrome");
     assert.deepEqual(updated.imports, { cookies: false, passwords: false, history: true });
-    assert.deepEqual(updated.ui, { menuBar: true, openAtLogin: false, autoCheckUpdates: false });
+    assert.deepEqual(updated.ui, { menuBar: true, openAtLogin: false, autoCheckUpdates: false, autoRestartCodex: true });
     assert.deepEqual(updated.browserless, {
       profileName: "work-session",
       region: "ams",
       onlyDomains: ["example.com", "app.example.com"],
     });
+    const reinstalled = installConfig({ home, hour: 10, minute: 30 });
+    assert.equal(reinstalled.ui.autoRestartCodex, true);
     assert.equal(JSON.stringify(updated).includes("secret-token"), false);
   } finally {
     fs.rmSync(home, { recursive: true, force: true });

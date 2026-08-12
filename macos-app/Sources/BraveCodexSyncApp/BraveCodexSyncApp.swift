@@ -578,6 +578,18 @@ struct PreferencesPanel: View {
           PreferenceRow(icon: "key.slash", color: .secondary, title: "Passwords", detail: "Browser extensions cannot access passwords", muted: true) {
             FixedBadge("Unavailable")
           }
+          if model.selectedTargetID == "codex" {
+            RowDivider()
+            PreferenceRow(
+              icon: "arrow.clockwise.circle",
+              color: Theme.accent,
+              title: "Restart Codex automatically",
+              detail: "Force quit before manual sync; reopen only after success"
+            ) {
+              Toggle("", isOn: Binding(get: { model.autoRestartCodex }, set: { model.setAutoRestartCodex($0) }))
+                .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking || model.isSyncing)
+            }
+          }
         }
 
         SectionLabel(title: "Automation", detail: "Runs in the background", separated: true)

@@ -77,6 +77,7 @@ final class SyncModel: ObservableObject {
   @Published var openAtLogin = false
   @Published var menuBarEnabled = true
   @Published var autoCheckUpdates = true
+  @Published var autoRestartCodex = false
   @Published var isCheckingForUpdates = false
   @Published var isInstallingUpdate = false
   @Published var availableUpdateVersion: String?
@@ -128,7 +129,7 @@ final class SyncModel: ObservableObject {
   var targetName: String {
     isBrowserlessTarget ? "Browserless Cloud" : selectedTargetBrowser?.name ?? "ChatGPT Codex"
   }
-  var codexBlocked: Bool { selectedTargetID == "codex" && codexRunning }
+  var codexBlocked: Bool { selectedTargetID == "codex" && codexRunning && !autoRestartCodex }
   var browserlessBlocked: Bool {
     isBrowserlessTarget && (!browserlessConfigured || sourceBrowserRunning || selectedSourceID == "comet")
   }
@@ -261,6 +262,7 @@ final class SyncModel: ObservableObject {
       historyEnabled = config.imports?.history ?? false
       menuBarEnabled = config.ui?.menuBar ?? true
       autoCheckUpdates = config.ui?.autoCheckUpdates ?? true
+      autoRestartCodex = config.ui?.autoRestartCodex ?? false
       browserlessProfileName = config.browserless?.profileName ?? "browser-cookie-bridge"
       browserlessRegion = config.browserless?.region ?? "sfo"
       browserlessOnlyDomains = (config.browserless?.onlyDomains ?? []).joined(separator: ", ")
@@ -345,6 +347,11 @@ final class SyncModel: ObservableObject {
     autoCheckUpdates = enabled
     persistPreferences(successMessage: enabled ? "Automatic update checks enabled" : "Automatic update checks disabled")
     if enabled { checkForUpdates() }
+  }
+
+  func setAutoRestartCodex(_ enabled: Bool) {
+    autoRestartCodex = enabled
+    persistPreferences(successMessage: enabled ? "Automatic Codex restart enabled" : "Automatic Codex restart disabled")
   }
 
   func checkForUpdates(showAlert: Bool = false) {
@@ -449,6 +456,68 @@ final class SyncModel: ObservableObject {
       }
       return
     }
+    if selectedTargetID == "codex" && codexRunning && autoRestartCodex {
+      forceQuitCodexThenSync(showMenuBarAlert: showMenuBarAlert)
+      return
+    }
+    startSync(showMenuBarAlert: showMenuBarAlert, reopenCodexOnSuccess: false)
+  }
+
+  private func forceQuitCodexThenSync(showMenuBarAlert: Bool) {
+    isSyncing = true
+    uploadCanceling = false
+    state = .syncing
+    primaryStatus = "Closing Codex for sync"
+    secondaryStatus = "Force quitting ChatGPT Codex and waiting for its browser database to close…"
+    let applications = NSWorkspace.shared.runningApplications.filter {
+      $0.bundleIdentifier == "com.openai.codex"
+    }
+    guard !applications.isEmpty, applications.allSatisfy({ $0.forceTerminate() }) else {
+      finishCodexPreparationFailure(
+        message: "macOS could not force quit ChatGPT Codex. Quit it manually, then try again.",
+        showMenuBarAlert: showMenuBarAlert
+      )
+      return
+    }
+    waitForCodexToQuit(attemptsRemaining: 50, showMenuBarAlert: showMenuBarAlert)
+  }
+
+  private func waitForCodexToQuit(attemptsRemaining: Int, showMenuBarAlert: Bool) {
+    let stillRunning = NSWorkspace.shared.runningApplications.contains {
+      $0.bundleIdentifier == "com.openai.codex"
+    }
+    if !stillRunning {
+      codexRunning = false
+      secondaryStatus = "Codex is closed — waiting briefly for its database to be released…"
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+        self?.startSync(showMenuBarAlert: showMenuBarAlert, reopenCodexOnSuccess: true)
+      }
+      return
+    }
+    guard attemptsRemaining > 0 else {
+      finishCodexPreparationFailure(
+        message: "ChatGPT Codex did not close within 10 seconds. Quit it manually, then try again.",
+        showMenuBarAlert: showMenuBarAlert
+      )
+      return
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+      self?.waitForCodexToQuit(attemptsRemaining: attemptsRemaining - 1, showMenuBarAlert: showMenuBarAlert)
+    }
+  }
+
+  private func finishCodexPreparationFailure(message: String, showMenuBarAlert: Bool) {
+    isSyncing = false
+    state = .error
+    primaryStatus = "Could not close Codex"
+    secondaryStatus = message
+    updateEndpointRunningStatus()
+    if showMenuBarAlert {
+      postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: .error)
+    }
+  }
+
+  private func startSync(showMenuBarAlert: Bool, reopenCodexOnSuccess: Bool) {
     isSyncing = true
     uploadCanceling = false
     state = .syncing
@@ -507,12 +576,48 @@ final class SyncModel: ObservableObject {
           : "Keep both browsers open and check the extensions")
       }
       self.updateEndpointRunningStatus()
-      if showMenuBarAlert {
+      if success && reopenCodexOnSuccess {
+        self.reopenCodexAfterSuccessfulSync(partial: partial, showMenuBarAlert: showMenuBarAlert)
+      } else if showMenuBarAlert {
         self.postNativeAlert(
           title: self.primaryStatus,
           message: self.secondaryStatus,
           kind: canceled ? .information : success ? (partial ? .warning : .information) : .error
         )
+      }
+    }
+  }
+
+  private func reopenCodexAfterSuccessfulSync(partial: Bool, showMenuBarAlert: Bool) {
+    guard let codexURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") else {
+      state = .warning
+      primaryStatus = "Codex sessions updated, but Codex was not reopened"
+      secondaryStatus = "Open ChatGPT Codex manually to use the updated sessions"
+      if showMenuBarAlert {
+        postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: .warning)
+      }
+      return
+    }
+    NSWorkspace.shared.openApplication(at: codexURL, configuration: NSWorkspace.OpenConfiguration()) { [weak self] _, error in
+      Task { @MainActor in
+        guard let self else { return }
+        if let error {
+          self.state = .warning
+          self.primaryStatus = "Codex sessions updated, but Codex was not reopened"
+          self.secondaryStatus = "Open ChatGPT Codex manually: \(error.localizedDescription)"
+        } else {
+          self.codexRunning = true
+          self.state = partial ? .warning : .success
+          self.primaryStatus = partial ? "Codex sync completed with warnings" : "Codex sessions updated"
+          self.secondaryStatus = "ChatGPT Codex was reopened after the successful sync"
+        }
+        if showMenuBarAlert {
+          self.postNativeAlert(
+            title: self.primaryStatus,
+            message: self.secondaryStatus,
+            kind: self.state == .success ? .information : .warning
+          )
+        }
       }
     }
   }
@@ -627,6 +732,7 @@ final class SyncModel: ObservableObject {
       "--history", historyEnabled ? "on" : "off",
       "--menu-bar", menuBarEnabled ? "on" : "off",
       "--auto-check-updates", autoCheckUpdates ? "on" : "off",
+      "--auto-restart-codex", autoRestartCodex ? "on" : "off",
       "--browserless-profile", browserlessProfileName,
       "--browserless-region", browserlessRegion,
       "--browserless-domains", browserlessOnlyDomains,
@@ -827,7 +933,13 @@ final class SyncModel: ObservableObject {
       $0.bundleIdentifier == selectedBrowser.bundleIdentifier
     }
     guard !isSyncing else { return }
-    if selectedTargetID == "codex" && codexRunning {
+    if selectedTargetID == "codex" && codexRunning && autoRestartCodex {
+      if state == .ready || primaryStatus == "Quit Codex before syncing" {
+        state = .ready
+        primaryStatus = "Ready to sync and restart Codex"
+        secondaryStatus = "Sync will force quit Codex and reopen it only after a successful transfer"
+      }
+    } else if selectedTargetID == "codex" && codexRunning {
       state = .warning
       primaryStatus = "Quit Codex before syncing"
       secondaryStatus = "Close ChatGPT Codex completely so its local cookie database can be updated safely"
@@ -948,6 +1060,7 @@ private struct AppConfig: Decodable {
     let menuBar: Bool?
     let openAtLogin: Bool?
     let autoCheckUpdates: Bool?
+    let autoRestartCodex: Bool?
   }
 
   struct BrowserlessSettings: Decodable {
