@@ -44,7 +44,7 @@
 
 ---
 
-> **Version 1.3.0 makes large Browserless uploads observable and recoverable.** The app measures the local profile and IndexedDB without reading their contents, streams capture progress and elapsed time, supports cancellation with deterministic temporary-data cleanup, reports auto-fit omissions, and verifies the cloud profile after upload.
+> **Version 1.4.0 adds an optional one-click Codex restart flow.** When enabled for a manual sync, Browser Cookie Bridge force quits Codex, waits for its database to close, performs the verified local transfer, preserves the imported/skipped/failed counts, and reopens Codex only after success. The option is off by default.
 
 ## Why Browser Cookie Bridge
 

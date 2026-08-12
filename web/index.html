@@ -49,7 +49,7 @@
           "image": "https://cookiebridge.apoorvdarshan.com/assets/hero-transfer.webp",
           "applicationCategory": "UtilitiesApplication",
           "operatingSystem": "macOS 13.5 or later",
-          "softwareVersion": "1.3.0",
+          "softwareVersion": "1.4.0",
           "isAccessibleForFree": true,
           "offers": {
             "@type": "Offer",
@@ -107,7 +107,7 @@
       <div class="hero-grain" aria-hidden="true"></div>
       <div class="shell hero-grid">
         <div class="hero-copy" data-reveal>
-          <div class="eyebrow"><span class="live-dot"></span> Native macOS utility · v1.3.0</div>
+          <div class="eyebrow"><span class="live-dot"></span> Native macOS utility · v1.4.0</div>
           <h1>Your browser sessions.<br /><em>Across the browsers you use.</em></h1>
           <p class="hero-lede">Move signed-in sessions locally between Chromium browsers and ChatGPT Codex—or explicitly upload an authenticated profile to your Browserless account. No cookie logs.</p>
 
@@ -266,8 +266,8 @@
           <div class="codex-icon"><img src="assets/browsers/chatgpt-codex.svg" alt="" /></div>
           <div>
             <p class="kicker">Codex destination</p>
-            <h3>Close Codex. Transfer. Reopen.</h3>
-            <p>Codex must be completely closed so its local SQLite database can be backed up and replaced safely. The app blocks the write while Codex is running and never force-quits it.</p>
+            <h3>Close Codex—or let the app restart it.</h3>
+            <p>Codex must be completely closed so its local SQLite database can be backed up and replaced safely. By default the app blocks the write. An optional, off-by-default setting can force quit Codex for a manual sync and reopen it only after success.</p>
           </div>
           <a href="#faq">Why is this required? <span>↓</span></a>
         </div>
@@ -365,7 +365,7 @@
         </div>
 
         <div class="faq-list" data-reveal data-delay="1">
-          <details open><summary>Why must Codex be closed?<span></span></summary><p>Codex can overwrite or ignore offline database changes while its Chromium process is running. The app blocks direct import until Codex is completely closed so it can back up, validate, and replace the database safely.</p></details>
+          <details open><summary>Why must Codex be closed?<span></span></summary><p>Codex can overwrite or ignore offline database changes while its Chromium process is running. By default the app blocks direct import until Codex is completely closed. You may optionally enable automatic restart for manual syncs: the app force quits Codex, waits for its database to close, transfers and validates the data, then reopens Codex only after success. Scheduled and login syncs never force quit it.</p></details>
           <details><summary>Do other browsers need to be closed?<span></span></summary><p>No for extension-based browser-to-browser transfers. Codex must be closed for its direct local merge. A Browserless upload also requires the source browser to be closed so a consistent temporary profile copy can be captured.</p></details>
           <details><summary>What leaves my Mac with Browserless?<span></span></summary><p>Only after you select Browserless Cloud and click Upload, cookies, local storage, and IndexedDB from the chosen profile are sent directly to your selected Browserless region. The app first measures local sizes without reading their contents, then reports progress and any origins omitted to fit Browserless's 2 MB serialized-profile cap. History and saved passwords are excluded. The token stays in macOS Keychain, CLI telemetry is disabled, and cloud uploads never run on a schedule or at login.</p></details>
           <details><summary>Does this move passwords?<span></span></summary><p>No. Browser extensions cannot access Chromium's password store. Browser Cookie Bridge does not access passwords, Keychain items, payment data, bookmarks, or autofill.</p></details>
