@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { braveCookiePaths, codexCookiePaths, TARGET_BROWSERS } from "../src/paths.js";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import {
+  braveCookiePaths,
+  codexCookiePaths,
+  isAppBundleWithIdentifier,
+  TARGET_BROWSERS,
+} from "../src/paths.js";
 
 test("profile discovery includes current and legacy Chromium cookie locations", () => {
   const brave = braveCookiePaths("/tmp/test-home");
@@ -12,4 +20,20 @@ test("profile discovery includes current and legacy Chromium cookie locations", 
 
 test("Browserless is destination-only", () => {
   assert(TARGET_BROWSERS.includes("browserless"));
+});
+
+test("canonical app detection requires the Browser Cookie Bridge bundle identifier", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-bridge-app-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const app = path.join(root, "Browser Cookie Bridge.app");
+  const contents = path.join(app, "Contents");
+  fs.mkdirSync(contents, { recursive: true });
+  fs.writeFileSync(path.join(contents, "Info.plist"), `
+    <plist><dict><key>CFBundleIdentifier</key><string>com.example.other</string></dict></plist>
+  `);
+  assert.equal(isAppBundleWithIdentifier(app), false);
+  fs.writeFileSync(path.join(contents, "Info.plist"), `
+    <plist><dict><key>CFBundleIdentifier</key><string>com.apoorvdarshan.browser-cookie-bridge</string></dict></plist>
+  `);
+  assert.equal(isAppBundleWithIdentifier(app), true);
 });

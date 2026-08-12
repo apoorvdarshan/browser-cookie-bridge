@@ -11,7 +11,7 @@
     "test:web-worker": "node --test web/worker/*.test.mjs",
     "check": "node --check bin/brave-codex-cookie-sync.js && node --check src/app-installer.js && node --check src/browserless.js && node --check src/browserless-preflight.js && node --check src/browserless-runner.js && node --check src/broker.js && node --check src/chromium-reader.js && node --check src/cli.js && node --check src/codex-direct-import.js && node --check src/config.js && node --check src/paths.js && node --check src/scheduler.js && node --check src/updater.js && node --check scripts/build-dmg.js && node --check extension-template/background.js && node --check web/server.js && node --check web/script.js",
     "release:check": "node scripts/check-release-version.js",
-    "build:app": "node bin/brave-codex-cookie-sync.js install-app --no-open",
+    "build:app": "node bin/brave-codex-cookie-sync.js install-app --no-open --replace-system-from-source",
     "build:dmg": "node scripts/build-dmg.js",
     "web": "node web/server.js",
     "web:deploy": "wrangler deploy --config web/wrangler.jsonc"

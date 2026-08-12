@@ -2,10 +2,24 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { appSupportDir, installedAppPath, projectRoot } from "./paths.js";
+import {
+  appSupportDir,
+  installedAppPath,
+  projectRoot,
+  systemInstalledAppPath,
+} from "./paths.js";
 
-export function installApp({ home = os.homedir(), open = true } = {}) {
+export function installApp({ home = os.homedir(), open = true, preserveSystemApp = true } = {}) {
   if (process.platform !== "darwin") throw new Error("The desktop app supports macOS only.");
+
+  const destination = installedAppPath(home);
+  const isSystemInstall = path.resolve(destination) === path.resolve(systemInstalledAppPath());
+  if (isSystemInstall && preserveSystemApp) {
+    console.log(`Preserving the signed installation at ${destination}`);
+    console.log("Use Check for Updates in the app to install signed releases.");
+    if (open) run("open", [destination]);
+    return destination;
+  }
 
   const packagePath = path.join(projectRoot(), "macos-app");
   run("swift", ["build", "-c", "release", "--package-path", packagePath]);
@@ -32,7 +46,6 @@ export function installApp({ home = os.homedir(), open = true } = {}) {
 
   run("codesign", ["--force", "--deep", "--sign", "-", staging]);
 
-  const destination = installedAppPath(home);
   fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o755 });
   fs.rmSync(destination, { recursive: true, force: true });
   fs.cpSync(staging, destination, { recursive: true, force: true });

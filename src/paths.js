@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const APP_ID = "com.apoorvdarshan.brave-codex-cookie-sync";
+export const APP_BUNDLE_ID = "com.apoorvdarshan.browser-cookie-bridge";
 export const LOGIN_SYNC_APP_ID = `${APP_ID}.login-sync`;
 export const APP_LOGIN_APP_ID = `${APP_ID}.app-login`;
 export const DEFAULT_PORT = 43128;
@@ -48,10 +49,22 @@ export function systemInstalledAppPath() {
   return path.join("/Applications", "Browser Cookie Bridge.app");
 }
 
+export function isAppBundleWithIdentifier(appPath, identifier = APP_BUNDLE_ID) {
+  const infoPath = path.join(appPath, "Contents", "Info.plist");
+  if (!fs.existsSync(infoPath)) return false;
+  try {
+    const info = fs.readFileSync(infoPath, "utf8");
+    const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`<key>CFBundleIdentifier</key>\\s*<string>${escaped}</string>`).test(info);
+  } catch {
+    return false;
+  }
+}
+
 export function installedAppPath(home = os.homedir()) {
   const systemApp = systemInstalledAppPath();
   const isCurrentUser = path.resolve(home) === path.resolve(os.homedir());
-  return isCurrentUser && fs.existsSync(systemApp) ? systemApp : userInstalledAppPath(home);
+  return isCurrentUser && isAppBundleWithIdentifier(systemApp) ? systemApp : userInstalledAppPath(home);
 }
 
 export function braveCookiePaths(home = os.homedir()) {

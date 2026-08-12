@@ -24,6 +24,7 @@ import {
   systemInstalledAppPath,
   userInstalledAppPath,
   APP_ID,
+  APP_BUNDLE_ID,
   SOURCE_BROWSERS,
   TARGET_BROWSERS,
 } from "./paths.js";
@@ -43,7 +44,7 @@ Local cookie and session transfer between Chromium browsers and into ChatGPT Cod
 
 Commands:
   setup [--hour 9] [--minute 0] [--no-schedule]
-  install-app [--no-open]
+  install-app [--no-open] [--replace-system-from-source]
   bootstrap-bundled --app-path /Applications/Browser Cookie Bridge.app
   preferences --source brave --target codex --cookies on --history off --menu-bar on --auto-check-updates on --auto-restart-codex off
   sync [--timeout 300] [--allow-cloud-upload]
@@ -147,8 +148,11 @@ function installDesktopApp(args) {
     hour: existing?.schedule?.hour ?? 9,
     minute: existing?.schedule?.minute ?? 0,
   });
-  console.log("Building the native macOS app…");
-  const destination = installApp({ open: !args.includes("--no-open") });
+  console.log("Preparing the native macOS app…");
+  const destination = installApp({
+    open: !args.includes("--no-open"),
+    preserveSystemApp: !args.includes("--replace-system-from-source"),
+  });
   if (config.ui.openAtLogin) {
     installAppLogin({ appPath: destination, bootstrapNow: false });
   } else {
@@ -214,7 +218,7 @@ function archiveDuplicateUserApp(currentAppPath) {
   if (!fs.existsSync(duplicate)) return;
   const infoPath = path.join(duplicate, "Contents", "Info.plist");
   const info = fs.existsSync(infoPath) ? fs.readFileSync(infoPath, "utf8") : "";
-  if (!info.includes(`<string>${APP_ID}</string>`)) return;
+  if (!info.includes(`<string>${APP_BUNDLE_ID}</string>`)) return;
 
   const trash = path.join(os.homedir(), ".Trash");
   fs.mkdirSync(trash, { recursive: true, mode: 0o700 });

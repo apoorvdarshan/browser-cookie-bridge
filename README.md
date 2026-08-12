@@ -108,7 +108,7 @@ Run the published package directly:
 npx browser-cookie-bridge install-app
 ```
 
-No administrator password is needed. The app is built from source on your Mac and installed in your user Applications folder unless an existing writable system Applications copy is being updated.
+No administrator password is needed. The app is built from source on your Mac and installed in your user Applications folder. If a signed `/Applications/Browser Cookie Bridge.app` already exists, the CLI preserves it instead of replacing its Developer ID signature with an ad-hoc local build; use the app's built-in updater for signed releases.
 
 Both installation methods use the same bundle identifier and the same settings under `~/Library/Application Support/BraveCodexCookieSync`. Installing the DMG after npm does not create a separate product identity: the system Applications copy becomes canonical, and a stale matching user Applications copy is moved to the Trash on launch. Future updates replace that same app in place.
 
@@ -123,7 +123,7 @@ npm test
 npm run build:app
 ```
 
-The final command compiles the native SwiftUI app, enables **Open at login**, **Sync at login**, and the **menu-bar helper**, then launches it. A first install uses `~/Applications/Browser Cookie Bridge.app` without requesting administrator access. If an existing `/Applications/Browser Cookie Bridge.app` is present, later builds and updates keep using that system Applications copy instead of creating a duplicate. Daily sync stays off until you enable it.
+The final command compiles the native SwiftUI app, enables **Open at login**, **Sync at login**, and the **menu-bar helper**, then launches it. A first install uses `~/Applications/Browser Cookie Bridge.app` without requesting administrator access. If an existing signed `/Applications/Browser Cookie Bridge.app` is present, the CLI keeps that system copy canonical and leaves app updates to the signed-DMG updater. Developers who intentionally need to replace it with a local ad-hoc build can pass `--replace-system-from-source`. Daily sync stays off until you enable it.
 
 ## Setup
 
@@ -186,7 +186,7 @@ Automation uses the saved source, destination, and data choices for local transf
 ## CLI
 
 ```bash
-browser-cookie-bridge install-app [--no-open]
+browser-cookie-bridge install-app [--no-open] [--replace-system-from-source]
 browser-cookie-bridge setup [--hour 9] [--minute 0] [--no-schedule]
 browser-cookie-bridge preferences --source brave --target codex --cookies on --history off --auto-restart-codex off
 browser-cookie-bridge sync [--timeout 300] [--allow-cloud-upload]
