@@ -98,7 +98,7 @@ The DMG is self-contained. Node.js 24+ and Xcode Command Line Tools are required
 - **[Apple silicon DMG](https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-arm64.dmg)** — M1, M2, M3, M4, and newer
 - **[Intel DMG](https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-x64.dmg)** — Intel-based Macs
 
-Open the DMG, drag **Browser Cookie Bridge** onto **Applications**, then open it from Applications. The current public build is checksum-verified and ad-hoc signed but not Apple-notarized, so macOS may require **Control-click → Open** on first launch. It does not require Node.js, Xcode, Terminal, or an administrator password.
+Open the DMG, drag **Browser Cookie Bridge** onto **Applications**, then open it from Applications. Current DMGs are checksum-verified, Developer ID-signed, and Apple-notarized for a standard macOS first-launch experience. The app does not require Node.js, Xcode, Terminal, or an administrator password.
 
 ### Via npm
 

@@ -65,6 +65,12 @@ fs.copyFileSync(path.join(nodeFolder, "LICENSE"), path.join(runtime, "node", "LI
 fs.chmodSync(path.join(runtime, "bin", "brave-codex-cookie-sync.js"), 0o755);
 
 const signingIdentity = process.env.MACOS_SIGNING_IDENTITY || "-";
+for (const nestedBinary of [bundledNode, ...filesEndingIn(runtime, ".node")]) {
+  const nestedSignArgs = ["--force", "--options", "runtime", "--sign", signingIdentity];
+  if (signingIdentity !== "-") nestedSignArgs.push("--timestamp");
+  nestedSignArgs.push(nestedBinary);
+  run("/usr/bin/codesign", nestedSignArgs);
+}
 const signArgs = ["--force", "--deep", "--options", "runtime", "--sign", signingIdentity];
 if (signingIdentity !== "-") signArgs.push("--timestamp");
 signArgs.push(app);
@@ -82,6 +88,23 @@ run("/usr/bin/hdiutil", [
   "-imagekey", "zlib-level=9",
   output,
 ]);
+
+if (signingIdentity !== "-") {
+  run("/usr/bin/codesign", ["--force", "--timestamp", "--sign", signingIdentity, output]);
+}
+
+if (process.env.NOTARIZE === "1") {
+  if (signingIdentity === "-") throw new Error("NOTARIZE=1 requires MACOS_SIGNING_IDENTITY");
+  const keyPath = requiredEnvironment("ASC_KEY_PATH");
+  const keyID = requiredEnvironment("ASC_KEY_ID");
+  const issuerID = process.env.ASC_ISSUER_ID?.trim();
+  const notaryArguments = ["notarytool", "submit", output, "--key", keyPath, "--key-id", keyID];
+  if (issuerID) notaryArguments.push("--issuer", issuerID);
+  notaryArguments.push("--wait");
+  run("/usr/bin/xcrun", notaryArguments);
+  run("/usr/bin/xcrun", ["stapler", "staple", output]);
+  run("/usr/bin/xcrun", ["stapler", "validate", output]);
+}
 
 const checksum = sha256(output);
 fs.writeFileSync(checksumOutput, `${checksum}  ${filename}\n`);
@@ -123,4 +146,20 @@ function run(command, args) {
 function valueAfter(name) {
   const index = process.argv.indexOf(name);
   return index === -1 ? null : process.argv[index + 1];
+}
+
+function requiredEnvironment(name) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function filesEndingIn(directory, suffix) {
+  const matches = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const candidate = path.join(directory, entry.name);
+    if (entry.isDirectory()) matches.push(...filesEndingIn(candidate, suffix));
+    else if (entry.isFile() && entry.name.endsWith(suffix)) matches.push(candidate);
+  }
+  return matches;
 }

@@ -38,7 +38,7 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --os=darwin --cpu="${{ matrix.arch }}"
 
       - name: Run tests
         run: npm test
@@ -46,8 +46,51 @@ jobs:
       - name: Check JavaScript syntax
         run: npm run check
 
+      - name: Require signing and notarization secrets
+        env:
+          CERTIFICATE_P12: ${{ secrets.DEVELOPER_ID_APPLICATION_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.DEVELOPER_ID_APPLICATION_NAME }}
+          ASC_PRIVATE_KEY_P8: ${{ secrets.ASC_PRIVATE_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          for name in CERTIFICATE_P12 CERTIFICATE_PASSWORD MACOS_SIGNING_IDENTITY ASC_PRIVATE_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID; do
+            test -n "${!name}" || { echo "::error::Missing required secret: $name"; exit 1; }
+          done
+
+      - name: Import Developer ID Application certificate
+        env:
+          CERTIFICATE_P12: ${{ secrets.DEVELOPER_ID_APPLICATION_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/browser-cookie-bridge.keychain-db"
+          CERTIFICATE="$RUNNER_TEMP/developer-id.p12"
+          printf '%s' "$CERTIFICATE_P12" | /usr/bin/base64 -D > "$CERTIFICATE"
+          security create-keychain -p actions "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p actions "$KEYCHAIN"
+          security import "$CERTIFICATE" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple: -s -k actions "$KEYCHAIN"
+
+      - name: Prepare App Store Connect notarization key
+        env:
+          ASC_PRIVATE_KEY_P8: ${{ secrets.ASC_PRIVATE_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          ASC_KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "$ASC_PRIVATE_KEY_P8" | /usr/bin/base64 -D > "$ASC_KEY_PATH"
+          chmod 600 "$ASC_KEY_PATH"
+          echo "ASC_KEY_PATH=$ASC_KEY_PATH" >> "$GITHUB_ENV"
+
       - name: Build self-contained DMG
         run: npm run build:dmg -- --arch "${{ matrix.arch }}"
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.DEVELOPER_ID_APPLICATION_NAME }}
+          NOTARIZE: "1"
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
 
       - name: Upload DMG artifacts
         uses: actions/upload-artifact@v4

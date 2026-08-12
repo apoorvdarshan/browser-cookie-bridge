@@ -80,7 +80,7 @@ To validate self-contained distribution on the current architecture:
 npm run build:dmg -- --arch arm64
 ```
 
-Use `--arch x64` for the Intel artifact. The builder downloads the pinned official Node runtime, verifies Node's published checksum, builds the matching Swift architecture, ad-hoc signs the app by default, and writes a DMG plus SHA-256 file under `dist/`. Set `MACOS_SIGNING_IDENTITY` only when an authorized Developer ID identity is available.
+Use `--arch x64` for the Intel artifact. The builder downloads the pinned official Node runtime, verifies Node's published checksum, builds the matching Swift architecture, ad-hoc signs the app by default, and writes a DMG plus SHA-256 file under `dist/`. Set `MACOS_SIGNING_IDENTITY` only when an authorized Developer ID identity is available. Maintainer releases also set `NOTARIZE=1` with `ASC_KEY_PATH`, `ASC_KEY_ID`, and `ASC_ISSUER_ID`; the resulting Developer ID-signed DMGs are notarized and stapled before their checksums are generated.
 
 Check the UI in both light and dark appearances where relevant. Verify labels, keyboard focus, VoiceOver descriptions, disabled states, progress states, and error messages. Include a screenshot or short recording in the pull request for visible UI changes, but remove all private browser data first.
 
@@ -123,7 +123,9 @@ Maintainers may ask for a smaller scope, additional tests, or manual verificatio
 
 ## Releases
 
-Releases are performed by maintainers. Do not create or push a version tag from a contribution branch. A release tag must match the versions in `package.json`, `extension-template/manifest.json`, and `macos-app/Info.plist`; the release workflow then runs tests, builds both DMGs, publishes to npm, and creates the GitHub Release with checksums.
+Releases are performed by maintainers. Do not create or push a version tag from a contribution branch. A release tag must match the versions in `package.json`, `extension-template/manifest.json`, and `macos-app/Info.plist`; the release workflow then runs tests, Developer ID-signs and notarizes both DMGs, publishes to npm, and creates the GitHub Release with checksums.
+
+The release repository requires `DEVELOPER_ID_APPLICATION_P12`, `DEVELOPER_ID_APPLICATION_PASSWORD`, `DEVELOPER_ID_APPLICATION_NAME`, `ASC_PRIVATE_KEY_P8`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `NPM_TOKEN` GitHub Actions secrets. The App Store Connect key authenticates only with Apple's notarization service; releases remain direct-download software and are not submitted to the Mac App Store.
 
 ## License
 
