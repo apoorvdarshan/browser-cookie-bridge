@@ -577,7 +577,11 @@ final class SyncModel: ObservableObject {
       }
       self.updateEndpointRunningStatus()
       if success && reopenCodexOnSuccess {
-        self.reopenCodexAfterSuccessfulSync(partial: partial, showMenuBarAlert: showMenuBarAlert)
+        self.reopenCodexAfterSuccessfulSync(
+          partial: partial,
+          syncSummary: self.secondaryStatus,
+          showMenuBarAlert: showMenuBarAlert
+        )
       } else if showMenuBarAlert {
         self.postNativeAlert(
           title: self.primaryStatus,
@@ -588,11 +592,15 @@ final class SyncModel: ObservableObject {
     }
   }
 
-  private func reopenCodexAfterSuccessfulSync(partial: Bool, showMenuBarAlert: Bool) {
+  private func reopenCodexAfterSuccessfulSync(partial: Bool, syncSummary: String, showMenuBarAlert: Bool) {
+    let transferResult = syncSummary.replacingOccurrences(
+      of: "Reopen Codex to use the updated sessions. ",
+      with: ""
+    )
     guard let codexURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") else {
       state = .warning
       primaryStatus = "Codex sessions updated, but Codex was not reopened"
-      secondaryStatus = "Open ChatGPT Codex manually to use the updated sessions"
+      secondaryStatus = "\(transferResult)\n\nCodex could not be found. Open it manually to use the updated sessions."
       if showMenuBarAlert {
         postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: .warning)
       }
@@ -604,12 +612,12 @@ final class SyncModel: ObservableObject {
         if let error {
           self.state = .warning
           self.primaryStatus = "Codex sessions updated, but Codex was not reopened"
-          self.secondaryStatus = "Open ChatGPT Codex manually: \(error.localizedDescription)"
+          self.secondaryStatus = "\(transferResult)\n\nCodex could not be reopened: \(error.localizedDescription)"
         } else {
           self.codexRunning = true
           self.state = partial ? .warning : .success
           self.primaryStatus = partial ? "Codex sync completed with warnings" : "Codex sessions updated"
-          self.secondaryStatus = "ChatGPT Codex was reopened after the successful sync"
+          self.secondaryStatus = "\(transferResult)\n\nChatGPT Codex reopened successfully."
         }
         if showMenuBarAlert {
           self.postNativeAlert(
