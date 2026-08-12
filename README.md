@@ -263,6 +263,16 @@ The product landing page, documentation overview, Privacy Policy, and Terms are 
 npm run web
 ```
 
+## Star History
+
+<a href="https://github.com/apoorvdarshan/browser-cookie-bridge/stargazers">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://cookiebridge.apoorvdarshan.com/api/star-history.svg?theme=dark&amp;v=1" />
+    <source media="(prefers-color-scheme: light)" srcset="https://cookiebridge.apoorvdarshan.com/api/star-history.svg?theme=light&amp;v=1" />
+    <img alt="Browser Cookie Bridge GitHub star history" src="https://cookiebridge.apoorvdarshan.com/api/star-history.svg?theme=light&amp;v=1" />
+  </picture>
+</a>
+
 ## License
 
 [MIT](LICENSE) © 2026 [Apoorv Darshan](https://github.com/apoorvdarshan)
