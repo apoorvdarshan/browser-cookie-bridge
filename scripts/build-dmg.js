@@ -58,6 +58,7 @@ for (const name of ["package.json", "README.md", "LICENSE", "THIRD_PARTY_NOTICES
   fs.copyFileSync(path.join(root, name), path.join(runtime, name));
 }
 const bundledNode = path.join(runtime, "node", "bin", "node");
+const nodeEntitlements = path.join(root, "macos-app", "Node.entitlements");
 fs.mkdirSync(path.dirname(bundledNode), { recursive: true });
 fs.copyFileSync(path.join(nodeFolder, "bin", "node"), bundledNode);
 fs.chmodSync(bundledNode, 0o755);
@@ -68,6 +69,7 @@ const signingIdentity = process.env.MACOS_SIGNING_IDENTITY || "-";
 for (const nestedBinary of [bundledNode, ...filesEndingIn(runtime, ".node")]) {
   const nestedSignArgs = ["--force", "--options", "runtime", "--sign", signingIdentity];
   if (signingIdentity !== "-") nestedSignArgs.push("--timestamp");
+  if (nestedBinary === bundledNode) nestedSignArgs.push("--entitlements", nodeEntitlements);
   nestedSignArgs.push(nestedBinary);
   run("/usr/bin/codesign", nestedSignArgs);
 }

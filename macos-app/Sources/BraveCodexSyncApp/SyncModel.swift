@@ -118,6 +118,7 @@ final class SyncModel: ObservableObject {
   private var activeSyncProcess: Process?
   private var uploadTimer: Timer?
   private var uploadStartedAt: Date?
+  private var runtimeReady = true
 
   var selectedBrowser: BrowserChoice {
     browsers.first(where: { $0.id == selectedSourceID }) ?? browsers[0]
@@ -140,7 +141,7 @@ final class SyncModel: ObservableObject {
   var browserlessBlocked: Bool {
     isBrowserlessTarget && (!browserlessConfigured || sourceBrowserRunning || selectedSourceID == "comet")
   }
-  var syncBlocked: Bool { codexBlocked || sourceSiteDataBlocked || browserlessBlocked }
+  var syncBlocked: Bool { !runtimeReady || codexBlocked || sourceSiteDataBlocked || browserlessBlocked }
   var formattedUploadElapsed: String {
     let minutes = uploadElapsedSeconds / 60
     let seconds = uploadElapsedSeconds % 60
@@ -185,7 +186,7 @@ final class SyncModel: ObservableObject {
   }
 
   init() {
-    bootstrapBundledRuntimeIfNeeded()
+    runtimeReady = bootstrapBundledRuntimeIfNeeded()
     let calendar = Calendar.current
     scheduleTime = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     updateEndpointRunningStatus()
@@ -201,19 +202,19 @@ final class SyncModel: ObservableObject {
     }
   }
 
-  private func bootstrapBundledRuntimeIfNeeded() {
-    guard let resources = Bundle.main.resourceURL else { return }
+  private func bootstrapBundledRuntimeIfNeeded() -> Bool {
+    guard let resources = Bundle.main.resourceURL else { return true }
     let bundledRuntime = resources.appending(path: "runtime")
     let bundledNode = bundledRuntime.appending(path: "node/bin/node")
     let bundledCLI = bundledRuntime.appending(path: "bin/brave-codex-cookie-sync.js")
     guard FileManager.default.isExecutableFile(atPath: bundledNode.path),
-          FileManager.default.fileExists(atPath: bundledCLI.path) else { return }
+          FileManager.default.fileExists(atPath: bundledCLI.path) else { return true }
 
     if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
       state = .warning
       primaryStatus = "Move the app to Applications"
       secondaryStatus = "Drag Browser Cookie Bridge onto Applications in the DMG window, then open it there"
-      return
+      return false
     }
 
     let process = Process()
@@ -230,7 +231,7 @@ final class SyncModel: ObservableObject {
     do {
       try process.run()
       process.waitUntilExit()
-      guard process.terminationStatus != 0 else { return }
+      guard process.terminationStatus != 0 else { return true }
       let data = output.fileHandleForReading.readDataToEndOfFile()
       let message = String(decoding: data, as: UTF8.self)
         .split(separator: "\n")
@@ -239,10 +240,12 @@ final class SyncModel: ObservableObject {
       state = .error
       primaryStatus = "Could not prepare the local runtime"
       secondaryStatus = message ?? "Move the app to Applications and reopen it"
+      return false
     } catch {
       state = .error
       primaryStatus = "Could not prepare the local runtime"
       secondaryStatus = error.localizedDescription
+      return false
     }
   }
 
@@ -1066,7 +1069,11 @@ final class SyncModel: ObservableObject {
       $0.bundleIdentifier == selectedBrowser.bundleIdentifier
     }
     guard !isSyncing else { return }
-    if selectedTargetID == "codex" && siteStorageEnabled && autoRestartBoth && (sourceBrowserRunning || codexRunning) {
+    if !runtimeReady {
+      state = .error
+      primaryStatus = "Local sync runtime could not be refreshed"
+      secondaryStatus = "Reopen the app or install the latest update before syncing"
+    } else if selectedTargetID == "codex" && siteStorageEnabled && autoRestartBoth && (sourceBrowserRunning || codexRunning) {
       state = .ready
       primaryStatus = "Ready to sync and restart both apps"
       secondaryStatus = "Manual sync will force quit \(selectedBrowser.name) and Codex, then reopen only the apps that were running"
