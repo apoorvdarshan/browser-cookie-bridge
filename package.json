@@ -1,6 +1,6 @@
 {
   "name": "browser-cookie-bridge",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Local-first cookie and session transfer for macOS with optional Browserless upload",
   "type": "module",
   "bin": {
