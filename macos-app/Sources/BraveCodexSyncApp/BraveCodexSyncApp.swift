@@ -592,14 +592,26 @@ struct PreferencesPanel: View {
           }
           if model.selectedTargetID == "codex" {
             RowDivider()
-            PreferenceRow(
-              icon: "arrow.clockwise.circle",
-              color: Theme.accent,
-              title: "Restart Codex automatically",
-              detail: "Force quit before manual sync; reopen only after success"
-            ) {
-              Toggle("", isOn: Binding(get: { model.autoRestartCodex }, set: { model.setAutoRestartCodex($0) }))
-                .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking || model.isSyncing)
+            if model.siteStorageEnabled {
+              PreferenceRow(
+                icon: "arrow.triangle.2.circlepath",
+                color: Theme.accent,
+                title: "Restart both automatically",
+                detail: "Manual sync force quits both; reopens running apps only after success"
+              ) {
+                Toggle("", isOn: Binding(get: { model.autoRestartBoth }, set: { model.setAutoRestartBoth($0) }))
+                  .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking || model.isSyncing)
+              }
+            } else {
+              PreferenceRow(
+                icon: "arrow.clockwise.circle",
+                color: Theme.accent,
+                title: "Restart Codex automatically",
+                detail: "Force quit before manual sync; reopen only after success"
+              ) {
+                Toggle("", isOn: Binding(get: { model.autoRestartCodex }, set: { model.setAutoRestartCodex($0) }))
+                  .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking || model.isSyncing)
+              }
             }
           }
         }

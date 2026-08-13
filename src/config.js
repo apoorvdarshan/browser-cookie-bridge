@@ -52,6 +52,7 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
       openAtLogin: existing.ui?.openAtLogin !== false,
       autoCheckUpdates: existing.ui?.autoCheckUpdates !== false,
       autoRestartCodex: existing.ui?.autoRestartCodex === true,
+      autoRestartBoth: existing.ui?.autoRestartBoth === true,
     },
     browserless: {
       profileName: cleanProfileName(existing.browserless?.profileName) || "browser-cookie-bridge",
@@ -81,6 +82,7 @@ export function updatePreferences({
   openAtLogin,
   autoCheckUpdates,
   autoRestartCodex,
+  autoRestartBoth,
   browserlessProfileName,
   browserlessRegion,
   browserlessOnlyDomains,
@@ -108,6 +110,7 @@ export function updatePreferences({
     openAtLogin: Boolean(openAtLogin),
     autoCheckUpdates: Boolean(autoCheckUpdates),
     autoRestartCodex: Boolean(autoRestartCodex),
+    autoRestartBoth: Boolean(autoRestartBoth),
   };
   const region = browserlessRegion ?? config.browserless?.region ?? "sfo";
   if (!["sfo", "lon", "ams"].includes(region)) throw new Error("Browserless region must be sfo, lon, or ams");

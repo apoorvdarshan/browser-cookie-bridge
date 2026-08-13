@@ -78,6 +78,7 @@ final class SyncModel: ObservableObject {
   @Published var menuBarEnabled = true
   @Published var autoCheckUpdates = true
   @Published var autoRestartCodex = false
+  @Published var autoRestartBoth = false
   @Published var isCheckingForUpdates = false
   @Published var isInstallingUpdate = false
   @Published var availableUpdateVersion: String?
@@ -130,9 +131,11 @@ final class SyncModel: ObservableObject {
   var targetName: String {
     isBrowserlessTarget ? "Browserless Cloud" : selectedTargetBrowser?.name ?? "ChatGPT Codex"
   }
-  var codexBlocked: Bool { selectedTargetID == "codex" && codexRunning && !autoRestartCodex }
+  var codexBlocked: Bool {
+    selectedTargetID == "codex" && codexRunning && !autoRestartCodex && !(siteStorageEnabled && autoRestartBoth)
+  }
   var sourceSiteDataBlocked: Bool {
-    selectedTargetID == "codex" && siteStorageEnabled && sourceBrowserRunning
+    selectedTargetID == "codex" && siteStorageEnabled && sourceBrowserRunning && !autoRestartBoth
   }
   var browserlessBlocked: Bool {
     isBrowserlessTarget && (!browserlessConfigured || sourceBrowserRunning || selectedSourceID == "comet")
@@ -268,6 +271,7 @@ final class SyncModel: ObservableObject {
       menuBarEnabled = config.ui?.menuBar ?? true
       autoCheckUpdates = config.ui?.autoCheckUpdates ?? true
       autoRestartCodex = config.ui?.autoRestartCodex ?? false
+      autoRestartBoth = config.ui?.autoRestartBoth ?? false
       browserlessProfileName = config.browserless?.profileName ?? "browser-cookie-bridge"
       browserlessRegion = config.browserless?.region ?? "sfo"
       browserlessOnlyDomains = (config.browserless?.onlyDomains ?? []).joined(separator: ", ")
@@ -362,6 +366,11 @@ final class SyncModel: ObservableObject {
   func setAutoRestartCodex(_ enabled: Bool) {
     autoRestartCodex = enabled
     persistPreferences(successMessage: enabled ? "Automatic Codex restart enabled" : "Automatic Codex restart disabled")
+  }
+
+  func setAutoRestartBoth(_ enabled: Bool) {
+    autoRestartBoth = enabled
+    persistPreferences(successMessage: enabled ? "Automatic source and Codex restart enabled" : "Automatic source and Codex restart disabled")
   }
 
   func checkForUpdates(showAlert: Bool = false) {
@@ -466,11 +475,84 @@ final class SyncModel: ObservableObject {
       }
       return
     }
+    if selectedTargetID == "codex" && siteStorageEnabled && autoRestartBoth && (sourceBrowserRunning || codexRunning) {
+      forceQuitBothThenSync(showMenuBarAlert: showMenuBarAlert)
+      return
+    }
     if selectedTargetID == "codex" && codexRunning && autoRestartCodex {
       forceQuitCodexThenSync(showMenuBarAlert: showMenuBarAlert)
       return
     }
     startSync(showMenuBarAlert: showMenuBarAlert, reopenCodexOnSuccess: false)
+  }
+
+  private func forceQuitBothThenSync(showMenuBarAlert: Bool) {
+    let sourceApplications = NSWorkspace.shared.runningApplications.filter {
+      $0.bundleIdentifier == selectedBrowser.bundleIdentifier
+    }
+    let codexApplications = NSWorkspace.shared.runningApplications.filter {
+      $0.bundleIdentifier == "com.openai.codex"
+    }
+    let reopenSource = !sourceApplications.isEmpty
+    let reopenCodex = !codexApplications.isEmpty
+    let applications = sourceApplications + codexApplications
+
+    isSyncing = true
+    uploadCanceling = false
+    state = .syncing
+    primaryStatus = "Closing both apps for full sync"
+    secondaryStatus = "Force quitting \(selectedBrowser.name) and ChatGPT Codex, then waiting for their browser storage to close…"
+    guard applications.allSatisfy({ $0.forceTerminate() }) else {
+      finishCodexPreparationFailure(
+        message: "macOS could not force quit both apps. Close \(selectedBrowser.name) and ChatGPT Codex manually, then try again.",
+        showMenuBarAlert: showMenuBarAlert
+      )
+      return
+    }
+    waitForBothToQuit(
+      attemptsRemaining: 50,
+      reopenSource: reopenSource,
+      reopenCodex: reopenCodex,
+      showMenuBarAlert: showMenuBarAlert
+    )
+  }
+
+  private func waitForBothToQuit(
+    attemptsRemaining: Int,
+    reopenSource: Bool,
+    reopenCodex: Bool,
+    showMenuBarAlert: Bool
+  ) {
+    let runningBundleIDs = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+    let stillRunning = runningBundleIDs.contains(selectedBrowser.bundleIdentifier) || runningBundleIDs.contains("com.openai.codex")
+    if !stillRunning {
+      sourceBrowserRunning = false
+      codexRunning = false
+      secondaryStatus = "Both apps are closed — waiting briefly for browser storage to be released…"
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+        self?.startSync(
+          showMenuBarAlert: showMenuBarAlert,
+          reopenCodexOnSuccess: reopenCodex,
+          reopenSourceOnSuccess: reopenSource
+        )
+      }
+      return
+    }
+    guard attemptsRemaining > 0 else {
+      finishCodexPreparationFailure(
+        message: "The apps did not close within 10 seconds. Close both manually, then try again.",
+        showMenuBarAlert: showMenuBarAlert
+      )
+      return
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+      self?.waitForBothToQuit(
+        attemptsRemaining: attemptsRemaining - 1,
+        reopenSource: reopenSource,
+        reopenCodex: reopenCodex,
+        showMenuBarAlert: showMenuBarAlert
+      )
+    }
   }
 
   private func forceQuitCodexThenSync(showMenuBarAlert: Bool) {
@@ -527,7 +609,7 @@ final class SyncModel: ObservableObject {
     }
   }
 
-  private func startSync(showMenuBarAlert: Bool, reopenCodexOnSuccess: Bool) {
+  private func startSync(showMenuBarAlert: Bool, reopenCodexOnSuccess: Bool, reopenSourceOnSuccess: Bool = false) {
     isSyncing = true
     uploadCanceling = false
     state = .syncing
@@ -586,10 +668,12 @@ final class SyncModel: ObservableObject {
           : "Keep both browsers open and check the extensions")
       }
       self.updateEndpointRunningStatus()
-      if success && reopenCodexOnSuccess {
-        self.reopenCodexAfterSuccessfulSync(
+      if success && (reopenCodexOnSuccess || reopenSourceOnSuccess) {
+        self.reopenApplicationsAfterSuccessfulSync(
           partial: partial,
           syncSummary: self.secondaryStatus,
+          reopenCodex: reopenCodexOnSuccess,
+          reopenSource: reopenSourceOnSuccess,
           showMenuBarAlert: showMenuBarAlert
         )
       } else if showMenuBarAlert {
@@ -602,15 +686,44 @@ final class SyncModel: ObservableObject {
     }
   }
 
-  private func reopenCodexAfterSuccessfulSync(partial: Bool, syncSummary: String, showMenuBarAlert: Bool) {
+  private func reopenApplicationsAfterSuccessfulSync(
+    partial: Bool,
+    syncSummary: String,
+    reopenCodex: Bool,
+    reopenSource: Bool,
+    showMenuBarAlert: Bool
+  ) {
     let transferResult = syncSummary.replacingOccurrences(
       of: "Reopen Codex to use the updated sessions. ",
       with: ""
     )
+    var restartMessages: [String] = []
+    var sourceRestartFailed = false
+    if reopenSource {
+      if let sourceURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: selectedBrowser.bundleIdentifier),
+         NSWorkspace.shared.open(sourceURL) {
+        sourceBrowserRunning = true
+        restartMessages.append("\(selectedBrowser.name) reopened successfully.")
+      } else {
+        sourceRestartFailed = true
+        restartMessages.append("\(selectedBrowser.name) could not be reopened; open it manually.")
+      }
+    }
+    let completedRestartMessages = restartMessages
+    let didSourceRestartFail = sourceRestartFailed
+    guard reopenCodex else {
+      state = partial || didSourceRestartFail ? .warning : .success
+      primaryStatus = didSourceRestartFail ? "Sync complete, but the source did not reopen" : (partial ? "Codex sync completed with warnings" : "Full site-data sync complete")
+      secondaryStatus = ([transferResult] + completedRestartMessages).joined(separator: "\n\n")
+      if showMenuBarAlert {
+        postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: state == .success ? .information : .warning)
+      }
+      return
+    }
     guard let codexURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") else {
       state = .warning
       primaryStatus = "Codex sessions updated, but Codex was not reopened"
-      secondaryStatus = "\(transferResult)\n\nCodex could not be found. Open it manually to use the updated sessions."
+      secondaryStatus = ([transferResult] + completedRestartMessages + ["Codex could not be found. Open it manually to use the updated sessions."]).joined(separator: "\n\n")
       if showMenuBarAlert {
         postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: .warning)
       }
@@ -622,12 +735,12 @@ final class SyncModel: ObservableObject {
         if let error {
           self.state = .warning
           self.primaryStatus = "Codex sessions updated, but Codex was not reopened"
-          self.secondaryStatus = "\(transferResult)\n\nCodex could not be reopened: \(error.localizedDescription)"
+          self.secondaryStatus = ([transferResult] + completedRestartMessages + ["Codex could not be reopened: \(error.localizedDescription)"]).joined(separator: "\n\n")
         } else {
           self.codexRunning = true
-          self.state = partial ? .warning : .success
-          self.primaryStatus = partial ? "Codex sync completed with warnings" : "Codex sessions updated"
-          self.secondaryStatus = "\(transferResult)\n\nChatGPT Codex reopened successfully."
+          self.state = partial || didSourceRestartFail ? .warning : .success
+          self.primaryStatus = didSourceRestartFail ? "Sync complete, but the source did not reopen" : (partial ? "Codex sync completed with warnings" : "Codex sessions updated")
+          self.secondaryStatus = ([transferResult] + completedRestartMessages + ["ChatGPT Codex reopened successfully."]).joined(separator: "\n\n")
         }
         if showMenuBarAlert {
           self.postNativeAlert(
@@ -752,6 +865,7 @@ final class SyncModel: ObservableObject {
       "--menu-bar", menuBarEnabled ? "on" : "off",
       "--auto-check-updates", autoCheckUpdates ? "on" : "off",
       "--auto-restart-codex", autoRestartCodex ? "on" : "off",
+      "--auto-restart-both", autoRestartBoth ? "on" : "off",
       "--browserless-profile", browserlessProfileName,
       "--browserless-region", browserlessRegion,
       "--browserless-domains", browserlessOnlyDomains,
@@ -952,7 +1066,11 @@ final class SyncModel: ObservableObject {
       $0.bundleIdentifier == selectedBrowser.bundleIdentifier
     }
     guard !isSyncing else { return }
-    if sourceSiteDataBlocked {
+    if selectedTargetID == "codex" && siteStorageEnabled && autoRestartBoth && (sourceBrowserRunning || codexRunning) {
+      state = .ready
+      primaryStatus = "Ready to sync and restart both apps"
+      secondaryStatus = "Manual sync will force quit \(selectedBrowser.name) and Codex, then reopen only the apps that were running"
+    } else if sourceSiteDataBlocked {
       state = .warning
       primaryStatus = "Quit \(selectedBrowser.name) before syncing"
       secondaryStatus = "Full site data uses live LevelDB files. Close the source browser completely so they can be copied safely"
@@ -1085,6 +1203,7 @@ private struct AppConfig: Decodable {
     let openAtLogin: Bool?
     let autoCheckUpdates: Bool?
     let autoRestartCodex: Bool?
+    let autoRestartBoth: Bool?
   }
 
   struct BrowserlessSettings: Decodable {

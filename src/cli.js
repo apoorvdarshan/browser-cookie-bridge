@@ -46,7 +46,7 @@ Commands:
   setup [--hour 9] [--minute 0] [--no-schedule]
   install-app [--no-open] [--replace-system-from-source]
   bootstrap-bundled --app-path /Applications/Browser Cookie Bridge.app
-  preferences --source brave --target codex --cookies on --history off --site-storage off --menu-bar on --auto-check-updates on --auto-restart-codex off
+  preferences --source brave --target codex --cookies on --history off --site-storage off --menu-bar on --auto-check-updates on --auto-restart-codex off --auto-restart-both off
   sync [--timeout 300] [--allow-cloud-upload]
   browserless-preflight
   doctor
@@ -131,12 +131,13 @@ function preferences(args) {
     openAtLogin: booleanFlag(args, "--open-at-login", existing.ui?.openAtLogin !== false),
     autoCheckUpdates: booleanFlag(args, "--auto-check-updates", existing.ui?.autoCheckUpdates !== false),
     autoRestartCodex: booleanFlag(args, "--auto-restart-codex", existing.ui?.autoRestartCodex === true),
+    autoRestartBoth: booleanFlag(args, "--auto-restart-both", existing.ui?.autoRestartBoth === true),
     browserlessProfileName: stringFlag(args, "--browserless-profile", existing.browserless?.profileName || "browser-cookie-bridge"),
     browserlessRegion: stringFlag(args, "--browserless-region", existing.browserless?.region || "sfo"),
     browserlessOnlyDomains: optionalStringFlag(args, "--browserless-domains", (existing.browserless?.onlyDomains || []).join(",")),
   });
   console.log(
-    `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, site-storage=${config.imports.siteStorage ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}, auto-check-updates=${config.ui.autoCheckUpdates ? "on" : "off"}, auto-restart-codex=${config.ui.autoRestartCodex ? "on" : "off"}`,
+    `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, site-storage=${config.imports.siteStorage ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}, auto-check-updates=${config.ui.autoCheckUpdates ? "on" : "off"}, auto-restart-codex=${config.ui.autoRestartCodex ? "on" : "off"}, auto-restart-both=${config.ui.autoRestartBoth ? "on" : "off"}`,
   );
 }
 

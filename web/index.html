@@ -268,7 +268,7 @@
           <div>
             <p class="kicker">Codex destination</p>
             <h3>Close Codex—or let the app restart it.</h3>
-            <p>Codex must be completely closed so its local browser data can be backed up and replaced safely. By default the app blocks the write. An optional Full site data mode also transfers compatible Local Storage, IndexedDB, session, and service-worker stores from a closed source browser.</p>
+            <p>Codex must be completely closed so its local browser data can be backed up and replaced safely. Full site data also requires a closed source browser. A separate, off-by-default toggle can force quit both apps and reopen the ones that were running only after a successful transfer.</p>
           </div>
           <a href="#faq">Why is this required? <span>↓</span></a>
         </div>
@@ -387,7 +387,7 @@
 
         <div class="faq-list" data-reveal data-delay="1">
           <details open><summary>Why must Codex be closed?<span></span></summary><p>Codex can overwrite or ignore offline database changes while its Chromium process is running. By default the app blocks direct import until Codex is completely closed. You may optionally enable automatic restart for manual syncs: the app force quits Codex, waits for its database to close, transfers and validates the data, then reopens Codex only after success. Scheduled and login syncs never force quit it.</p></details>
-          <details><summary>Do other browsers need to be closed?<span></span></summary><p>No for cookie-only extension transfers. Codex must be closed for direct import. When Full site data is enabled, the selected source browser must also be closed because Local Storage and IndexedDB use live LevelDB files. Browserless uploads likewise require a closed source profile.</p></details>
+          <details><summary>Do other browsers need to be closed?<span></span></summary><p>No for cookie-only extension transfers. Codex must be closed for direct import. When Full site data is enabled, the selected source browser must also be closed because Local Storage and IndexedDB use live LevelDB files. For manual syncs, the optional Restart both automatically switch can force quit the source and Codex, then reopen only the apps that were running after a successful transfer. Browserless uploads likewise require a closed source profile.</p></details>
           <details><summary>What leaves my Mac with Browserless?<span></span></summary><p>Only after you select Browserless Cloud and click Upload, cookies, local storage, and IndexedDB from the chosen profile are sent directly to your selected Browserless region. The app first measures local sizes without reading their contents, then reports progress and any origins omitted to fit Browserless's 2 MB serialized-profile cap. History and saved passwords are excluded. The token stays in macOS Keychain, CLI telemetry is disabled, and cloud uploads never run on a schedule or at login.</p></details>
           <details><summary>Does this move passwords?<span></span></summary><p>No. Browser extensions cannot access Chromium's password store. Browser Cookie Bridge does not access passwords, Keychain items, payment data, bookmarks, or autofill.</p></details>
           <details><summary>Does it overwrite all destination cookies?<span></span></summary><p>The importer merges selected records using their cookie identity fields. Existing unrelated destination cookies remain in place. Codex is backed up before any replacement.</p></details>

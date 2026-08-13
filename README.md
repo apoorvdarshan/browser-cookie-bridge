@@ -67,6 +67,7 @@ Browser Cookie Bridge currently ships for macOS. A separate Windows app is being
 - 🌐 **Seven Chromium browsers** — Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Perplexity Comet can be sources or destinations.
 - ✨ **ChatGPT Codex import** — merge selected local browser data into Codex's built-in browser; Codex is destination-only.
 - 🔁 **Optional Codex restart** — manual Sync can force quit a running Codex instance and reopen it only after a successful local transfer; off by default.
+- 🔄 **Optional two-app restart** — Full site data can force quit the selected source browser and Codex, then reopen only the apps that were running after a successful transfer; off by default.
 - ☁️ **Optional Browserless upload** — create or refresh a Browserless authenticated profile with cookies, local storage, and IndexedDB; see a local size preflight, live progress, cancellation, and post-upload verification.
 - 🕘 **Background automation** — sync when you sign in, at a fixed daily time, or whenever you choose.
 - ◉ **Native menu-bar app** — closing the window removes the Dock icon while the helper continues running.
@@ -205,7 +206,7 @@ Automation uses the saved source, destination, and data choices for local transf
 ```bash
 browser-cookie-bridge install-app [--no-open] [--replace-system-from-source]
 browser-cookie-bridge setup [--hour 9] [--minute 0] [--no-schedule]
-browser-cookie-bridge preferences --source brave --target codex --cookies on --history off --site-storage off --auto-restart-codex off
+browser-cookie-bridge preferences --source brave --target codex --cookies on --history off --site-storage off --auto-restart-codex off --auto-restart-both off
 browser-cookie-bridge sync [--timeout 300] [--allow-cloud-upload]
 browser-cookie-bridge browserless-preflight
 browser-cookie-bridge doctor
