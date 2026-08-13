@@ -25,3 +25,19 @@ test("Codex summary explains the completed direct merge and backup", () => {
   assert.match(summary, /Reopen Codex/);
   assert.match(summary, /Backup: \/tmp\/backup/);
 });
+
+test("Codex summary reports source cookies that could not be read", () => {
+  const summary = directCodexSummary({
+    imported: 8,
+    historyImported: 0,
+    skipped: 0,
+    historySkipped: 0,
+    failed: 0,
+    historyFailed: 0,
+    sourceCookieSkipped: 3,
+    siteStorageImported: 0,
+    backupPath: "/tmp/backup",
+  });
+  assert.match(summary, /with warnings/);
+  assert.match(summary, /3 source cookies were unreadable or unsupported/);
+});

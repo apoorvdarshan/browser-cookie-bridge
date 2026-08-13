@@ -85,6 +85,7 @@ final class SyncModel: ObservableObject {
   @Published var extensionsReady = false
   @Published var cookiesEnabled = true
   @Published var historyEnabled = false
+  @Published var siteStorageEnabled = false
   @Published var selectedSourceID = "brave"
   @Published var selectedTargetID = "codex"
   @Published var codexRunning = false
@@ -130,10 +131,13 @@ final class SyncModel: ObservableObject {
     isBrowserlessTarget ? "Browserless Cloud" : selectedTargetBrowser?.name ?? "ChatGPT Codex"
   }
   var codexBlocked: Bool { selectedTargetID == "codex" && codexRunning && !autoRestartCodex }
+  var sourceSiteDataBlocked: Bool {
+    selectedTargetID == "codex" && siteStorageEnabled && sourceBrowserRunning
+  }
   var browserlessBlocked: Bool {
     isBrowserlessTarget && (!browserlessConfigured || sourceBrowserRunning || selectedSourceID == "comet")
   }
-  var syncBlocked: Bool { codexBlocked || browserlessBlocked }
+  var syncBlocked: Bool { codexBlocked || sourceSiteDataBlocked || browserlessBlocked }
   var formattedUploadElapsed: String {
     let minutes = uploadElapsedSeconds / 60
     let seconds = uploadElapsedSeconds % 60
@@ -260,6 +264,7 @@ final class SyncModel: ObservableObject {
       if selectedTargetID == selectedSourceID { selectedTargetID = "codex" }
       cookiesEnabled = config.imports?.cookies ?? true
       historyEnabled = config.imports?.history ?? false
+      siteStorageEnabled = config.imports?.siteStorage ?? false
       menuBarEnabled = config.ui?.menuBar ?? true
       autoCheckUpdates = config.ui?.autoCheckUpdates ?? true
       autoRestartCodex = config.ui?.autoRestartCodex ?? false
@@ -307,6 +312,11 @@ final class SyncModel: ObservableObject {
   func setHistoryEnabled(_ enabled: Bool) {
     historyEnabled = enabled
     persistPreferences(successMessage: enabled ? "History URL import enabled" : "History import disabled")
+  }
+
+  func setSiteStorageEnabled(_ enabled: Bool) {
+    siteStorageEnabled = enabled
+    persistPreferences(successMessage: enabled ? "Full site-data import enabled" : "Full site-data import disabled")
   }
 
   func saveBrowserlessSettings(token: String, profileName: String, region: String, onlyDomains: String) {
@@ -738,6 +748,7 @@ final class SyncModel: ObservableObject {
       "--target", selectedTargetID,
       "--cookies", cookiesEnabled ? "on" : "off",
       "--history", historyEnabled ? "on" : "off",
+      "--site-storage", siteStorageEnabled ? "on" : "off",
       "--menu-bar", menuBarEnabled ? "on" : "off",
       "--auto-check-updates", autoCheckUpdates ? "on" : "off",
       "--auto-restart-codex", autoRestartCodex ? "on" : "off",
@@ -941,7 +952,11 @@ final class SyncModel: ObservableObject {
       $0.bundleIdentifier == selectedBrowser.bundleIdentifier
     }
     guard !isSyncing else { return }
-    if selectedTargetID == "codex" && codexRunning && autoRestartCodex {
+    if sourceSiteDataBlocked {
+      state = .warning
+      primaryStatus = "Quit \(selectedBrowser.name) before syncing"
+      secondaryStatus = "Full site data uses live LevelDB files. Close the source browser completely so they can be copied safely"
+    } else if selectedTargetID == "codex" && codexRunning && autoRestartCodex {
       if state == .ready || primaryStatus == "Quit Codex before syncing" {
         state = .ready
         primaryStatus = "Ready to sync and restart Codex"
@@ -1062,6 +1077,7 @@ private struct AppConfig: Decodable {
   struct Imports: Decodable {
     let cookies: Bool
     let history: Bool
+    let siteStorage: Bool?
   }
 
   struct UISettings: Decodable {

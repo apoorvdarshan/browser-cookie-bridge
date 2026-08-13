@@ -63,6 +63,7 @@ Browser Cookie Bridge currently ships for macOS. A separate Windows app is being
 ## Features
 
 - 🍪 **Cookie and session transfer** — cookies are enabled by default, including supported domain, path, expiry, security, `SameSite`, and partition attributes.
+- 🗃️ **Optional full site data for Codex** — replace Codex's compatible Local Storage, IndexedDB, Session Storage, service-worker, and related origin stores from a closed source profile, with backup and rollback. Off by default.
 - 🌐 **Seven Chromium browsers** — Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Perplexity Comet can be sources or destinations.
 - ✨ **ChatGPT Codex import** — merge selected local browser data into Codex's built-in browser; Codex is destination-only.
 - 🔁 **Optional Codex restart** — manual Sync can force quit a running Codex instance and reopen it only after a successful local transfer; off by default.
@@ -78,8 +79,9 @@ Browser Cookie Bridge currently ships for macOS. A separate Windows app is being
 | Data | Support | Notes |
 |---|---:|---|
 | **Cookies and sessions** | ✅ Default | Transfers supported cookie values and attributes |
+| **Full site data → Codex** | Optional | Replaces compatible origin storage from a closed Chromium profile; backs up Codex first |
 | **History URLs** | ◐ Optional | Original visit times and page titles cannot be preserved |
-| **Local storage and IndexedDB** | ◐ Browserless only | Included only in an explicit Browserless authenticated-profile upload |
+| **Local storage and IndexedDB** | ◐ Optional | Full site data into Codex, or an explicit Browserless authenticated-profile upload |
 | **Passwords** | — Never | Chromium extensions cannot read the browser password store |
 | **Bookmarks, autofill, payments** | — Never | Not requested or accessed |
 | **iCloud Keychain** | — Never | Remains completely separate |
@@ -203,7 +205,7 @@ Automation uses the saved source, destination, and data choices for local transf
 ```bash
 browser-cookie-bridge install-app [--no-open] [--replace-system-from-source]
 browser-cookie-bridge setup [--hour 9] [--minute 0] [--no-schedule]
-browser-cookie-bridge preferences --source brave --target codex --cookies on --history off --auto-restart-codex off
+browser-cookie-bridge preferences --source brave --target codex --cookies on --history off --site-storage off --auto-restart-codex off
 browser-cookie-bridge sync [--timeout 300] [--allow-cloud-upload]
 browser-cookie-bridge browserless-preflight
 browser-cookie-bridge doctor
@@ -231,6 +233,7 @@ The broker validates a random token and extension origin, limits payload size, a
 - Cookie values and history URLs are never logged.
 - Browser-to-browser data is held only in broker memory.
 - Codex backups are stored with user-only permissions under `~/Library/Application Support/BraveCodexCookieSync/backups/codex`; the newest 14 are retained.
+- Full site-data import is opt-in and requires both Codex and the source browser to be closed. It replaces compatible Codex origin-storage directories rather than attempting an unsafe LevelDB merge; the previous directories are included in the same backup.
 - The app refuses unknown Codex database schemas instead of guessing.
 - Imported Codex rows use an empty `encrypted_value` because OpenAI's Safe Storage key is protected by a private macOS Keychain access group. Those imported rows can therefore remain readable to software running as your macOS user until the website refreshes them.
 - Anyone who can use your logged-in macOS account or modify a generated extension may be able to access transferred browser sessions.

@@ -12,39 +12,56 @@ const BROWSERS = {
     root: ["BraveSoftware", "Brave-Browser"],
     safeStorageService: "Brave Safe Storage",
     safeStorageAccount: "Brave",
+    processPattern: /\/Brave Browser\.app\/Contents\/MacOS\/Brave Browser(?:\s|$)/,
   },
   chrome: {
     root: ["Google", "Chrome"],
     safeStorageService: "Chrome Safe Storage",
     safeStorageAccount: "Chrome",
+    processPattern: /\/Google Chrome\.app\/Contents\/MacOS\/Google Chrome(?:\s|$)/,
   },
   edge: {
     root: ["Microsoft Edge"],
     safeStorageService: "Microsoft Edge Safe Storage",
     safeStorageAccount: "Microsoft Edge",
+    processPattern: /\/Microsoft Edge\.app\/Contents\/MacOS\/Microsoft Edge(?:\s|$)/,
   },
   arc: {
     root: ["Arc", "User Data"],
     safeStorageService: "Arc Safe Storage",
     safeStorageAccount: "Arc",
+    processPattern: /\/Arc\.app\/Contents\/MacOS\/Arc(?:\s|$)/,
   },
   vivaldi: {
     root: ["Vivaldi"],
     safeStorageService: "Vivaldi Safe Storage",
     safeStorageAccount: "Vivaldi",
+    processPattern: /\/Vivaldi\.app\/Contents\/MacOS\/Vivaldi(?:\s|$)/,
   },
   opera: {
     root: ["com.operasoftware.Opera"],
     directProfile: true,
     safeStorageService: "Opera Safe Storage",
     safeStorageAccount: "Opera",
+    processPattern: /\/Opera\.app\/Contents\/MacOS\/Opera(?:\s|$)/,
   },
   comet: {
     root: ["Comet"],
     safeStorageService: "Comet Safe Storage",
     safeStorageAccount: "Comet",
+    processPattern: /\/Comet\.app\/Contents\/MacOS\/Comet(?:\s|$)/,
   },
 };
+
+export function isChromiumBrowserRunning({ browser, processList } = {}) {
+  const definition = BROWSERS[browser];
+  if (!definition) throw new Error(`Unsupported Chromium source: ${browser}`);
+  const output = processList ?? spawnSync("/bin/ps", ["-axo", "command="], {
+    encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
+  }).stdout;
+  return String(output).split("\n").some((command) => definition.processPattern.test(command.trim()));
+}
 
 export function readChromiumProfile({
   browser,
@@ -61,7 +78,7 @@ export function readChromiumProfile({
     throw new Error(`${browserDisplayName(browser)} profile not found at ${profilePath}`);
   }
 
-  const cookies = imports.cookies
+  const cookieResult = imports.cookies
     ? readCookies({
         databasePath: firstExisting([
           path.join(profilePath, "Network", "Cookies"),
@@ -69,12 +86,18 @@ export function readChromiumProfile({
         ]),
         password: password ?? readSafeStoragePassword(definition, browser),
       })
-    : [];
+    : { cookies: [], total: 0, skipped: 0 };
   const history = imports.history
     ? readHistory(path.join(profilePath, "History"))
     : [];
 
-  return { cookies, history, profileName, profilePath };
+  return {
+    cookies: cookieResult.cookies,
+    cookieStats: { total: cookieResult.total, imported: cookieResult.cookies.length, skipped: cookieResult.skipped },
+    history,
+    profileName,
+    profilePath,
+  };
 }
 
 export function decryptChromiumCookieValue({ domain, encryptedValue, password }) {
@@ -105,6 +128,7 @@ function readCookies({ databasePath, password }) {
       FROM cookies
     `).all();
     const cookies = [];
+    let skipped = 0;
     for (const row of rows) {
       try {
         const value = row.value || decryptChromiumCookieValue({
@@ -133,9 +157,10 @@ function readCookies({ databasePath, password }) {
         });
       } catch {
         // An individual malformed or obsolete cookie must not block the rest of the profile.
+        skipped += 1;
       }
     }
-    return cookies;
+    return { cookies, total: rows.length, skipped };
   } finally {
     database.close();
   }

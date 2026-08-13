@@ -45,6 +45,7 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
       cookies: existing.imports?.cookies !== false,
       passwords: false,
       history: existing.imports?.history === true,
+      siteStorage: existing.imports?.siteStorage === true,
     },
     ui: {
       menuBar: existing.ui?.menuBar !== false,
@@ -73,6 +74,7 @@ export function updatePreferences({
   home,
   cookies,
   history,
+  siteStorage,
   sourceBrowser,
   targetBrowser,
   menuBar,
@@ -95,7 +97,12 @@ export function updatePreferences({
   }
   config.sourceBrowser = sourceBrowser;
   config.targetBrowser = targetBrowser;
-  config.imports = { cookies: Boolean(cookies), passwords: false, history: Boolean(history) };
+  config.imports = {
+    cookies: Boolean(cookies),
+    passwords: false,
+    history: Boolean(history),
+    siteStorage: Boolean(siteStorage),
+  };
   config.ui = {
     menuBar: Boolean(menuBar),
     openAtLogin: Boolean(openAtLogin),

@@ -69,6 +69,39 @@ test("direct Codex import backs up, merges, and validates cookies and history", 
   }
 });
 
+test("direct Codex import replaces and backs up full site data", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-bridge-site-data-"));
+  try {
+    const cookiePath = codexCookiePaths(home)[0];
+    const codexProfile = path.dirname(path.dirname(cookiePath));
+    const sourceProfile = path.join(home, "source-profile");
+    createCookieDatabase(cookiePath);
+    fs.mkdirSync(path.join(codexProfile, "Local Storage", "leveldb"), { recursive: true });
+    fs.writeFileSync(path.join(codexProfile, "Local Storage", "leveldb", "old.log"), "codex-old");
+    fs.mkdirSync(path.join(sourceProfile, "Local Storage", "leveldb"), { recursive: true });
+    fs.writeFileSync(path.join(sourceProfile, "Local Storage", "leveldb", "new.log"), "source-new");
+    fs.mkdirSync(path.join(sourceProfile, "IndexedDB", "https_example.test_0.indexeddb.leveldb"), { recursive: true });
+    fs.writeFileSync(path.join(sourceProfile, "IndexedDB", "https_example.test_0.indexeddb.leveldb", "CURRENT"), "MANIFEST-000001");
+
+    const result = directImportToCodex({
+      home,
+      codexRunning: false,
+      now: new Date("2026-08-14T04:00:00.000Z"),
+      cookies: [],
+      sourceProfilePath: sourceProfile,
+      siteStorage: true,
+    });
+
+    assert.equal(result.siteStorageImported, 2);
+    assert.deepEqual(result.siteStorageNames, ["Local Storage", "IndexedDB"]);
+    assert.equal(fs.readFileSync(path.join(codexProfile, "Local Storage", "leveldb", "new.log"), "utf8"), "source-new");
+    assert.equal(fs.existsSync(path.join(codexProfile, "Local Storage", "leveldb", "old.log")), false);
+    assert.equal(fs.readFileSync(path.join(result.backupPath, "Site Storage", "Local Storage", "leveldb", "old.log"), "utf8"), "codex-old");
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
 function createCookieDatabase(target) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   const database = new DatabaseSync(target);

@@ -569,6 +569,18 @@ struct PreferencesPanel: View {
             Toggle("", isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }))
               .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
           }
+          if model.selectedTargetID == "codex" {
+            RowDivider()
+            PreferenceRow(
+              icon: "externaldrive.badge.plus",
+              color: Theme.accent,
+              title: "Full site data",
+              detail: "Local Storage, IndexedDB, sessions, and service workers · both apps must be closed"
+            ) {
+              Toggle("", isOn: Binding(get: { model.siteStorageEnabled }, set: { model.setSiteStorageEnabled($0) }))
+                .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking || model.isSyncing)
+            }
+          }
           RowDivider()
           PreferenceRow(icon: "clock.arrow.circlepath", color: Theme.accent, title: "History URLs", detail: "Original visit times are not preserved") {
             Toggle("", isOn: Binding(get: { model.historyEnabled }, set: { model.setHistoryEnabled($0) }))

@@ -268,7 +268,7 @@
           <div>
             <p class="kicker">Codex destination</p>
             <h3>Close Codex—or let the app restart it.</h3>
-            <p>Codex must be completely closed so its local SQLite database can be backed up and replaced safely. By default the app blocks the write. An optional, off-by-default setting can force quit Codex for a manual sync and reopen it only after success.</p>
+            <p>Codex must be completely closed so its local browser data can be backed up and replaced safely. By default the app blocks the write. An optional Full site data mode also transfers compatible Local Storage, IndexedDB, session, and service-worker stores from a closed source browser.</p>
           </div>
           <a href="#faq">Why is this required? <span>↓</span></a>
         </div>
@@ -307,7 +307,7 @@
           <div class="data-row data-row-head"><span>Data</span><span>Support</span><span>What to expect</span></div>
           <div class="data-row"><strong>Cookies & sessions</strong><span><i class="status-dot status-on"></i> Default</span><p>Supported values, domain, path, expiry, security, SameSite, and partition attributes.</p></div>
           <div class="data-row"><strong>History URLs</strong><span><i class="status-dot status-partial"></i> Optional</span><p>URLs transfer; original visit times and page titles cannot be preserved.</p></div>
-          <div class="data-row"><strong>Local storage & IndexedDB</strong><span><i class="status-dot status-partial"></i> Browserless</span><p>Measured locally before capture. Browserless caps the serialized profile at 2 MB, so heavy origins may be omitted and are reported.</p></div>
+          <div class="data-row"><strong>Full site data</strong><span><i class="status-dot status-partial"></i> Optional</span><p>For Codex, compatible Local Storage, IndexedDB, session, and service-worker stores can be replaced from a closed source profile with backup and rollback. Browserless uses its separate fitted cloud capture.</p></div>
           <div class="data-row"><strong>Passwords</strong><span><i class="status-dot"></i> Never</span><p>Chromium extensions cannot read the browser password store.</p></div>
           <div class="data-row"><strong>Bookmarks & autofill</strong><span><i class="status-dot"></i> Never</span><p>Bookmarks, payment data, autofill, and iCloud Keychain remain untouched.</p></div>
         </div>
@@ -387,11 +387,11 @@
 
         <div class="faq-list" data-reveal data-delay="1">
           <details open><summary>Why must Codex be closed?<span></span></summary><p>Codex can overwrite or ignore offline database changes while its Chromium process is running. By default the app blocks direct import until Codex is completely closed. You may optionally enable automatic restart for manual syncs: the app force quits Codex, waits for its database to close, transfers and validates the data, then reopens Codex only after success. Scheduled and login syncs never force quit it.</p></details>
-          <details><summary>Do other browsers need to be closed?<span></span></summary><p>No for extension-based browser-to-browser transfers. Codex must be closed for its direct local merge. A Browserless upload also requires the source browser to be closed so a consistent temporary profile copy can be captured.</p></details>
+          <details><summary>Do other browsers need to be closed?<span></span></summary><p>No for cookie-only extension transfers. Codex must be closed for direct import. When Full site data is enabled, the selected source browser must also be closed because Local Storage and IndexedDB use live LevelDB files. Browserless uploads likewise require a closed source profile.</p></details>
           <details><summary>What leaves my Mac with Browserless?<span></span></summary><p>Only after you select Browserless Cloud and click Upload, cookies, local storage, and IndexedDB from the chosen profile are sent directly to your selected Browserless region. The app first measures local sizes without reading their contents, then reports progress and any origins omitted to fit Browserless's 2 MB serialized-profile cap. History and saved passwords are excluded. The token stays in macOS Keychain, CLI telemetry is disabled, and cloud uploads never run on a schedule or at login.</p></details>
           <details><summary>Does this move passwords?<span></span></summary><p>No. Browser extensions cannot access Chromium's password store. Browser Cookie Bridge does not access passwords, Keychain items, payment data, bookmarks, or autofill.</p></details>
           <details><summary>Does it overwrite all destination cookies?<span></span></summary><p>The importer merges selected records using their cookie identity fields. Existing unrelated destination cookies remain in place. Codex is backed up before any replacement.</p></details>
-          <details><summary>Will every website stay signed in?<span></span></summary><p>Not always. Some sites bind sessions to a device, browser, IP address, or other risk signals and may ask you to sign in again.</p></details>
+          <details><summary>Will every website stay signed in?<span></span></summary><p>Not always. Full site data improves compatibility by adding origin storage beyond cookies, but some sites bind sessions to a device, browser, hardware-backed credential, IP address, or other risk signals and may still ask you to sign in again.</p></details>
           <details><summary>Do I need Node.js or Xcode?<span></span></summary><p>No when you use Homebrew or the DMG. Node.js and Xcode Command Line Tools are needed only for the npm and source installation methods.</p></details>
           <details><summary>Will macOS trust the downloaded app?<span></span></summary><p>Yes. Public DMGs are SHA-256 verified, signed with the project's Apple Developer ID, and notarized by Apple. Open the DMG, drag the app to Applications, and launch it normally.</p></details>
           <details><summary>What if I previously installed through npm?<span></span></summary><p>The DMG and npm build share the same bundle ID, settings, and updater. The Applications copy becomes canonical; a stale matching copy in your user Applications folder is moved to the Trash instead of running twice.</p></details>

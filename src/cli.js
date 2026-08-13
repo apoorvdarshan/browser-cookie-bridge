@@ -8,7 +8,7 @@ import {
   directImportToCodex,
   isCodexRunning,
 } from "./codex-direct-import.js";
-import { readChromiumProfile } from "./chromium-reader.js";
+import { isChromiumBrowserRunning, readChromiumProfile } from "./chromium-reader.js";
 import { uploadBrowserlessProfile } from "./browserless.js";
 import { inspectBrowserlessProfile } from "./browserless-preflight.js";
 import { installConfig, installRuntime, readConfig, updatePreferences } from "./config.js";
@@ -46,7 +46,7 @@ Commands:
   setup [--hour 9] [--minute 0] [--no-schedule]
   install-app [--no-open] [--replace-system-from-source]
   bootstrap-bundled --app-path /Applications/Browser Cookie Bridge.app
-  preferences --source brave --target codex --cookies on --history off --menu-bar on --auto-check-updates on --auto-restart-codex off
+  preferences --source brave --target codex --cookies on --history off --site-storage off --menu-bar on --auto-check-updates on --auto-restart-codex off
   sync [--timeout 300] [--allow-cloud-upload]
   browserless-preflight
   doctor
@@ -124,6 +124,7 @@ function preferences(args) {
   const config = updatePreferences({
     cookies: booleanFlag(args, "--cookies", existing.imports?.cookies !== false),
     history: booleanFlag(args, "--history", existing.imports?.history === true),
+    siteStorage: booleanFlag(args, "--site-storage", existing.imports?.siteStorage === true),
     sourceBrowser: stringFlag(args, "--source", existing.sourceBrowser || "brave"),
     targetBrowser: stringFlag(args, "--target", existing.targetBrowser || "codex"),
     menuBar: booleanFlag(args, "--menu-bar", existing.ui?.menuBar === true),
@@ -135,7 +136,7 @@ function preferences(args) {
     browserlessOnlyDomains: optionalStringFlag(args, "--browserless-domains", (existing.browserless?.onlyDomains || []).join(",")),
   });
   console.log(
-    `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}, auto-check-updates=${config.ui.autoCheckUpdates ? "on" : "off"}, auto-restart-codex=${config.ui.autoRestartCodex ? "on" : "off"}`,
+    `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, site-storage=${config.imports.siteStorage ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}, auto-check-updates=${config.ui.autoCheckUpdates ? "on" : "off"}, auto-restart-codex=${config.ui.autoRestartCodex ? "on" : "off"}`,
   );
 }
 
@@ -306,14 +307,21 @@ async function sync(args, { signal } = {}) {
   }
   if (isCodexTarget) {
     if (isCodexRunning()) throw new Error(CODEX_RUNNING_ERROR);
+    const siteStorage = config.imports?.siteStorage === true;
+    if (siteStorage && isChromiumBrowserRunning({ browser: source })) {
+      throw new Error(`Quit ${source} completely before importing full site data into Codex.`);
+    }
     const payload = readChromiumProfile({
       browser: config.sourceBrowser || "brave",
       imports: config.imports || { cookies: true, history: false },
     });
-    console.log(`Read ${payload.cookies.length} cookies and ${payload.history.length} history URLs from ${config.sourceBrowser || "brave"}.`);
+    console.log(`Read ${payload.cookies.length} of ${payload.cookieStats.total} cookies (${payload.cookieStats.skipped} unavailable) and ${payload.history.length} history URLs from ${config.sourceBrowser || "brave"}.`);
     const result = directImportToCodex({
       cookies: payload.cookies,
       history: payload.history,
+      sourceProfilePath: payload.profilePath,
+      siteStorage,
+      sourceCookieSkipped: payload.cookieStats.skipped,
       codexRunning: false,
     });
     console.log(directCodexSummary(result));
@@ -363,10 +371,15 @@ export function directCodexSummary(result) {
   const imported = result.imported + result.historyImported;
   const skipped = result.skipped + result.historySkipped;
   const failures = result.failed + result.historyFailed;
-  if (failures > 0) {
-    return `Direct Codex sync completed with warnings: ${imported} imported, ${skipped} skipped, ${failures} failed. Backup: ${result.backupPath}`;
+  const unavailable = result.sourceCookieSkipped || 0;
+  const siteStorage = result.siteStorageImported > 0
+    ? ` Full site data: ${result.siteStorageImported} storage area${result.siteStorageImported === 1 ? "" : "s"} replaced from the source profile.`
+    : "";
+  if (failures > 0 || unavailable > 0) {
+    const sourceNote = unavailable > 0 ? ` ${unavailable} source cookie${unavailable === 1 ? " was" : "s were"} unreadable or unsupported.` : "";
+    return `Direct Codex sync completed with warnings: ${imported} imported, ${skipped} skipped, ${failures} failed.${sourceNote}${siteStorage} Backup: ${result.backupPath}`;
   }
-  return `Direct Codex sync complete: ${imported} imported and ${skipped} skipped. Reopen Codex to use the updated sessions. Backup: ${result.backupPath}`;
+  return `Direct Codex sync complete: ${imported} imported and ${skipped} skipped.${siteStorage} Reopen Codex to use the updated sessions. Backup: ${result.backupPath}`;
 }
 
 export function transferSummary(result) {

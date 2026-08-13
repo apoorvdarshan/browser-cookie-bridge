@@ -5,7 +5,16 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
-import { readChromiumProfile } from "../src/chromium-reader.js";
+import { isChromiumBrowserRunning, readChromiumProfile } from "../src/chromium-reader.js";
+
+test("detects whether the selected Chromium source is running", () => {
+  const processes = [
+    "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser --profile-directory=Default",
+    "/Applications/Other.app/Contents/MacOS/Other",
+  ].join("\n");
+  assert.equal(isChromiumBrowserRunning({ browser: "brave", processList: processes }), true);
+  assert.equal(isChromiumBrowserRunning({ browser: "chrome", processList: processes }), false);
+});
 
 test("native Chromium reader decrypts a version 24 cookie profile while the database is readable", () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-reader-"));
@@ -41,6 +50,7 @@ test("native Chromium reader decrypts a version 24 cookie profile while the data
     });
     assert.equal(result.profileName, "Default");
     assert.equal(result.cookies.length, 1);
+    assert.deepEqual(result.cookieStats, { total: 1, imported: 1, skipped: 0 });
     assert.equal(result.cookies[0].value, "native-reader-secret");
     assert.equal(result.cookies[0].sameSite, "lax");
   } finally {

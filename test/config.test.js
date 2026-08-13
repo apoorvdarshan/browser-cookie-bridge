@@ -13,7 +13,7 @@ test("preferences default to cookies and persist source and history choices", ()
     const installed = installConfig({ home, hour: 9, minute: 15, nodePath: "/Applications/Browser Cookie Bridge.app/Contents/Resources/runtime/node/bin/node" });
     assert.equal(installed.sourceBrowser, "brave");
     assert.equal(installed.targetBrowser, "codex");
-    assert.deepEqual(installed.imports, { cookies: true, passwords: false, history: false });
+    assert.deepEqual(installed.imports, { cookies: true, passwords: false, history: false, siteStorage: false });
     assert.deepEqual(installed.ui, { menuBar: true, openAtLogin: true, autoCheckUpdates: true, autoRestartCodex: false });
     assert.deepEqual(installed.browserless, { profileName: "browser-cookie-bridge", region: "sfo", onlyDomains: [] });
     assert.equal(installed.nodePath, "/Applications/Browser Cookie Bridge.app/Contents/Resources/runtime/node/bin/node");
@@ -29,6 +29,7 @@ test("preferences default to cookies and persist source and history choices", ()
       targetBrowser: "chrome",
       cookies: false,
       history: true,
+      siteStorage: true,
       menuBar: true,
       openAtLogin: false,
       autoCheckUpdates: false,
@@ -40,7 +41,7 @@ test("preferences default to cookies and persist source and history choices", ()
     const updated = readConfig(home);
     assert.equal(updated.sourceBrowser, "edge");
     assert.equal(updated.targetBrowser, "chrome");
-    assert.deepEqual(updated.imports, { cookies: false, passwords: false, history: true });
+    assert.deepEqual(updated.imports, { cookies: false, passwords: false, history: true, siteStorage: true });
     assert.deepEqual(updated.ui, { menuBar: true, openAtLogin: false, autoCheckUpdates: false, autoRestartCodex: true });
     assert.deepEqual(updated.browserless, {
       profileName: "work-session",
@@ -65,6 +66,7 @@ test("a browser cannot import into itself", () => {
       targetBrowser: "brave",
       cookies: true,
       history: false,
+      siteStorage: false,
       menuBar: false,
       openAtLogin: true,
     }), /must be different/);

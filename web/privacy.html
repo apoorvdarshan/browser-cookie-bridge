@@ -72,7 +72,7 @@
         <p class="kicker">Policy</p>
         <h1>Privacy, in plain language.</h1>
         <p>Browser Cookie Bridge is local-first. Local browser and Codex transfers stay on your Mac; Browserless Cloud is a separate optional destination that uploads only after an explicit action.</p>
-        <div class="legal-meta">Effective August 12, 2026 · Version 1.2</div>
+        <div class="legal-meta">Effective August 14, 2026 · Version 1.3</div>
       </div>
     </section>
 
@@ -94,6 +94,7 @@
           <ul>
             <li>Cookie values and supported attributes such as domain, path, expiry, security, SameSite, and partition information</li>
             <li>History URLs, when you explicitly enable history transfer</li>
+            <li>Compatible Local Storage, IndexedDB, Session Storage, service-worker, and related origin-storage files when you explicitly enable Full site data for a Codex import</li>
             <li>Source and destination browser choices</li>
             <li>Automation and interface preferences, including login sync, daily time, menu-bar visibility, and update checks</li>
             <li>Local technical status needed to complete a transfer, such as whether a selected endpoint connected or Codex is running</li>
@@ -105,7 +106,7 @@
           <p>Selected data passes through a short-lived broker bound to IPv4 loopback. The broker holds transfer payloads in memory, requires a random local token and expected extension origin, and does not write cookie values or history URLs to logs.</p>
 
           <h3>ChatGPT Codex import</h3>
-          <p>For a Codex destination, the app reads the selected local Chromium profile and works with Codex's local SQLite data while Codex is closed. It creates a backup and a separate working copy, validates the result, and replaces the destination only after integrity checks pass.</p>
+          <p>For a Codex destination, the app reads the selected local Chromium profile and works with Codex's local data while Codex is closed. It creates a backup and a separate working copy, validates cookie and history databases, and replaces the destination only after checks pass. If you explicitly enable Full site data, the source browser must also be closed; compatible origin-storage directories are backed up and replaced as complete units rather than merged while live.</p>
 
           <h3>Optional Browserless Cloud upload</h3>
           <p>When you select Browserless Cloud, connect an account, review the warning, and click Upload, the app uses the official Browserless CLI to send cookies, local storage, and IndexedDB from the selected closed browser profile to the region and profile name you chose. History and saved passwords are not included. This is a direct request to Browserless, not a developer-operated relay.</p>

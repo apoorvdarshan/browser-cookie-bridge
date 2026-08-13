@@ -8,6 +8,16 @@ import { appSupportDir, codexCookiePaths } from "./paths.js";
 const CHROMIUM_EPOCH_OFFSET_SECONDS = 11_644_473_600;
 const CODEX_RUNNING_ERROR = "ChatGPT Codex is open. Quit it completely, then click Sync now again.";
 const MAX_BACKUPS = 14;
+const SITE_STORAGE_DIRECTORIES = [
+  "Local Storage",
+  "IndexedDB",
+  "Session Storage",
+  "Service Worker",
+  "File System",
+  "WebStorage",
+  "shared_proto_db",
+  "Shared Dictionary",
+];
 
 export function isCodexRunning({ processList } = {}) {
   const output = processList ?? spawnSync("/bin/ps", ["-axo", "command="], {
@@ -22,6 +32,9 @@ export function isCodexRunning({ processList } = {}) {
 export function directImportToCodex({
   cookies,
   history = [],
+  sourceProfilePath,
+  siteStorage = false,
+  sourceCookieSkipped = 0,
   home = os.homedir(),
   codexRunning = isCodexRunning(),
   now = new Date(),
@@ -36,6 +49,7 @@ export function directImportToCodex({
     throw new Error("Codex browser storage was not found. Open the Codex browser once, quit Codex, then try again.");
   }
   const historyPath = path.join(path.dirname(cookiePath), "History");
+  const codexProfilePath = codexProfileRoot(cookiePath);
   const backupRoot = path.join(appSupportDir(home), "backups", "codex");
   const backupPath = path.join(backupRoot, backupDirectoryName(now));
   fs.mkdirSync(backupPath, { recursive: true, mode: 0o700 });
@@ -76,6 +90,20 @@ export function directImportToCodex({
     fs.chmodSync(historyWorking, 0o600);
   }
 
+  let siteStoragePlan = [];
+  if (siteStorage) {
+    try {
+      if (!sourceProfilePath || !fs.existsSync(sourceProfilePath)) {
+        throw new Error("The selected source profile was not found for full site-data import.");
+      }
+      siteStoragePlan = prepareSiteStorageTransfer({ sourceProfilePath, codexProfilePath, backupPath });
+    } catch (error) {
+      fs.rmSync(cookieWorking, { force: true });
+      if (historyWorking) fs.rmSync(historyWorking, { force: true });
+      throw error;
+    }
+  }
+
   let cookieResult;
   let historyResult = { imported: 0, skipped: 0, failed: 0 };
   try {
@@ -87,13 +115,16 @@ export function directImportToCodex({
       replaceDatabase(historyWorking, historyPath);
       historyResult.replaced = true;
     }
+    commitSiteStorageTransfer(siteStoragePlan);
   } catch (error) {
     restoreDatabase(cookieBackup, cookiePath);
     if (historyBackup) restoreDatabase(historyBackup, historyPath);
+    restoreSiteStorageTransfer(siteStoragePlan);
     throw new Error(`Codex data was restored from backup after the sync failed: ${error.message}`);
   } finally {
     fs.rmSync(cookieWorking, { force: true });
     if (historyWorking) fs.rmSync(historyWorking, { force: true });
+    cleanupSiteStorageTransfer(siteStoragePlan);
   }
 
   pruneBackups(backupRoot, MAX_BACKUPS);
@@ -107,7 +138,76 @@ export function directImportToCodex({
     backupPath,
     targetPath: cookiePath,
     directCodexImport: true,
+    siteStorageImported: siteStoragePlan.filter((item) => item.committed).length,
+    siteStorageNames: siteStoragePlan.filter((item) => item.committed).map((item) => item.name),
+    sourceCookieSkipped: Number.isInteger(sourceCookieSkipped) && sourceCookieSkipped > 0 ? sourceCookieSkipped : 0,
   };
+}
+
+function codexProfileRoot(cookiePath) {
+  const parent = path.dirname(cookiePath);
+  return path.basename(parent) === "Network" ? path.dirname(parent) : parent;
+}
+
+function prepareSiteStorageTransfer({ sourceProfilePath, codexProfilePath, backupPath }) {
+  const plan = [];
+  try {
+    fs.mkdirSync(codexProfilePath, { recursive: true, mode: 0o700 });
+    for (const name of SITE_STORAGE_DIRECTORIES) {
+      const source = path.join(sourceProfilePath, name);
+      if (!fs.existsSync(source)) continue;
+      const destination = path.join(codexProfilePath, name);
+      const backup = path.join(backupPath, "Site Storage", name);
+      const stage = `${destination}.browser-cookie-bridge-${process.pid}-${Date.now()}.stage`;
+      const existed = fs.existsSync(destination);
+      const item = { name, destination, backup, stage, existed, touched: false, committed: false };
+      plan.push(item);
+      if (existed) copyStorageTree(destination, backup);
+      copyStorageTree(source, stage);
+    }
+    if (plan.length === 0) {
+      throw new Error("No compatible Local Storage, IndexedDB, session, or service-worker data was found in the source profile.");
+    }
+    return plan;
+  } catch (error) {
+    cleanupSiteStorageTransfer(plan);
+    throw error;
+  }
+}
+
+function commitSiteStorageTransfer(plan) {
+  for (const item of plan) {
+    item.touched = true;
+    fs.rmSync(item.destination, { recursive: true, force: true });
+    fs.renameSync(item.stage, item.destination);
+    item.committed = true;
+  }
+}
+
+function restoreSiteStorageTransfer(plan) {
+  for (const item of plan) {
+    if (!item.touched) continue;
+    fs.rmSync(item.destination, { recursive: true, force: true });
+    if (item.existed && fs.existsSync(item.backup)) copyStorageTree(item.backup, item.destination);
+    item.touched = false;
+    item.committed = false;
+  }
+}
+
+function cleanupSiteStorageTransfer(plan) {
+  for (const item of plan) fs.rmSync(item.stage, { recursive: true, force: true });
+}
+
+function copyStorageTree(source, destination) {
+  fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 });
+  fs.cpSync(source, destination, {
+    recursive: true,
+    force: true,
+    preserveTimestamps: true,
+    filter(candidate) {
+      try { return !fs.lstatSync(candidate).isSymbolicLink(); } catch { return false; }
+    },
+  });
 }
 
 function mergeCookies(databasePath, cookies, now) {
