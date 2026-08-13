@@ -1,6 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { directCodexSummary, transferSummary } from "../src/cli.js";
+import { directCodexSummary, requireClosedCodexSource, transferSummary } from "../src/cli.js";
+
+test("Codex full site-data preflight resolves and checks the source browser", () => {
+  const checked = [];
+  const source = requireClosedCodexSource({
+    sourceBrowser: "brave",
+    siteStorage: true,
+    runningCheck({ browser }) {
+      checked.push(browser);
+      return false;
+    },
+  });
+
+  assert.equal(source, "brave");
+  assert.deepEqual(checked, ["brave"]);
+  assert.equal(requireClosedCodexSource({ sourceBrowser: undefined, siteStorage: false }), "brave");
+  assert.throws(
+    () => requireClosedCodexSource({ sourceBrowser: "chrome", siteStorage: true, runningCheck: () => true }),
+    /Quit chrome completely/,
+  );
+});
 
 test("transfer summary distinguishes complete and partial imports", () => {
   const complete = transferSummary({ imported: 8, failed: 0, skipped: 2, historyImported: 3, historyFailed: 0, historySkipped: 1 });

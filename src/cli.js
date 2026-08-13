@@ -309,14 +309,15 @@ async function sync(args, { signal } = {}) {
   if (isCodexTarget) {
     if (isCodexRunning()) throw new Error(CODEX_RUNNING_ERROR);
     const siteStorage = config.imports?.siteStorage === true;
-    if (siteStorage && isChromiumBrowserRunning({ browser: source })) {
-      throw new Error(`Quit ${source} completely before importing full site data into Codex.`);
-    }
+    const source = requireClosedCodexSource({
+      sourceBrowser: config.sourceBrowser,
+      siteStorage,
+    });
     const payload = readChromiumProfile({
-      browser: config.sourceBrowser || "brave",
+      browser: source,
       imports: config.imports || { cookies: true, history: false },
     });
-    console.log(`Read ${payload.cookies.length} of ${payload.cookieStats.total} cookies (${payload.cookieStats.skipped} unavailable) and ${payload.history.length} history URLs from ${config.sourceBrowser || "brave"}.`);
+    console.log(`Read ${payload.cookies.length} of ${payload.cookieStats.total} cookies (${payload.cookieStats.skipped} unavailable) and ${payload.history.length} history URLs from ${source}.`);
     const result = directImportToCodex({
       cookies: payload.cookies,
       history: payload.history,
@@ -351,6 +352,18 @@ async function sync(args, { signal } = {}) {
   const result = await broker.completion;
   console.log(transferSummary(result));
   return result;
+}
+
+export function requireClosedCodexSource({
+  sourceBrowser,
+  siteStorage,
+  runningCheck = isChromiumBrowserRunning,
+}) {
+  const source = sourceBrowser || "brave";
+  if (siteStorage && runningCheck({ browser: source })) {
+    throw new Error(`Quit ${source} completely before importing full site data into Codex.`);
+  }
+  return source;
 }
 
 function browserlessPreflight() {
