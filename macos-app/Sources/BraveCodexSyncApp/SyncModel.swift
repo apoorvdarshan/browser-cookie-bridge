@@ -732,27 +732,22 @@ final class SyncModel: ObservableObject {
       }
       return
     }
-    NSWorkspace.shared.openApplication(at: codexURL, configuration: NSWorkspace.OpenConfiguration()) { [weak self] _, error in
-      Task { @MainActor in
-        guard let self else { return }
-        if let error {
-          self.state = .warning
-          self.primaryStatus = "Codex sessions updated, but Codex was not reopened"
-          self.secondaryStatus = ([transferResult] + completedRestartMessages + ["Codex could not be reopened: \(error.localizedDescription)"]).joined(separator: "\n\n")
-        } else {
-          self.codexRunning = true
-          self.state = partial || didSourceRestartFail ? .warning : .success
-          self.primaryStatus = didSourceRestartFail ? "Sync complete, but the source did not reopen" : (partial ? "Codex sync completed with warnings" : "Codex sessions updated")
-          self.secondaryStatus = ([transferResult] + completedRestartMessages + ["ChatGPT Codex reopened successfully."]).joined(separator: "\n\n")
-        }
-        if showMenuBarAlert {
-          self.postNativeAlert(
-            title: self.primaryStatus,
-            message: self.secondaryStatus,
-            kind: self.state == .success ? .information : .warning
-          )
-        }
-      }
+    if NSWorkspace.shared.open(codexURL) {
+      codexRunning = true
+      state = partial || didSourceRestartFail ? .warning : .success
+      primaryStatus = didSourceRestartFail ? "Sync complete, but the source did not reopen" : (partial ? "Codex sync completed with warnings" : "Codex sessions updated")
+      secondaryStatus = ([transferResult] + completedRestartMessages + ["ChatGPT Codex reopened successfully."]).joined(separator: "\n\n")
+    } else {
+      state = .warning
+      primaryStatus = "Codex sessions updated, but Codex was not reopened"
+      secondaryStatus = ([transferResult] + completedRestartMessages + ["Codex could not be reopened. Open it manually to use the updated sessions."]).joined(separator: "\n\n")
+    }
+    if showMenuBarAlert {
+      postNativeAlert(
+        title: primaryStatus,
+        message: secondaryStatus,
+        kind: state == .success ? .information : .warning
+      )
     }
   }
 
