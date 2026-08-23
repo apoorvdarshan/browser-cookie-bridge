@@ -20,9 +20,9 @@ Do **not** open a public issue, discussion, or pull request for a suspected vuln
 
 Use GitHub's private advisory form:
 
-**[Privately report a security vulnerability](https://github.com/apoorvdarshan/browser-cookie-bridge/security/advisories/new)**
+**[Privately report a security vulnerability](https://github.com/aopv/browser-cookie-bridge/security/advisories/new)**
 
-If that form is unavailable, contact [@apoorvdarshan](https://github.com/apoorvdarshan) privately and ask for a secure reporting channel. Do not send secrets in the initial message.
+If that form is unavailable, contact [@apoorvdarshan](https://github.com/aopv) privately and ask for a secure reporting channel. Do not send secrets in the initial message.
 
 Include only the minimum information needed to reproduce the problem:
 
@@ -49,7 +49,7 @@ Examples include:
 - Update installation from an untrusted package or version
 - A browser extension gaining permissions beyond those documented by the project
 
-General bugs, unsupported websites, expired sessions, expected browser permission prompts, and failures caused by running Codex during an import should use the normal [bug report form](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml), provided no sensitive data is included.
+General bugs, unsupported websites, expired sessions, expected browser permission prompts, and failures caused by running Codex during an import should use the normal [bug report form](https://github.com/aopv/browser-cookie-bridge/issues/new?template=bug_report.yml), provided no sensitive data is included.
 
 ## Response process
 

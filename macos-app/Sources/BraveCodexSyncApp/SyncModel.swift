@@ -378,7 +378,7 @@ final class SyncModel: ObservableObject {
 
   func checkForUpdates(showAlert: Bool = false) {
     guard !isCheckingForUpdates, !isInstallingUpdate else { return }
-    guard let url = URL(string: "https://api.github.com/repos/apoorvdarshan/browser-cookie-bridge/releases/latest") else { return }
+    guard let url = URL(string: "https://api.github.com/repos/aopv/browser-cookie-bridge/releases/latest") else { return }
     isCheckingForUpdates = true
     postUpdateState()
     var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)

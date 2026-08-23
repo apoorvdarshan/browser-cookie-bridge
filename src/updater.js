@@ -117,7 +117,7 @@ async function downloadReleaseDMG({ version, architecture, support }) {
   const updates = path.join(support, "updates");
   fs.mkdirSync(updates, { recursive: true, mode: 0o700 });
   const filename = releaseAssetName(version, architecture);
-  const base = `https://github.com/apoorvdarshan/browser-cookie-bridge/releases/download/v${version}`;
+  const base = `https://github.com/aopv/browser-cookie-bridge/releases/download/v${version}`;
   const dmgPath = path.join(updates, filename);
   const checksumPath = `${dmgPath}.sha256`;
   await downloadFile(`${base}/${filename}`, dmgPath);
