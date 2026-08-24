@@ -277,7 +277,7 @@ Product screenshots, the transparent cookie logo, and launch artwork live in [`m
 
 ## Website
 
-The product landing page, documentation overview, Privacy Policy, and Terms are live at **[cookiebridge.apoorvdarshan.com](https://cookiebridge.apoorvdarshan.com)** and live in [`web/`](web/). Preview them locally at `http://localhost:3000`:
+The product landing page, documentation overview, Privacy Policy, and Terms are live at **[cookiebridge.aopv.dev](https://cookiebridge.aopv.dev)** and live in [`web/`](web/). Preview them locally at `http://localhost:3000`:
 
 ```bash
 npm run web
@@ -287,9 +287,9 @@ npm run web
 
 <a href="https://github.com/aopv/browser-cookie-bridge/stargazers">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://cookiebridge.apoorvdarshan.com/api/star-history.svg?theme=dark&amp;v=1" />
-    <source media="(prefers-color-scheme: light)" srcset="https://cookiebridge.apoorvdarshan.com/api/star-history.svg?theme=light&amp;v=1" />
-    <img alt="Browser Cookie Bridge GitHub star history" src="https://cookiebridge.apoorvdarshan.com/api/star-history.svg?theme=light&amp;v=1" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://cookiebridge.aopv.dev/api/star-history.svg?theme=dark&amp;v=1" />
+    <source media="(prefers-color-scheme: light)" srcset="https://cookiebridge.aopv.dev/api/star-history.svg?theme=light&amp;v=1" />
+    <img alt="Browser Cookie Bridge GitHub star history" src="https://cookiebridge.aopv.dev/api/star-history.svg?theme=light&amp;v=1" />
   </picture>
 </a>
 

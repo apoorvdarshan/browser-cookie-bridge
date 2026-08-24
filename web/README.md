@@ -22,7 +22,7 @@ The site has no runtime dependencies, analytics, forms, or remote font requests.
 
 ## Deploy
 
-The production site uses Cloudflare Workers Static Assets on `cookiebridge.apoorvdarshan.com`:
+The production site uses Cloudflare Workers Static Assets on `cookiebridge.aopv.dev`:
 
 ```bash
 npm run web:deploy
