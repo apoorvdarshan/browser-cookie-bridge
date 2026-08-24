@@ -22,7 +22,7 @@ Use GitHub's private advisory form:
 
 **[Privately report a security vulnerability](https://github.com/apoorvdarshan/browser-cookie-bridge/security/advisories/new)**
 
-If that form is unavailable, contact [@apoorvdarshan](https://github.com/apoorvdarshan) privately and ask for a secure reporting channel. Do not send secrets in the initial message.
+If that form is unavailable, contact [@aporvv](https://github.com/apoorvdarshan) privately and ask for a secure reporting channel. Do not send secrets in the initial message.
 
 Include only the minimum information needed to reproduce the problem:
 

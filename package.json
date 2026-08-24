@@ -1,6 +1,6 @@
 {
   "name": "browser-cookie-bridge",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "description": "Local-first cookie and session transfer for macOS with optional Browserless upload",
   "type": "module",
   "bin": {
@@ -24,7 +24,7 @@
     "type": "git",
     "url": "git+https://github.com/apoorvdarshan/browser-cookie-bridge.git"
   },
-  "homepage": "https://cookiebridge.apoorvdarshan.com/",
+  "homepage": "https://cookiebridge.aopv.dev/",
   "bugs": {
     "url": "https://github.com/apoorvdarshan/browser-cookie-bridge/issues"
   },
@@ -42,7 +42,7 @@
     "browserless",
     "codex"
   ],
-  "funding": "https://ko-fi.com/apoorvdarshan",
+  "funding": "https://ko-fi.com/apv",
   "files": [
     "bin",
     "src",

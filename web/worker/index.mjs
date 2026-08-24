@@ -1,4 +1,4 @@
-const OWNER = "apoorvdarshan";
+const OWNER = "aopv";
 const REPOSITORY = "browser-cookie-bridge";
 const CACHE_SECONDS = 6 * 60 * 60;
 const ONE_DAY = 24 * 60 * 60 * 1000;
