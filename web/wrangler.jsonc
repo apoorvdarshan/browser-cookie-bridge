@@ -14,7 +14,7 @@
   },
   "routes": [
     {
-      "pattern": "cookiebridge.aopv.dev",
+      "pattern": "cookiebridge.apoorvdarshan.com",
       "custom_domain": true
     }
   ],

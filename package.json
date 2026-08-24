@@ -24,7 +24,7 @@
     "type": "git",
     "url": "git+https://github.com/apoorvdarshan/browser-cookie-bridge.git"
   },
-  "homepage": "https://cookiebridge.aopv.dev/",
+  "homepage": "https://cookiebridge.apoorvdarshan.com/",
   "bugs": {
     "url": "https://github.com/apoorvdarshan/browser-cookie-bridge/issues"
   },
@@ -42,7 +42,7 @@
     "browserless",
     "codex"
   ],
-  "funding": "https://ko-fi.com/apv",
+  "funding": "https://ko-fi.com/apoorvdarshan",
   "files": [
     "bin",
     "src",
