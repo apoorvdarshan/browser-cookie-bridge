@@ -2,11 +2,11 @@ import AppKit
 import SwiftUI
 
 private enum ProjectLinks {
-  static let repository = URL(string: "https://github.com/aopv/browser-cookie-bridge")!
-  static let downloads = URL(string: "https://github.com/aopv/browser-cookie-bridge/releases/latest")!
+  static let repository = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge")!
+  static let downloads = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest")!
   static let npm = URL(string: "https://www.npmjs.com/package/browser-cookie-bridge")!
-  static let issues = URL(string: "https://github.com/aopv/browser-cookie-bridge/issues/new?template=bug_report.yml")!
-  static let license = URL(string: "https://github.com/aopv/browser-cookie-bridge/blob/main/LICENSE")!
+  static let issues = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml")!
+  static let license = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/LICENSE")!
   static let koFi = URL(string: "https://ko-fi.com/apoorvdarshan")!
   static let x = URL(string: "https://x.com/apoorvdarshan")!
   static let productHunt = URL(string: "https://www.producthunt.com/products/browser-cookie-bridge")!

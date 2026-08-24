@@ -22,11 +22,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aopv/browser-cookie-bridge.git"
+    "url": "git+https://github.com/apoorvdarshan/browser-cookie-bridge.git"
   },
   "homepage": "https://cookiebridge.apoorvdarshan.com/",
   "bugs": {
-    "url": "https://github.com/aopv/browser-cookie-bridge/issues"
+    "url": "https://github.com/apoorvdarshan/browser-cookie-bridge/issues"
   },
   "publishConfig": {
     "access": "public",

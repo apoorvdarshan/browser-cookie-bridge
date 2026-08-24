@@ -5,8 +5,8 @@ Thanks for helping improve Browser Cookie Bridge. Contributions are welcome, esp
 ## Before you start
 
 - Read the [security policy](SECURITY.md) before working with cookie, broker, updater, or Codex database code.
-- Search [existing issues](https://github.com/aopv/browser-cookie-bridge/issues) before opening a duplicate.
-- Use the [bug report form](https://github.com/aopv/browser-cookie-bridge/issues/new?template=bug_report.yml) for reproducible problems.
+- Search [existing issues](https://github.com/apoorvdarshan/browser-cookie-bridge/issues) before opening a duplicate.
+- Use the [bug report form](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml) for reproducible problems.
 - For a vulnerability, follow the private reporting instructions in [SECURITY.md](SECURITY.md). Do not open a public issue.
 
 Never include real cookie values, session tokens, browser profiles, generated extension tokens, or other private browsing data in an issue, commit, fixture, screenshot, or log.
@@ -22,7 +22,7 @@ Never include real cookie values, session tokens, browser profiles, generated ex
 ## Set up the project
 
 ```bash
-git clone https://github.com/aopv/browser-cookie-bridge.git
+git clone https://github.com/apoorvdarshan/browser-cookie-bridge.git
 cd browser-cookie-bridge
 npm test
 npm run check

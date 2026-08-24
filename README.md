@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/Homebrew-Cask-FBB040?logo=homebrew&logoColor=black" alt="Homebrew Cask" />
   <a href="https://www.npmjs.com/package/browser-cookie-bridge"><img src="https://img.shields.io/npm/v/browser-cookie-bridge?logo=npm&color=CB3837" alt="browser-cookie-bridge on npm" /></a>
   <img src="https://img.shields.io/badge/local--first-cloud%20optional-C68B3C" alt="Local-first, cloud optional" />
-  <img src="https://img.shields.io/github/stars/aopv/browser-cookie-bridge?logo=github&color=C68B3C" alt="GitHub stars" />
+  <img src="https://img.shields.io/github/stars/apoorvdarshan/browser-cookie-bridge?logo=github&color=C68B3C" alt="GitHub stars" />
   <a href="https://www.producthunt.com/products/browser-cookie-bridge"><img src="https://img.shields.io/badge/Product%20Hunt-View%20launch-DA552F?logo=producthunt&logoColor=white" alt="Browser Cookie Bridge on Product Hunt" /></a>
   <a href="https://tally.so/r/J9j0D4"><img src="https://img.shields.io/badge/Windows-Join%20waitlist-8E2735?logo=windows&logoColor=white" alt="Join the Browser Cookie Bridge Windows waitlist" /></a>
   <img src="https://img.shields.io/badge/license-MIT-3DA639" alt="MIT License" />
@@ -23,21 +23,21 @@
 
 <p>
   <a href="#installation"><b>Install</b></a> ·
-  <a href="https://github.com/aopv/homebrew-tap">Homebrew</a> ·
-  <a href="https://github.com/aopv/browser-cookie-bridge/releases/latest">DMG</a> ·
+  <a href="https://github.com/apoorvdarshan/homebrew-tap">Homebrew</a> ·
+  <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest">DMG</a> ·
   <a href="https://www.npmjs.com/package/browser-cookie-bridge">npm</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#security--privacy">Security</a> ·
   <a href="CONTRIBUTING.md">Contribute</a> ·
-  <a href="https://github.com/aopv/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a> ·
+  <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a> ·
   <a href="https://www.producthunt.com/products/browser-cookie-bridge">Product Hunt</a> ·
   <a href="https://tally.so/r/J9j0D4">Windows waitlist</a> ·
   <a href="#support">Support</a>
 </p>
 
 <p>
-  <a href="https://github.com/aopv/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-arm64.dmg"><b>Download for Apple silicon</b></a>
-  · <a href="https://github.com/aopv/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-x64.dmg">Download for Intel</a>
+  <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-arm64.dmg"><b>Download for Apple silicon</b></a>
+  · <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-x64.dmg">Download for Intel</a>
 </p>
 
 <br />
@@ -109,8 +109,8 @@ checksum, and installs the signed and notarized app into `/Applications`.
 
 ### Download a DMG — recommended
 
-- **[Apple silicon DMG](https://github.com/aopv/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-arm64.dmg)** — M1, M2, M3, M4, and newer
-- **[Intel DMG](https://github.com/aopv/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-x64.dmg)** — Intel-based Macs
+- **[Apple silicon DMG](https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-arm64.dmg)** — M1, M2, M3, M4, and newer
+- **[Intel DMG](https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-x64.dmg)** — Intel-based Macs
 
 Open the DMG, drag **Browser Cookie Bridge** onto **Applications**, then open it from Applications. Current DMGs are checksum-verified, Developer ID-signed, and Apple-notarized for a standard macOS first-launch experience. The app does not require Node.js, Xcode, Terminal, or an administrator password.
 
@@ -135,7 +135,7 @@ copy is moved to Trash on launch, and future updates replace the same app.
 ### From source
 
 ```bash
-git clone https://github.com/aopv/browser-cookie-bridge.git
+git clone https://github.com/apoorvdarshan/browser-cookie-bridge.git
 cd browser-cookie-bridge
 npm test
 npm run build:app
@@ -265,10 +265,10 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for local setu
 If Browser Cookie Bridge is useful to you:
 
 - ⭐ **Star** the repository
-- ⬇️ **[Download the latest DMG](https://github.com/aopv/browser-cookie-bridge/releases/latest)**
-- 🍺 **[Install from Homebrew](https://github.com/aopv/homebrew-tap)**
+- ⬇️ **[Download the latest DMG](https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest)**
+- 🍺 **[Install from Homebrew](https://github.com/apoorvdarshan/homebrew-tap)**
 - 📦 **[Install from npm](https://www.npmjs.com/package/browser-cookie-bridge)**
-- 🐛 **[Report a bug](https://github.com/aopv/browser-cookie-bridge/issues/new?template=bug_report.yml)** — never include cookie values or tokens
+- 🐛 **[Report a bug](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml)** — never include cookie values or tokens
 - ☕ **[Support on Ko-fi](https://ko-fi.com/apoorvdarshan)**
 - 𝕏 **Follow [@apoorvdarshan](https://x.com/apoorvdarshan)**
 - 🚀 **[View on Product Hunt](https://www.producthunt.com/products/browser-cookie-bridge)**
@@ -285,7 +285,7 @@ npm run web
 
 ## Star History
 
-<a href="https://github.com/aopv/browser-cookie-bridge/stargazers">
+<a href="https://github.com/apoorvdarshan/browser-cookie-bridge/stargazers">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://cookiebridge.apoorvdarshan.com/api/star-history.svg?theme=dark&amp;v=1" />
     <source media="(prefers-color-scheme: light)" srcset="https://cookiebridge.apoorvdarshan.com/api/star-history.svg?theme=light&amp;v=1" />
@@ -295,6 +295,6 @@ npm run web
 
 ## License
 
-[MIT](LICENSE) © 2026 [Apoorv Darshan](https://github.com/aopv)
+[MIT](LICENSE) © 2026 [Apoorv Darshan](https://github.com/apoorvdarshan)
 
 <sub>Not affiliated with Brave, Google, Microsoft, The Browser Company, Vivaldi, Opera, Perplexity, OpenAI, or Browserless. Their names and marks belong to their respective owners.</sub>

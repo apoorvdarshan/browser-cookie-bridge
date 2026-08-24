@@ -104,7 +104,7 @@ jobs:
   publish:
     name: Publish npm package and GitHub Release
     needs: build-dmg
-    if: github.repository == 'aopv/browser-cookie-bridge'
+    if: github.repository == 'apoorvdarshan/browser-cookie-bridge'
     runs-on: ubuntu-latest
 
     steps:
