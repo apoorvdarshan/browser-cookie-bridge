@@ -6,18 +6,252 @@ import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import {
   CODEX_RUNNING_ERROR,
+  CURSOR_RUNNING_ERROR,
   directImportToCodex,
+  directImportToCursor,
   isCodexRunning,
+  isCursorRunning,
 } from "../src/codex-direct-import.js";
-import { codexCookiePaths } from "../src/paths.js";
+import { codexCookiePaths, cursorCookiePaths } from "../src/paths.js";
 
 test("direct Codex import refuses to write while Codex is running", () => {
   assert.equal(isCodexRunning({ processList: "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT\n" }), true);
   assert.equal(isCodexRunning({ processList: "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser\n" }), false);
   assert.throws(
-    () => directImportToCodex({ cookies: [], codexRunning: true }),
+    () => directImportToCodex({ cookies: [], runningCheck: () => true }),
     new RegExp(CODEX_RUNNING_ERROR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
   );
+});
+
+test("direct Cursor import detects the app and writes only to its browser partition", () => {
+  assert.equal(isCursorRunning({ processList: "/Applications/Cursor.app/Contents/MacOS/Cursor\n" }), true);
+  assert.equal(isCursorRunning({ processList: "/Applications/Cursor Beta.app/Contents/MacOS/Cursor\n" }), true);
+  assert.equal(isCursorRunning({ processList: "/Applications/Cursor.app/Contents/Frameworks/Cursor Helper.app/Contents/MacOS/Cursor Helper\n" }), false);
+  assert.equal(isCursorRunning({ processList: "/Applications/Cursor.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler\n" }), false);
+  assert.throws(
+    () => directImportToCursor({ cookies: [], runningCheck: () => true }),
+    new RegExp(CURSOR_RUNNING_ERROR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+  );
+
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-bridge-cursor-"));
+  try {
+    const cookiePath = cursorCookiePaths(home)[0];
+    const rootCookiePath = path.join(home, "Library", "Application Support", "Cursor", "Cookies");
+    createCookieDatabase(cookiePath);
+    fs.mkdirSync(path.dirname(rootCookiePath), { recursive: true });
+    fs.writeFileSync(rootCookiePath, "main-cursor-store-must-not-change");
+    for (const suffix of ["-journal", "-wal", "-shm"]) fs.writeFileSync(`${cookiePath}${suffix}`, "");
+    const result = directImportToCursor({
+      home,
+      runningCheck: () => false,
+      now: new Date("2026-09-04T04:00:00.000Z"),
+      cookies: [{
+        name: "session",
+        value: "cursor-session-secret",
+        domain: ".example.test",
+        hostOnly: false,
+        path: "/",
+        secure: true,
+        httpOnly: true,
+        sameSite: "lax",
+        session: false,
+        expirationDate: 2_000_000_000,
+      }],
+    });
+
+    assert.equal(result.targetID, "cursor");
+    assert.equal(result.targetName, "Cursor");
+    assert.equal(result.directEmbeddedBrowserImport, true);
+    assert.equal(result.directCodexImport, false);
+    assert.equal(result.imported, 1);
+    assert.match(result.backupPath, /backups\/cursor/);
+    assert.equal(fs.existsSync(path.join(result.backupPath, "Cookies")), true);
+
+    const cookies = new DatabaseSync(cookiePath, { readOnly: true });
+    const row = cookies.prepare("SELECT value FROM cookies WHERE host_key = '.example.test' AND name = 'session'").get();
+    assert.equal(row.value, "cursor-session-secret");
+    cookies.close();
+    assert.equal(fs.readFileSync(rootCookiePath, "utf8"), "main-cursor-store-must-not-change");
+    for (const suffix of ["-journal", "-wal", "-shm"]) assert.equal(fs.existsSync(`${cookiePath}${suffix}`), false);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("direct Cursor import rejects history before changing its browser database", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-bridge-cursor-history-"));
+  try {
+    const cookiePath = cursorCookiePaths(home)[0];
+    createCookieDatabase(cookiePath);
+    assert.throws(
+      () => directImportToCursor({
+        home,
+        runningCheck: () => false,
+        cookies: [],
+        history: [{ url: "https://example.test" }],
+      }),
+      /does not expose a compatible history store/,
+    );
+    assert.equal(fs.existsSync(path.join(home, "Library", "Application Support", "BraveCodexCookieSync", "backups", "cursor")), false);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("direct Cursor import rejects full site data before creating a backup", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-bridge-cursor-site-data-"));
+  try {
+    createCookieDatabase(cursorCookiePaths(home)[0]);
+    assert.throws(
+      () => directImportToCursor({ home, runningCheck: () => false, cookies: [], siteStorage: true }),
+      /full site-data import is not supported yet/,
+    );
+    assert.equal(fs.existsSync(path.join(home, "Library", "Application Support", "BraveCodexCookieSync", "backups", "cursor")), false);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("direct Cursor import fails closed when Cursor opens after the backup", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-bridge-cursor-reopen-"));
+  try {
+    const cookiePath = cursorCookiePaths(home)[0];
+    createCookieDatabase(cookiePath);
+    const before = fs.readFileSync(cookiePath);
+    let checks = 0;
+    assert.throws(
+      () => directImportToCursor({
+        home,
+        cookies: [{ name: "session", value: "must-not-land", domain: ".example.test", path: "/" }],
+        runningCheck: () => checks++ > 0,
+      }),
+      new RegExp(CURSOR_RUNNING_ERROR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+    assert(checks >= 2);
+    assert.deepEqual(fs.readFileSync(cookiePath), before);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("direct Cursor import refuses an unknown cookie schema without touching the target", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-bridge-cursor-schema-"));
+  try {
+    const cookiePath = cursorCookiePaths(home)[0];
+    createCookieDatabase(cookiePath);
+    const database = new DatabaseSync(cookiePath);
+    database.prepare("UPDATE meta SET value = '25' WHERE key = 'version'").run();
+    database.close();
+    const before = fs.readFileSync(cookiePath);
+    assert.throws(
+      () => directImportToCursor({
+        home,
+        runningCheck: () => false,
+        cookies: [{ name: "session", value: "schema-check", domain: ".example.test", path: "/" }],
+      }),
+      /Unsupported Cursor cookies schema version: 25/,
+    );
+    assert.deepEqual(fs.readFileSync(cookiePath), before);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("direct Cursor import rejects an unknown partial uniqueness index", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-bridge-cursor-index-"));
+  try {
+    const cookiePath = cursorCookiePaths(home)[0];
+    createCookieDatabase(cookiePath);
+    const database = new DatabaseSync(cookiePath);
+    database.exec(`
+      DROP INDEX cookies_unique_index;
+      CREATE UNIQUE INDEX cookies_unique_index
+        ON cookies(host_key, top_frame_site_key, has_cross_site_ancestor, name, path, source_scheme, source_port)
+        WHERE host_key <> '';
+    `);
+    database.close();
+    assert.throws(
+      () => directImportToCursor({
+        home,
+        runningCheck: () => false,
+        cookies: [{ name: "session", value: "index-check", domain: ".example.test", path: "/" }],
+      }),
+      /Unsupported Cursor cookies uniqueness schema/,
+    );
+    const inspected = new DatabaseSync(cookiePath, { readOnly: true });
+    assert.equal(inspected.prepare("SELECT COUNT(*) AS count FROM cookies").get().count, 0);
+    inspected.close();
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("direct Cursor import aborts a database write error without replacing the target", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-bridge-cursor-write-error-"));
+  try {
+    const cookiePath = cursorCookiePaths(home)[0];
+    createCookieDatabase(cookiePath);
+    const database = new DatabaseSync(cookiePath);
+    database.exec("CREATE TRIGGER reject_cookie BEFORE INSERT ON cookies BEGIN SELECT RAISE(ABORT, 'blocked test write'); END");
+    database.close();
+    assert.throws(
+      () => directImportToCursor({
+        home,
+        runningCheck: () => false,
+        cookies: [{ name: "session", value: "must-not-land", domain: ".example.test", path: "/" }],
+      }),
+      /blocked test write/,
+    );
+    const inspected = new DatabaseSync(cookiePath, { readOnly: true });
+    assert.equal(inspected.prepare("SELECT COUNT(*) AS count FROM cookies").get().count, 0);
+    inspected.close();
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("direct Cursor import restores the backup after replacement starts and fails", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-bridge-cursor-rollback-"));
+  try {
+    const cookiePath = cursorCookiePaths(home)[0];
+    createCookieDatabase(cookiePath);
+    assert.throws(
+      () => directImportToCursor({
+        home,
+        runningCheck: () => false,
+        cookies: [{ name: "session", value: "must-be-rolled-back", domain: ".example.test", path: "/" }],
+        databaseReplacer(source, target) {
+          fs.renameSync(source, target);
+          throw new Error("simulated replacement failure");
+        },
+      }),
+      /data was restored from backup after the sync failed: simulated replacement failure/,
+    );
+    const inspected = new DatabaseSync(cookiePath, { readOnly: true });
+    assert.equal(inspected.prepare("SELECT COUNT(*) AS count FROM cookies").get().count, 0);
+    inspected.close();
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("direct Cursor import does not replace the database when every source cookie is invalid", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-bridge-cursor-empty-"));
+  try {
+    const cookiePath = cursorCookiePaths(home)[0];
+    createCookieDatabase(cookiePath);
+    assert.throws(
+      () => directImportToCursor({ home, runningCheck: () => false, cookies: [{}] }),
+      /No valid cookies were available/,
+    );
+    const inspected = new DatabaseSync(cookiePath, { readOnly: true });
+    assert.equal(inspected.prepare("SELECT COUNT(*) AS count FROM cookies").get().count, 0);
+    inspected.close();
+    const backupRoot = path.join(home, "Library", "Application Support", "BraveCodexCookieSync", "backups", "cursor");
+    assert.equal(fs.existsSync(backupRoot) ? fs.readdirSync(backupRoot).length : 0, 0);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test("direct Codex import backs up, merges, and validates cookies and history", () => {
@@ -30,7 +264,7 @@ test("direct Codex import backs up, merges, and validates cookies and history", 
     const secret = "direct-session-secret";
     const result = directImportToCodex({
       home,
-      codexRunning: false,
+      runningCheck: () => false,
       now: new Date("2026-08-10T04:00:00.000Z"),
       cookies: [{
         name: "session",
@@ -85,7 +319,7 @@ test("direct Codex import replaces and backs up full site data", () => {
 
     const result = directImportToCodex({
       home,
-      codexRunning: false,
+      runningCheck: () => false,
       now: new Date("2026-08-14T04:00:00.000Z"),
       cookies: [],
       sourceProfilePath: sourceProfile,

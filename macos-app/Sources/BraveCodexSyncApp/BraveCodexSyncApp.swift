@@ -291,7 +291,7 @@ struct ContentView: View {
       .buttonStyle(.plain)
       .foregroundStyle(.secondary)
       .help("Refresh status")
-      if model.selectedTargetID != "codex" && !model.isBrowserlessTarget {
+      if !model.isDirectTarget && !model.isBrowserlessTarget {
         Button("Extension setup…") { showingSetup = true }
           .controlSize(.small)
       }
@@ -384,7 +384,8 @@ struct SyncPanel: View {
     if model.isBrowserlessTarget && model.uploadCanceling { return "Canceling…" }
     if model.isBrowserlessTarget && model.isSyncing { return "Cancel upload" }
     if model.isSyncing { return "Syncing…" }
-    if model.codexBlocked { return "Close Codex first" }
+    if model.cursorHasNoDataSelected { return "Turn on Cookies" }
+    if model.directTargetBlocked { return "Close \(model.targetName) first" }
     if model.isBrowserlessTarget && !model.browserlessConfigured { return "Connect Browserless" }
     if model.isBrowserlessTarget && model.selectedSourceID == "comet" { return "Choose another browser" }
     if model.isBrowserlessTarget && model.sourceBrowserRunning { return "Close \(model.selectedBrowser.name) first" }
@@ -461,6 +462,15 @@ struct TargetPicker: View {
         }
         HStack(spacing: 5) {
           ForEach(Array(model.browsers.dropFirst(4))) { browser in targetButton(browser) }
+        }
+        HStack(spacing: 5) {
+          EndpointButton(
+            icon: model.cursorIcon,
+            name: "Cursor browser",
+            selected: model.selectedTargetID == "cursor",
+            disabled: model.isWorking || model.isSyncing,
+            buttonWidth: 64
+          ) { model.selectTarget("cursor") }
           EndpointButton(
             icon: model.codexIcon,
             name: "ChatGPT Codex",
@@ -473,7 +483,7 @@ struct TargetPicker: View {
         }
       }
     }
-    .frame(width: 199)
+    .frame(width: 220)
   }
 
   private func targetButton(_ browser: BrowserChoice) -> some View {
@@ -563,11 +573,27 @@ struct PreferencesPanel: View {
             }
           }
         } else {
-          PreferenceRow(icon: "network", color: Theme.accent, title: "Cookies", detail: "Site sessions and sign-ins") {
+          PreferenceRow(
+            icon: "network",
+            color: Theme.accent,
+            title: "Cookies",
+            detail: model.selectedTargetID == "cursor" ? "Experimental direct import into Cursor's browser partition" : "Site sessions and sign-ins"
+          ) {
             Toggle("", isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }))
               .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
           }
-          if model.selectedTargetID == "codex" {
+          if model.selectedTargetID == "cursor" {
+            RowDivider()
+            PreferenceRow(
+              icon: "externaldrive.badge.plus",
+              color: .secondary,
+              title: "Full site data",
+              detail: "Not enabled for Cursor browser yet",
+              muted: true
+            ) {
+              FixedBadge("Excluded")
+            }
+          } else if model.selectedTargetID == "codex" {
             RowDivider()
             PreferenceRow(
               icon: "externaldrive.badge.plus",
@@ -580,9 +606,15 @@ struct PreferencesPanel: View {
             }
           }
           RowDivider()
-          PreferenceRow(icon: "clock.arrow.circlepath", color: Theme.accent, title: "History URLs", detail: "Original visit times are not preserved") {
-            Toggle("", isOn: Binding(get: { model.historyEnabled }, set: { model.setHistoryEnabled($0) }))
-              .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
+          if model.selectedTargetID == "cursor" {
+            PreferenceRow(icon: "clock.arrow.circlepath", color: .secondary, title: "History URLs", detail: "Cursor browser does not expose a history store", muted: true) {
+              FixedBadge("Excluded")
+            }
+          } else {
+            PreferenceRow(icon: "clock.arrow.circlepath", color: Theme.accent, title: "History URLs", detail: "Original visit times are not preserved") {
+              Toggle("", isOn: Binding(get: { model.historyEnabled }, set: { model.setHistoryEnabled($0) }))
+                .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
+            }
           }
           RowDivider()
           PreferenceRow(icon: "key.slash", color: .secondary, title: "Passwords", detail: "Browser extensions cannot access passwords", muted: true) {
@@ -863,7 +895,7 @@ struct ExtensionSetupSheet: View {
           Button("Open page") { model.openExtensions(for: model.selectedSourceID) }
           Button("Show folder") { model.revealExtension(model.selectedSourceID) }
         }
-        if model.selectedTargetID != "codex" {
+        if !model.isDirectTarget {
           Divider().padding(.leading, 58)
           SetupEndpointRow(icon: model.targetIcon, title: model.targetName, detail: "Load the destination extension") {
             Button("Open page") { model.openExtensions(for: model.selectedTargetID) }
@@ -874,8 +906,8 @@ struct ExtensionSetupSheet: View {
       .background(Color(nsColor: .controlBackgroundColor).opacity(0.65), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
       .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.07)))
 
-      Text(model.selectedTargetID == "codex"
-        ? "Codex uses a direct local merge, so no extension is required. Quit Codex before syncing. Password access is never requested."
+      Text(model.isDirectTarget
+        ? "\(model.targetName) uses a direct local merge, so no extension is required. Quit \(model.targetName) before syncing. Password access is never requested."
         : "In both endpoints, enable Developer mode and choose Load unpacked. Password access is never requested.")
         .font(.system(size: 10.5))
         .foregroundStyle(.secondary)

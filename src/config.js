@@ -34,6 +34,12 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
 
   const sourceBrowser = SOURCE_BROWSERS.includes(existing.sourceBrowser) ? existing.sourceBrowser : "brave";
   const configuredTarget = TARGET_BROWSERS.includes(existing.targetBrowser) ? existing.targetBrowser : "codex";
+  const rememberedImports = {
+    history: existing.rememberedImports?.history === true
+      || (configuredTarget !== "cursor" && existing.imports?.history === true),
+    siteStorage: existing.rememberedImports?.siteStorage === true
+      || (configuredTarget !== "cursor" && existing.imports?.siteStorage === true),
+  };
   const config = {
     version: 2,
     token: existing.token || crypto.randomBytes(32).toString("base64url"),
@@ -44,9 +50,10 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
     imports: {
       cookies: existing.imports?.cookies !== false,
       passwords: false,
-      history: existing.imports?.history === true,
-      siteStorage: existing.imports?.siteStorage === true,
+      history: configuredTarget !== "cursor" && existing.imports?.history === true,
+      siteStorage: configuredTarget !== "cursor" && existing.imports?.siteStorage === true,
     },
+    rememberedImports,
     ui: {
       menuBar: existing.ui?.menuBar !== false,
       openAtLogin: existing.ui?.openAtLogin !== false,
@@ -67,6 +74,7 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
   writePrivateJson(target, config);
   for (const browser of SOURCE_BROWSERS) installExtension(config, home, browser, "browser");
   fs.rmSync(installedExtensionDir(home, "codex"), { recursive: true, force: true });
+  fs.rmSync(installedExtensionDir(home, "cursor"), { recursive: true, force: true });
   fs.rmSync(installedExtensionDir(home, "atlas"), { recursive: true, force: true });
   return config;
 }
@@ -97,14 +105,29 @@ export function updatePreferences({
   if (sourceBrowser === targetBrowser) {
     throw new Error("Source and target browsers must be different");
   }
+  const previousTarget = config.targetBrowser;
+  const rememberedImports = {
+    history: config.rememberedImports?.history === true,
+    siteStorage: config.rememberedImports?.siteStorage === true,
+  };
+  if (previousTarget !== "cursor" && targetBrowser === "cursor") {
+    rememberedImports.history = config.imports?.history === true;
+    rememberedImports.siteStorage = config.imports?.siteStorage === true;
+  }
+  const leavingCursor = previousTarget === "cursor" && targetBrowser !== "cursor";
+  const effectiveHistory = leavingCursor ? rememberedImports.history : Boolean(history);
+  const effectiveSiteStorage = leavingCursor ? rememberedImports.siteStorage : Boolean(siteStorage);
   config.sourceBrowser = sourceBrowser;
   config.targetBrowser = targetBrowser;
   config.imports = {
     cookies: Boolean(cookies),
     passwords: false,
-    history: Boolean(history),
-    siteStorage: Boolean(siteStorage),
+    history: targetBrowser !== "cursor" && effectiveHistory,
+    siteStorage: targetBrowser !== "cursor" && effectiveSiteStorage,
   };
+  config.rememberedImports = targetBrowser === "cursor"
+    ? rememberedImports
+    : { history: effectiveHistory, siteStorage: effectiveSiteStorage };
   config.ui = {
     menuBar: Boolean(menuBar),
     openAtLogin: Boolean(openAtLogin),

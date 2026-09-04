@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { directCodexSummary, requireClosedCodexSource, transferSummary } from "../src/cli.js";
+import {
+  directCodexSummary,
+  directTargetSummary,
+  requireClosedCodexSource,
+  requireClosedDirectTargetSource,
+  transferSummary,
+} from "../src/cli.js";
 
 test("Codex full site-data preflight resolves and checks the source browser", () => {
   const checked = [];
@@ -20,6 +26,48 @@ test("Codex full site-data preflight resolves and checks the source browser", ()
     () => requireClosedCodexSource({ sourceBrowser: "chrome", siteStorage: true, runningCheck: () => true }),
     /Quit chrome completely/,
   );
+});
+
+test("direct target helpers describe Cursor safeguards", () => {
+  assert.throws(
+    () => requireClosedDirectTargetSource({
+      sourceBrowser: "chrome",
+      siteStorage: true,
+      targetName: "Cursor",
+      runningCheck: () => true,
+    }),
+    /before importing full site data into Cursor/,
+  );
+  const summary = directTargetSummary({
+    targetName: "Cursor",
+    imported: 4,
+    skipped: 0,
+    failed: 0,
+    historyImported: 0,
+    historySkipped: 0,
+    historyFailed: 0,
+    siteStorageImported: 0,
+    sourceCookieSkipped: 0,
+    backupPath: "/tmp/cursor-backup",
+  });
+  assert.match(summary, /Direct Cursor sync complete: 4 imported/);
+  assert.match(summary, /Reopen Cursor/);
+
+  const cleanupWarning = directTargetSummary({
+    targetName: "Cursor",
+    imported: 4,
+    skipped: 0,
+    failed: 0,
+    historyImported: 0,
+    historySkipped: 0,
+    historyFailed: 0,
+    siteStorageImported: 0,
+    sourceCookieSkipped: 0,
+    backupPath: "/tmp/cursor-backup",
+    backupCleanupWarning: "The transfer succeeded, but old backups could not be pruned.",
+  });
+  assert.match(cleanupWarning, /completed with warnings/);
+  assert.match(cleanupWarning, /old backups could not be pruned/);
 });
 
 test("transfer summary distinguishes complete and partial imports", () => {

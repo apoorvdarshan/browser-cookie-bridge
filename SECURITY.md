@@ -33,7 +33,7 @@ Include only the minimum information needed to reproduce the problem:
 - Relevant logs with all credentials, paths, and personal data removed
 - A proof of concept that contains no real cookies, sessions, tokens, or browser data
 
-Never submit real cookie values, generated `config.js` contents, broker tokens, Codex databases, browser profiles, Keychain material, or unredacted backups.
+Never submit real cookie values, generated `config.js` contents, broker tokens, Codex or Cursor databases, browser profiles, Keychain material, or unredacted backups.
 
 ## What counts as a security issue
 
@@ -45,11 +45,11 @@ Examples include:
 - Authentication or origin-validation bypasses in the local broker
 - Another local user being able to read generated configuration, backups, or transferred data
 - Arbitrary file read/write or command execution through the CLI, updater, extension, or app
-- Codex database corruption that bypasses backup, validation, or rollback safeguards
+- Codex or Cursor browser database corruption that bypasses backup, validation, or rollback safeguards
 - Update installation from an untrusted package or version
 - A browser extension gaining permissions beyond those documented by the project
 
-General bugs, unsupported websites, expired sessions, expected browser permission prompts, and failures caused by running Codex during an import should use the normal [bug report form](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml), provided no sensitive data is included.
+General bugs, unsupported websites, expired sessions, expected browser permission prompts, and failures caused by running a destination app during a direct import should use the normal [bug report form](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml), provided no sensitive data is included.
 
 ## Response process
 
@@ -73,11 +73,11 @@ Timelines may vary with severity and complexity. Please allow a reasonable remed
 - Generated configuration and backup files use user-only filesystem permissions.
 - Release automation builds separate Apple-silicon and Intel DMGs. The updater selects the current architecture and verifies the published SHA-256 file before mounting or installing a release.
 - Public DMGs are currently ad-hoc signed rather than Apple-notarized. Verify the release checksum and download only from this repository's GitHub Releases page.
-- Codex imports create a consistent SQLite backup, modify a working copy, run integrity checks, and replace the destination only after validation.
-- The newest 14 Codex backups are retained under `~/Library/Application Support/BraveCodexCookieSync/backups/codex`.
-- OpenAI's Safe Storage key is protected by a private macOS Keychain access group. Imported Codex cookies therefore use an empty `encrypted_value` and may remain readable to software running as the same macOS user until the website refreshes them.
+- Codex and Cursor imports create a consistent SQLite backup, modify a working copy, run integrity checks, and replace the destination only after validation. Cursor import is limited to its dedicated browser-partition cookie database.
+- The newest 14 backups per direct destination are retained under `~/Library/Application Support/BraveCodexCookieSync/backups/codex` or `backups/cursor`.
+- Direct imports store imported cookie values in SQLite's plaintext `value` column with an empty `encrypted_value`; they may remain readable to software running as the same macOS user until the website refreshes them.
 - Anyone controlling the signed-in macOS account can potentially access browser sessions, generated extensions, or local backups.
 - Some websites bind sessions to a browser, device, IP address, or other risk signals and may invalidate transferred cookies.
-- ChatGPT Codex is an unsupported direct integration. Codex updates may change database locations or schemas; Browser Cookie Bridge refuses unknown schemas rather than modifying them.
+- ChatGPT Codex and Cursor are unsupported direct integrations. App updates may change database locations or schemas; Browser Cookie Bridge refuses unknown required schemas rather than modifying them.
 
 Browser Cookie Bridge is a convenience tool, not a security boundary. Transfer data only between profiles you own and trust, and keep macOS, your browsers, and the app updated.

@@ -71,8 +71,8 @@
       <div class="shell">
         <p class="kicker">Policy</p>
         <h1>Privacy, in plain language.</h1>
-        <p>Browser Cookie Bridge is local-first. Local browser and Codex transfers stay on your Mac; Browserless Cloud is a separate optional destination that uploads only after an explicit action.</p>
-        <div class="legal-meta">Effective August 14, 2026 · Version 1.3</div>
+        <p>Browser Cookie Bridge is local-first. Local browser, Codex, and Cursor transfers stay on your Mac; Browserless Cloud is a separate optional destination that uploads only after an explicit action.</p>
+        <div class="legal-meta">Effective September 4, 2026 · Version 1.4</div>
       </div>
     </section>
 
@@ -97,7 +97,7 @@
             <li>Compatible Local Storage, IndexedDB, Session Storage, service-worker, and related origin-storage files when you explicitly enable Full site data for a Codex import</li>
             <li>Source and destination browser choices</li>
             <li>Automation and interface preferences, including login sync, daily time, menu-bar visibility, and update checks</li>
-            <li>Local technical status needed to complete a transfer, such as whether a selected endpoint connected or Codex is running</li>
+            <li>Local technical status needed to complete a transfer, such as whether a selected endpoint connected or a direct-destination app is running</li>
           </ul>
           <p>The app does not access browser passwords, bookmarks, autofill, payment information, iCloud Keychain, or unrelated files.</p>
           <p>When update checks are enabled, the app requests public release metadata from GitHub. If you approve an update, it downloads the architecture-specific DMG and SHA-256 file from GitHub Releases, verifies the checksum locally, and replaces the installed app in place. No cookie or history data is included in those requests.</p>
@@ -105,8 +105,8 @@
           <h3>Browser-to-browser transfer</h3>
           <p>Selected data passes through a short-lived broker bound to IPv4 loopback. The broker holds transfer payloads in memory, requires a random local token and expected extension origin, and does not write cookie values or history URLs to logs.</p>
 
-          <h3>ChatGPT Codex import</h3>
-          <p>For a Codex destination, the app reads the selected local Chromium profile and works with Codex's local data while Codex is closed. It creates a backup and a separate working copy, validates cookie and history databases, and replaces the destination only after checks pass. If you explicitly enable Full site data, the source browser must also be closed; compatible origin-storage directories are backed up and replaced as complete units rather than merged while live.</p>
+          <h3>ChatGPT Codex and Cursor import</h3>
+          <p>For a Codex or Cursor destination, the app reads the selected local Chromium profile and works with the destination's embedded-browser data while that app is closed. It creates a destination-specific backup and separate working copy, validates the cookie database, and replaces it only after checks pass. Cursor import is limited to cookies in Cursor's dedicated browser partition; history and Full site data are excluded. Codex additionally supports history and optional Full site data. For Codex Full site data, the source browser must also be closed; compatible origin-storage directories are backed up and replaced as complete units rather than merged while live.</p>
 
           <h3>Optional Browserless Cloud upload</h3>
           <p>When you select Browserless Cloud, connect an account, review the warning, and click Upload, the app uses the official Browserless CLI to send cookies, local storage, and IndexedDB from the selected closed browser profile to the region and profile name you chose. History and saved passwords are not included. This is a direct request to Browserless, not a developer-operated relay.</p>
@@ -123,9 +123,9 @@
 
         <section id="storage">
           <h2>Local storage and retention</h2>
-          <p>Configuration, generated extensions, the pinned runtime, and Codex backups are stored under <code>~/Library/Application Support/BraveCodexCookieSync/</code>. Configuration and generated token files use user-only filesystem permissions. A Browserless API token, if provided, is stored separately in macOS Keychain.</p>
+          <p>Configuration, generated extensions, the pinned runtime, and direct-import backups are stored under <code>~/Library/Application Support/BraveCodexCookieSync/</code>. Configuration and generated token files use user-only filesystem permissions. A Browserless API token, if provided, is stored separately in macOS Keychain.</p>
           <p>The official Browserless CLI records the upload-disclaimer acceptance timestamp in <code>~/.browserless/config.json</code>. Browser Cookie Bridge does not place the API token in that file.</p>
-          <p>The newest 14 Codex pre-change backups are retained. You control the Mac account and can remove local app data by uninstalling the app and deleting its Application Support folder after confirming you no longer need the backups.</p>
+          <p>The newest 14 pre-change backups per direct destination are retained. You control the Mac account and can remove local app data by uninstalling the app and deleting its Application Support folder after confirming you no longer need the backups.</p>
         </section>
 
         <section id="sharing">
@@ -150,7 +150,7 @@
 
         <section id="security">
           <h2>Security</h2>
-          <p>Cookies are credentials. Protect your macOS account, use only profiles you own and trust, and never share generated extension folders or backups. Imported Codex cookies can remain readable to software running as your macOS user until the relevant website refreshes them.</p>
+          <p>Cookies are credentials. Protect your macOS account, use only profiles you own and trust, and never share generated extension folders or backups. Directly imported cookies are stored in SQLite's plaintext value column and can remain readable to software running as your macOS user until the relevant website refreshes them.</p>
           <p>For the full threat model and private vulnerability reporting instructions, read the <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">Security Policy</a>.</p>
         </section>
 

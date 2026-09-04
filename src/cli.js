@@ -5,8 +5,9 @@ import { installApp } from "./app-installer.js";
 import { createBroker } from "./broker.js";
 import {
   CODEX_RUNNING_ERROR,
-  directImportToCodex,
-  isCodexRunning,
+  CURSOR_RUNNING_ERROR,
+  directImportToEmbeddedBrowser,
+  isDirectTargetRunning,
 } from "./codex-direct-import.js";
 import { isChromiumBrowserRunning, readChromiumProfile } from "./chromium-reader.js";
 import { uploadBrowserlessProfile } from "./browserless.js";
@@ -17,6 +18,7 @@ import {
   appLoginLaunchAgentPath,
   codexCookiePaths,
   configPath,
+  cursorCookiePaths,
   installedAppPath,
   installedExtensionDir,
   launchAgentPath,
@@ -40,7 +42,7 @@ import { performUpdate, startDetachedUpdate } from "./updater.js";
 
 const HELP = `browser-cookie-bridge
 
-Local cookie and session transfer between Chromium browsers and into ChatGPT Codex.
+Local cookie and session transfer between Chromium browsers and embedded app browsers.
 
 Commands:
   setup [--hour 9] [--minute 0] [--no-schedule]
@@ -251,9 +253,10 @@ function setup(args) {
 
   console.log("Setup complete.");
   console.log(`Pinned runtime: ${runtime}`);
-  if (config.targetBrowser === "codex") {
+  if (isDirectTarget(config.targetBrowser)) {
+    const targetName = directTargetName(config.targetBrowser);
     console.log(`Source browser: ${config.sourceBrowser} (read locally; no extension required)`);
-    console.log("Target integration: direct local Codex merge (Codex must be closed)");
+    console.log(`Target integration: direct local ${targetName} browser merge (${targetName} must be closed)`);
   } else if (config.targetBrowser === "browserless") {
     console.log(`Source browser: ${config.sourceBrowser} (captured locally by the Browserless CLI)`);
     console.log(`Cloud destination: Browserless ${config.browserless?.region || "sfo"} / ${config.browserless?.profileName || "browser-cookie-bridge"}`);
@@ -265,8 +268,8 @@ function setup(args) {
   }
   if (plist) console.log(`Daily schedule: ${pad(hour)}:${pad(minute)} (${plist})`);
   console.log(`Broker port: 127.0.0.1:${config.port}`);
-  console.log(config.targetBrowser === "codex"
-    ? "Codex is backed up and validated before its local browser data is changed."
+  console.log(isDirectTarget(config.targetBrowser)
+    ? `${directTargetName(config.targetBrowser)} is backed up and validated before its local browser data is changed.`
     : "Cookie values are transferred in memory and are not written to logs or disk.");
 }
 
@@ -275,7 +278,7 @@ async function sync(args, { signal } = {}) {
   const config = readConfig();
   const target = config.targetBrowser || "codex";
   const seconds = integerFlag(args, "--timeout", target === "browserless" ? 900 : 300, 5, 3600);
-  const isCodexTarget = target === "codex";
+  const directTarget = isDirectTarget(target);
   if (target === "browserless") {
     if (!args.includes("--allow-cloud-upload")) {
       throw new Error("Browserless cloud uploads are manual-only. Start one from the app or pass --allow-cloud-upload explicitly.");
@@ -306,27 +309,39 @@ async function sync(args, { signal } = {}) {
     console.log(result.summary);
     return result;
   }
-  if (isCodexTarget) {
-    if (isCodexRunning()) throw new Error(CODEX_RUNNING_ERROR);
+  if (directTarget) {
+    if (isDirectTargetRunning({ target })) {
+      throw new Error(target === "cursor" ? CURSOR_RUNNING_ERROR : CODEX_RUNNING_ERROR);
+    }
+    if (target === "cursor" && config.imports?.history === true) {
+      throw new Error("Cursor browser does not expose a compatible history store. Turn off History URLs and try again.");
+    }
+    if (target === "cursor" && config.imports?.siteStorage === true) {
+      throw new Error("Cursor browser full site-data import is not supported yet. Turn off Full site data and try again.");
+    }
+    if (target === "cursor" && config.imports?.cookies === false) {
+      throw new Error("Cursor import currently supports cookies only. Turn on Cookies and try again.");
+    }
     const siteStorage = config.imports?.siteStorage === true;
-    const source = requireClosedCodexSource({
+    const source = requireClosedDirectTargetSource({
       sourceBrowser: config.sourceBrowser,
       siteStorage,
+      targetName: directTargetName(target),
     });
     const payload = readChromiumProfile({
       browser: source,
       imports: config.imports || { cookies: true, history: false },
     });
     console.log(`Read ${payload.cookies.length} of ${payload.cookieStats.total} cookies (${payload.cookieStats.skipped} unavailable) and ${payload.history.length} history URLs from ${source}.`);
-    const result = directImportToCodex({
+    const result = directImportToEmbeddedBrowser({
+      target,
       cookies: payload.cookies,
       history: payload.history,
       sourceProfilePath: payload.profilePath,
       siteStorage,
       sourceCookieSkipped: payload.cookieStats.skipped,
-      codexRunning: false,
     });
-    console.log(directCodexSummary(result));
+    console.log(directTargetSummary(result));
     return result;
   }
   const broker = createBroker({
@@ -359,9 +374,18 @@ export function requireClosedCodexSource({
   siteStorage,
   runningCheck = isChromiumBrowserRunning,
 }) {
+  return requireClosedDirectTargetSource({ sourceBrowser, siteStorage, runningCheck, targetName: "Codex" });
+}
+
+export function requireClosedDirectTargetSource({
+  sourceBrowser,
+  siteStorage,
+  targetName,
+  runningCheck = isChromiumBrowserRunning,
+}) {
   const source = sourceBrowser || "brave";
   if (siteStorage && runningCheck({ browser: source })) {
-    throw new Error(`Quit ${source} completely before importing full site data into Codex.`);
+    throw new Error(`Quit ${source} completely before importing full site data into ${targetName}.`);
   }
   return source;
 }
@@ -382,6 +406,11 @@ function emitBrowserlessProgress(event) {
 }
 
 export function directCodexSummary(result) {
+  return directTargetSummary({ ...result, targetName: "Codex" });
+}
+
+export function directTargetSummary(result) {
+  const targetName = result.targetName || "embedded browser";
   const imported = result.imported + result.historyImported;
   const skipped = result.skipped + result.historySkipped;
   const failures = result.failed + result.historyFailed;
@@ -389,11 +418,12 @@ export function directCodexSummary(result) {
   const siteStorage = result.siteStorageImported > 0
     ? ` Full site data: ${result.siteStorageImported} storage area${result.siteStorageImported === 1 ? "" : "s"} replaced from the source profile.`
     : "";
-  if (failures > 0 || unavailable > 0) {
+  const backupWarning = result.backupCleanupWarning ? ` ${result.backupCleanupWarning}` : "";
+  if (failures > 0 || unavailable > 0 || backupWarning) {
     const sourceNote = unavailable > 0 ? ` ${unavailable} source cookie${unavailable === 1 ? " was" : "s were"} unreadable or unsupported.` : "";
-    return `Direct Codex sync completed with warnings: ${imported} imported, ${skipped} skipped, ${failures} failed.${sourceNote}${siteStorage} Backup: ${result.backupPath}`;
+    return `Direct ${targetName} sync completed with warnings: ${imported} imported, ${skipped} skipped, ${failures} failed.${sourceNote}${siteStorage}${backupWarning} Backup: ${result.backupPath}`;
   }
-  return `Direct Codex sync complete: ${imported} imported and ${skipped} skipped.${siteStorage} Reopen Codex to use the updated sessions. Backup: ${result.backupPath}`;
+  return `Direct ${targetName} sync complete: ${imported} imported and ${skipped} skipped.${siteStorage} Reopen ${targetName} to use the updated sessions. Backup: ${result.backupPath}`;
 }
 
 export function transferSummary(result) {
@@ -409,6 +439,7 @@ function doctor() {
   const home = os.homedir();
   const brave = existing(braveCookiePaths(home));
   const codex = existing(codexCookiePaths(home));
+  const cursor = existing(cursorCookiePaths(home));
   console.log(`Platform: ${process.platform} ${process.arch}`);
   console.log(`Node: ${process.version}`);
   console.log(`Configuration: ${status(configPath(home))}`);
@@ -419,8 +450,8 @@ function doctor() {
   console.log(`Selected target: ${target}`);
   console.log(`Source extension: ${status(installedExtensionDir(home, source))}`);
   console.log(
-    target === "codex"
-      ? "Target integration: direct local Codex merge (Codex must be closed)"
+    isDirectTarget(target)
+      ? `Target integration: direct local ${directTargetName(target)} browser merge (${directTargetName(target)} must be closed)`
       : target === "browserless"
         ? `Target integration: optional Browserless cloud upload (${config?.browserless?.region || "sfo"}); manual only`
       : `Target extension: ${status(installedExtensionDir(home, target))}`,
@@ -431,8 +462,10 @@ function doctor() {
   console.log(`Desktop app: ${status(installedAppPath(home))}`);
   console.log(`Brave cookie stores detected: ${brave.length}`);
   console.log(`Codex cookie stores detected: ${codex.length}`);
+  console.log(`Cursor browser cookie stores detected: ${cursor.length}`);
   for (const file of brave) console.log(`  Brave: ${file}`);
   for (const file of codex) console.log(`  Codex: ${file}`);
+  for (const file of cursor) console.log(`  Cursor: ${file}`);
   console.log("No cookie names, domains, values, or encryption keys were read.");
 }
 
@@ -445,8 +478,8 @@ function enableLoginSync() {
   });
   console.log(`Login sync enabled: ${plist}`);
   const config = readConfig();
-  console.log(config.targetBrowser === "codex"
-    ? "A sync starts when you sign in and updates Codex only when Codex is closed."
+  console.log(isDirectTarget(config.targetBrowser)
+    ? `A sync starts when you sign in and updates ${directTargetName(config.targetBrowser)} only when it is closed.`
     : config.targetBrowser === "browserless"
       ? "Browserless uploads remain manual-only; login sync will not send data to the cloud."
     : "A sync starts when you sign in and waits up to five minutes for both browser extensions.");
@@ -484,6 +517,14 @@ function setAppLogin(enabled) {
 
 function remove() {
   console.log(removeSchedule() ? "Daily schedule removed." : "No daily schedule was installed.");
+}
+
+function isDirectTarget(target) {
+  return target === "codex" || target === "cursor";
+}
+
+function directTargetName(target) {
+  return target === "cursor" ? "Cursor" : "Codex";
 }
 
 function assertMacOS() {

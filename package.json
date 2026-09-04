@@ -40,7 +40,8 @@
     "chromium",
     "brave",
     "browserless",
-    "codex"
+    "codex",
+    "cursor"
   ],
   "funding": "https://ko-fi.com/apoorvdarshan",
   "files": [

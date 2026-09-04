@@ -77,6 +77,63 @@ test("a browser cannot import into itself", () => {
   }
 });
 
+test("Cursor is a direct destination without history or an extension", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-codex-sync-cursor-"));
+  try {
+    installConfig({ home, hour: 9, minute: 15 });
+    updatePreferences({
+      home,
+      sourceBrowser: "brave",
+      targetBrowser: "codex",
+      cookies: true,
+      history: true,
+      siteStorage: true,
+      menuBar: true,
+      openAtLogin: true,
+      autoCheckUpdates: true,
+    });
+    fs.mkdirSync(installedExtensionDir(home, "cursor"), { recursive: true });
+    const updated = updatePreferences({
+      home,
+      sourceBrowser: "brave",
+      targetBrowser: "cursor",
+      cookies: true,
+      history: true,
+      siteStorage: true,
+      menuBar: true,
+      openAtLogin: true,
+      autoCheckUpdates: true,
+    });
+    assert.equal(updated.targetBrowser, "cursor");
+    assert.equal(updated.imports.history, false);
+    assert.equal(updated.imports.siteStorage, false);
+    assert.equal(updated.rememberedImports.history, true);
+    assert.equal(updated.rememberedImports.siteStorage, true);
+
+    const reinstalled = installConfig({ home, hour: 9, minute: 15 });
+    assert.equal(reinstalled.targetBrowser, "cursor");
+    assert.equal(reinstalled.imports.history, false);
+    assert.equal(reinstalled.imports.siteStorage, false);
+    assert.equal(fs.existsSync(installedExtensionDir(home, "cursor")), false);
+
+    const restored = updatePreferences({
+      home,
+      sourceBrowser: "brave",
+      targetBrowser: "codex",
+      cookies: true,
+      history: false,
+      siteStorage: false,
+      menuBar: true,
+      openAtLogin: true,
+      autoCheckUpdates: true,
+    });
+    assert.equal(restored.imports.history, true);
+    assert.equal(restored.imports.siteStorage, true);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
 test("a bundled runtime installs without Swift or Xcode source files", () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-codex-sync-home-"));
   const source = fs.mkdtempSync(path.join(os.tmpdir(), "browser-codex-sync-bundle-"));

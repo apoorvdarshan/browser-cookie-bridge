@@ -17,7 +17,7 @@ Never include real cookie values, session tokens, browser profiles, generated ex
 - Node.js 24 or newer
 - Xcode Command Line Tools: `xcode-select --install`
 - At least one supported Chromium browser for manual transfer testing
-- ChatGPT Codex only when testing the direct Codex destination
+- ChatGPT Codex or Cursor only when testing the corresponding direct destination
 
 ## Set up the project
 
@@ -41,7 +41,7 @@ The app is installed as `~/Applications/Browser Cookie Bridge.app`. This command
 | Path | Purpose |
 |---|---|
 | `macos-app/` | Native SwiftUI app, app metadata, icons, and menu-bar assets |
-| `src/` | Broker, browser reader, Codex importer, scheduling, installer, and updater |
+| `src/` | Broker, browser reader, embedded-browser importer, scheduling, installer, and updater |
 | `extension-template/` | Unpacked Chromium extension copied into each local endpoint folder |
 | `bin/` | CLI entry point |
 | `test/` | Node test suite |
@@ -84,7 +84,7 @@ Use `--arch x64` for the Intel artifact. The builder downloads the pinned offici
 
 Check the UI in both light and dark appearances where relevant. Verify labels, keyboard focus, VoiceOver descriptions, disabled states, progress states, and error messages. Include a screenshot or short recording in the pull request for visible UI changes, but remove all private browser data first.
 
-For transfer changes, use disposable test profiles and non-sensitive test accounts. Verify the source and destination combination you changed, plus one unaffected path. Codex must be completely closed before testing a Codex import.
+For transfer changes, use disposable test profiles and non-sensitive test accounts. Verify the source and destination combination you changed, plus one unaffected path. Codex or Cursor must be completely closed before testing its direct import.
 
 ## Safety rules
 
@@ -93,8 +93,8 @@ Changes must preserve these guarantees:
 - Cookie values and history URLs are never logged.
 - Browser-to-browser payloads remain local and are not persisted by the broker.
 - Generated broker tokens and configuration files keep user-only permissions.
-- Codex changes are made through a backup and working copy, followed by SQLite integrity checks.
-- Unknown Codex database schemas fail closed instead of being modified optimistically.
+- Direct embedded-browser changes are made through a destination-specific backup and working copy, followed by SQLite integrity checks.
+- Unknown required embedded-browser database schemas fail closed instead of being modified optimistically.
 - The app never force-quits a source or destination browser.
 - Passwords, bookmarks, autofill, payment data, and iCloud Keychain remain out of scope.
 

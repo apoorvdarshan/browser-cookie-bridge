@@ -90,6 +90,7 @@ final class SyncModel: ObservableObject {
   @Published var selectedSourceID = "brave"
   @Published var selectedTargetID = "codex"
   @Published var codexRunning = false
+  @Published var cursorRunning = false
   @Published var sourceBrowserRunning = false
   @Published var browserlessConfigured = false
   @Published var browserlessProfileName = "browser-cookie-bridge"
@@ -119,6 +120,8 @@ final class SyncModel: ObservableObject {
   private var uploadTimer: Timer?
   private var uploadStartedAt: Date?
   private var runtimeReady = true
+  private var rememberedHistoryEnabled = false
+  private var rememberedSiteStorageEnabled = false
 
   var selectedBrowser: BrowserChoice {
     browsers.first(where: { $0.id == selectedSourceID }) ?? browsers[0]
@@ -129,19 +132,28 @@ final class SyncModel: ObservableObject {
   }
 
   var isBrowserlessTarget: Bool { selectedTargetID == "browserless" }
+  var isDirectTarget: Bool { selectedTargetID == "codex" || selectedTargetID == "cursor" }
   var targetName: String {
-    isBrowserlessTarget ? "Browserless Cloud" : selectedTargetBrowser?.name ?? "ChatGPT Codex"
+    if isBrowserlessTarget { return "Browserless Cloud" }
+    if selectedTargetID == "cursor" { return "Cursor" }
+    return selectedTargetBrowser?.name ?? "ChatGPT Codex"
   }
-  var codexBlocked: Bool {
-    selectedTargetID == "codex" && codexRunning && !autoRestartCodex && !(siteStorageEnabled && autoRestartBoth)
+  var directTargetRunning: Bool {
+    selectedTargetID == "cursor" ? cursorRunning : selectedTargetID == "codex" && codexRunning
+  }
+  var directTargetBlocked: Bool {
+    isDirectTarget && directTargetRunning
+      && (selectedTargetID == "cursor" || (!autoRestartCodex && !(siteStorageEnabled && autoRestartBoth)))
   }
   var sourceSiteDataBlocked: Bool {
-    selectedTargetID == "codex" && siteStorageEnabled && sourceBrowserRunning && !autoRestartBoth
+    isDirectTarget && siteStorageEnabled && sourceBrowserRunning
+      && (selectedTargetID == "cursor" || !autoRestartBoth)
   }
   var browserlessBlocked: Bool {
     isBrowserlessTarget && (!browserlessConfigured || sourceBrowserRunning || selectedSourceID == "comet")
   }
-  var syncBlocked: Bool { !runtimeReady || codexBlocked || sourceSiteDataBlocked || browserlessBlocked }
+  var cursorHasNoDataSelected: Bool { selectedTargetID == "cursor" && !cookiesEnabled }
+  var syncBlocked: Bool { !runtimeReady || directTargetBlocked || sourceSiteDataBlocked || browserlessBlocked || cursorHasNoDataSelected }
   var formattedUploadElapsed: String {
     let minutes = uploadElapsedSeconds / 60
     let seconds = uploadElapsedSeconds % 60
@@ -149,7 +161,9 @@ final class SyncModel: ObservableObject {
   }
   var sourceIcon: NSImage { browserIcon(selectedBrowser) }
   var targetIcon: NSImage {
-    isBrowserlessTarget ? browserlessIcon : selectedTargetBrowser.map(browserIcon) ?? codexIcon
+    if isBrowserlessTarget { return browserlessIcon }
+    if selectedTargetID == "cursor" { return cursorIcon }
+    return selectedTargetBrowser.map(browserIcon) ?? codexIcon
   }
   var browserlessIcon: NSImage {
     bundledIcon("browserless")
@@ -160,6 +174,9 @@ final class SyncModel: ObservableObject {
     bundledIcon("chatgpt-codex")
       ?? chatGPTResource("app.icns")
       ?? appIcon(bundleIdentifier: "com.openai.codex", fallbackSymbol: "terminal")
+  }
+  var cursorIcon: NSImage {
+    appIcon(bundleIdentifier: "com.todesktop.230313mzl4w4u92", fallbackSymbol: "cursorarrow.square")
   }
 
   func browserIcon(_ browser: BrowserChoice) -> NSImage {
@@ -264,13 +281,21 @@ final class SyncModel: ObservableObject {
       let configuredSource = config.sourceBrowser ?? "brave"
       selectedSourceID = browsers.contains(where: { $0.id == configuredSource }) ? configuredSource : "brave"
       let configuredTarget = config.targetBrowser ?? "codex"
-      selectedTargetID = configuredTarget == "codex" || configuredTarget == "browserless" || browsers.contains(where: { $0.id == configuredTarget })
+      selectedTargetID = configuredTarget == "codex" || configuredTarget == "cursor" || configuredTarget == "browserless" || browsers.contains(where: { $0.id == configuredTarget })
         ? configuredTarget
         : "codex"
       if selectedTargetID == selectedSourceID { selectedTargetID = "codex" }
       cookiesEnabled = config.imports?.cookies ?? true
-      historyEnabled = config.imports?.history ?? false
-      siteStorageEnabled = config.imports?.siteStorage ?? false
+      let loadedHistoryEnabled = config.imports?.history ?? false
+      let loadedSiteStorageEnabled = config.imports?.siteStorage ?? false
+      rememberedHistoryEnabled = config.rememberedImports?.history ?? loadedHistoryEnabled
+      rememberedSiteStorageEnabled = config.rememberedImports?.siteStorage ?? loadedSiteStorageEnabled
+      historyEnabled = loadedHistoryEnabled
+      siteStorageEnabled = loadedSiteStorageEnabled
+      if selectedTargetID == "cursor" {
+        historyEnabled = false
+        siteStorageEnabled = false
+      }
       menuBarEnabled = config.ui?.menuBar ?? true
       autoCheckUpdates = config.ui?.autoCheckUpdates ?? true
       autoRestartCodex = config.ui?.autoRestartCodex ?? false
@@ -302,9 +327,21 @@ final class SyncModel: ObservableObject {
   }
 
   func selectTarget(_ id: String) {
-    let validTarget = id == "codex" || id == "browserless" || browsers.contains(where: { $0.id == id })
+    let validTarget = id == "codex" || id == "cursor" || id == "browserless" || browsers.contains(where: { $0.id == id })
     guard validTarget, id != selectedTargetID, id != selectedSourceID else { return }
+    let wasCursor = selectedTargetID == "cursor"
+    if id == "cursor" && !wasCursor {
+      rememberedHistoryEnabled = historyEnabled
+      rememberedSiteStorageEnabled = siteStorageEnabled
+    }
     selectedTargetID = id
+    if id == "cursor" {
+      historyEnabled = false
+      siteStorageEnabled = false
+    } else if wasCursor {
+      historyEnabled = rememberedHistoryEnabled
+      siteStorageEnabled = rememberedSiteStorageEnabled
+    }
     persistPreferences(successMessage: "Import destination changed to \(targetName)")
     updateEndpointRunningStatus()
     if id == "browserless" && !browserlessConfigured { showingBrowserlessSetup = true }
@@ -317,12 +354,16 @@ final class SyncModel: ObservableObject {
   }
 
   func setHistoryEnabled(_ enabled: Bool) {
+    guard selectedTargetID != "cursor" else { return }
     historyEnabled = enabled
+    rememberedHistoryEnabled = enabled
     persistPreferences(successMessage: enabled ? "History URL import enabled" : "History import disabled")
   }
 
   func setSiteStorageEnabled(_ enabled: Bool) {
+    guard selectedTargetID != "cursor" else { return }
     siteStorageEnabled = enabled
+    rememberedSiteStorageEnabled = enabled
     persistPreferences(successMessage: enabled ? "Full site-data import enabled" : "Full site-data import disabled")
   }
 
@@ -410,7 +451,7 @@ final class SyncModel: ObservableObject {
         }
         if self.isVersion(release.version, newerThan: self.currentVersion) {
           self.availableUpdateVersion = release.version
-          if !self.codexBlocked && !self.isSyncing {
+          if !self.directTargetBlocked && !self.isSyncing {
             self.state = .ready
             self.primaryStatus = "Update \(release.version) available"
             self.secondaryStatus = "Install it now; the app will relaunch automatically"
@@ -617,8 +658,8 @@ final class SyncModel: ObservableObject {
     uploadCanceling = false
     state = .syncing
     primaryStatus = isBrowserlessTarget ? "Uploading authenticated state" : "Transferring selected data"
-    secondaryStatus = selectedTargetID == "codex"
-      ? "Backing up Codex and merging \(selectedBrowser.name) locally…"
+    secondaryStatus = isDirectTarget
+      ? "Backing up \(targetName) and merging \(selectedBrowser.name) locally…"
       : isBrowserlessTarget
         ? "Sending \(selectedBrowser.name) to Browserless \(browserlessRegion.uppercased()) only for this request…"
         : "Waiting for \(selectedBrowser.name) and \(targetName)…"
@@ -657,15 +698,15 @@ final class SyncModel: ObservableObject {
         self.state = partial ? .warning : .success
         self.primaryStatus = self.isBrowserlessTarget
           ? (partial ? "Browserless profile uploaded with omissions" : "Browserless profile uploaded")
-          : self.selectedTargetID == "codex"
-          ? (partial ? "Codex sync completed with warnings" : "Codex sessions updated")
+          : self.isDirectTarget
+          ? (partial ? "\(self.targetName) sync completed with warnings" : "\(self.targetName) sessions updated")
           : (partial ? "Partially synced" : "Transfer complete")
         self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and \(self.targetName) are up to date"
       } else {
         self.state = .error
         self.primaryStatus = "Sync did not finish"
-        self.secondaryStatus = self.lastMeaningfulLine(output) ?? (self.selectedTargetID == "codex"
-          ? "Quit Codex completely, then try again"
+        self.secondaryStatus = self.lastMeaningfulLine(output) ?? (self.isDirectTarget
+          ? "Quit \(self.targetName) completely, then try again"
           : self.isBrowserlessTarget
             ? "Check the API token, close the source browser, and try again"
           : "Keep both browsers open and check the extensions")
@@ -1052,13 +1093,16 @@ final class SyncModel: ObservableObject {
   }
 
   private var requiredExtensionIDs: [String] {
-    selectedTargetID == "codex" || selectedTargetID == "browserless" ? [] : [selectedSourceID, selectedTargetID]
+    isDirectTarget || selectedTargetID == "browserless" ? [] : [selectedSourceID, selectedTargetID]
   }
 
   private func updateEndpointRunningStatus() {
-    let wasRunning = codexRunning
+    let wasDirectTargetRunning = directTargetRunning
     codexRunning = NSWorkspace.shared.runningApplications.contains {
       $0.bundleIdentifier == "com.openai.codex"
+    }
+    cursorRunning = NSWorkspace.shared.runningApplications.contains {
+      $0.bundleIdentifier == "com.todesktop.230313mzl4w4u92"
     }
     sourceBrowserRunning = NSWorkspace.shared.runningApplications.contains {
       $0.bundleIdentifier == selectedBrowser.bundleIdentifier
@@ -1076,20 +1120,24 @@ final class SyncModel: ObservableObject {
       state = .warning
       primaryStatus = "Quit \(selectedBrowser.name) before syncing"
       secondaryStatus = "Full site data uses live LevelDB files. Close the source browser completely so they can be copied safely"
+    } else if cursorHasNoDataSelected {
+      state = .warning
+      primaryStatus = "Turn on Cookies to sync with Cursor"
+      secondaryStatus = "Cursor import currently supports cookie sessions only"
     } else if selectedTargetID == "codex" && codexRunning && autoRestartCodex {
       if state == .ready || primaryStatus == "Quit Codex before syncing" {
         state = .ready
         primaryStatus = "Ready to sync and restart Codex"
         secondaryStatus = "Sync will force quit Codex and reopen it only after a successful transfer"
       }
-    } else if selectedTargetID == "codex" && codexRunning {
+    } else if isDirectTarget && directTargetRunning {
       state = .warning
-      primaryStatus = "Quit Codex before syncing"
-      secondaryStatus = "Close ChatGPT Codex completely so its local cookie database can be updated safely"
-    } else if selectedTargetID == "codex" && wasRunning && primaryStatus == "Quit Codex before syncing" {
+      primaryStatus = "Quit \(targetName) before syncing"
+      secondaryStatus = "Close \(targetName) completely so its local cookie database can be updated safely"
+    } else if isDirectTarget && wasDirectTargetRunning && primaryStatus.hasPrefix("Quit ") {
       state = .ready
       primaryStatus = "Ready to sync directly"
-      secondaryStatus = "Codex is closed — a backup will be created before anything changes"
+      secondaryStatus = "\(targetName) is closed — a backup will be created before anything changes"
     } else if isBrowserlessTarget {
       if selectedSourceID == "comet" {
         state = .warning
@@ -1186,6 +1234,7 @@ private struct AppConfig: Decodable {
   let sourceBrowser: String?
   let targetBrowser: String?
   let imports: Imports?
+  let rememberedImports: RememberedImports?
   let ui: UISettings?
   let browserless: BrowserlessSettings?
 
@@ -1197,6 +1246,11 @@ private struct AppConfig: Decodable {
   struct Imports: Decodable {
     let cookies: Bool
     let history: Bool
+    let siteStorage: Bool?
+  }
+
+  struct RememberedImports: Decodable {
+    let history: Bool?
     let siteStorage: Bool?
   }
 

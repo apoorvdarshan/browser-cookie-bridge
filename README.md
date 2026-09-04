@@ -6,7 +6,7 @@
 
 <strong>Move signed-in sessions locally—or explicitly upload one to Browserless Cloud.</strong>
 
-<p>Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Comet · ChatGPT Codex import · optional Browserless authenticated profiles.</p>
+<p>Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Comet · ChatGPT Codex and Cursor browser import · optional Browserless authenticated profiles.</p>
 
 <p>
   <img src="https://img.shields.io/badge/macOS-13.5%2B-111111?logo=apple&logoColor=white" alt="macOS 13.5+" />
@@ -50,9 +50,9 @@
 
 ## Why Browser Cookie Bridge
 
-Signing into the same sites across several browsers is repetitive. Export files are awkward, password managers do not move active sessions, and ChatGPT Codex does not currently offer a Brave import button.
+Signing into the same sites across several browsers is repetitive. Export files are awkward, password managers do not move active sessions, and embedded app browsers do not always offer an import button.
 
-Browser Cookie Bridge gives those browser profiles a small, native control panel. Local browser and Codex transfers stay on the Mac. If you explicitly select Browserless Cloud and click Upload, the app can instead send authenticated profile state to your own Browserless account.
+Browser Cookie Bridge gives those browser profiles a small, native control panel. Local browser, Codex, and Cursor transfers stay on the Mac. If you explicitly select Browserless Cloud and click Upload, the app can instead send authenticated profile state to your own Browserless account.
 
 ## Windows waitlist
 
@@ -63,13 +63,13 @@ Browser Cookie Bridge currently ships for macOS. A separate Windows app is being
 - 🍪 **Cookie and session transfer** — cookies are enabled by default, including supported domain, path, expiry, security, `SameSite`, and partition attributes.
 - 🗃️ **Optional full site data for Codex** — replace Codex's compatible Local Storage, IndexedDB, Session Storage, service-worker, and related origin stores from a closed source profile, with backup and rollback. Off by default.
 - 🌐 **Seven Chromium browsers** — Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Perplexity Comet can be sources or destinations.
-- ✨ **ChatGPT Codex import** — merge selected local browser data into Codex's built-in browser; Codex is destination-only.
+- ✨ **ChatGPT Codex and experimental Cursor import** — merge cookie sessions into either app's built-in browser; Codex also supports optional history and full site data. Both are destination-only.
 - 🔁 **Optional Codex restart** — manual Sync can force quit a running Codex instance and reopen it only after a successful local transfer; off by default.
 - 🔄 **Optional two-app restart** — Full site data can force quit the selected source browser and Codex, then reopen only the apps that were running after a successful transfer; off by default.
 - ☁️ **Optional Browserless upload** — create or refresh a Browserless authenticated profile with cookies, local storage, and IndexedDB; see a local size preflight, live progress, cancellation, and post-upload verification.
 - 🕘 **Background automation** — sync when you sign in, at a fixed daily time, or whenever you choose.
 - ◉ **Native menu-bar app** — closing the window removes the Dock icon while the helper continues running.
-- 🧯 **Backup and rollback** — Codex's database is backed up, modified on a separate copy, integrity-checked, and restored if replacement fails.
+- 🧯 **Backup and rollback** — the destination app browser's database is backed up, modified on a separate copy, integrity-checked, and restored if replacement fails.
 - ⬆️ **Built-in updates** — checks for GitHub releases, verifies the DMG checksum, installs in place, and relaunches the app.
 - 🔒 **Local-first** — local paths use no account, analytics, cookie logs, or remote relay; the separate Browserless path runs only after explicit selection and confirmation.
 
@@ -79,7 +79,7 @@ Browser Cookie Bridge currently ships for macOS. A separate Windows app is being
 |---|---:|---|
 | **Cookies and sessions** | ✅ Default | Transfers supported cookie values and attributes |
 | **Full site data → Codex** | Optional | Replaces compatible origin storage from a closed Chromium profile; backs up Codex first |
-| **History URLs** | ◐ Optional | Original visit times and page titles cannot be preserved |
+| **History URLs** | ◐ Optional | Supported for browser and Codex targets; excluded for Cursor. Original visit times and page titles cannot be preserved |
 | **Local storage and IndexedDB** | ◐ Optional | Full site data into Codex, or an explicit Browserless authenticated-profile upload |
 | **Passwords** | — Never | Chromium extensions cannot read the browser password store |
 | **Bookmarks, autofill, payments** | — Never | Not requested or accessed |
@@ -90,7 +90,7 @@ Some websites bind sessions to a specific device or browser and may ask you to s
 ## Requirements
 
 - **macOS 13.5+**
-- A supported Chromium browser, or ChatGPT Codex as the destination
+- A supported Chromium browser, ChatGPT Codex, or Cursor as the destination
 
 The DMG is self-contained. Node.js 24+ and Xcode Command Line Tools are required only for npm or source installation.
 
@@ -143,16 +143,18 @@ The final command compiles the native SwiftUI app, enables **Open at login**, **
 
 ## Setup
 
-### Browser → ChatGPT Codex
+### Browser → ChatGPT Codex or Cursor
 
 No browser extension is needed for this path.
 
-1. Select a source browser and **ChatGPT Codex** as the destination.
-2. Quit Codex completely, or enable **Restart Codex automatically**. Closing only its browser panel is not enough.
-3. Choose **Cookies** and, optionally, **History URLs**.
-4. Press **Sync now** and reopen Codex after the success message if automatic restart is off.
+Cursor support is experimental and currently limited to cookie sessions in its dedicated browser partition. The importer validates the audited Cursor schema and fails closed if Cursor changes it.
 
-By default, an open Codex blocks the transfer. The optional **Restart Codex automatically** setting applies only to a manual Sync: it force quits Codex, waits for its database to close, and reopens Codex only after the transfer succeeds. Scheduled and login syncs never force quit it.
+1. Select a source browser and **ChatGPT Codex** or **Cursor browser** as the destination.
+2. Quit the destination app completely. For Codex, you can instead enable **Restart Codex automatically**. Closing only the app's browser panel is not enough.
+3. Choose **Cookies**. For Codex, you can also choose **History URLs** and **Full site data**. Both are excluded for Cursor until its other browser stores can be validated safely.
+4. Press **Sync now**, then reopen the destination app after the success message.
+
+An open destination app blocks the transfer. The optional **Restart Codex automatically** setting applies only to a manual Codex sync: it force quits Codex, waits for its database to close, and reopens Codex only after the transfer succeeds. Cursor must be quit manually. Scheduled and login syncs never force quit either app.
 
 ### Browser → browser
 
@@ -187,7 +189,7 @@ The official CLI records the Browserless upload-disclaimer acceptance timestamp 
 | Control | What it does |
 |---|---|
 | **Export from** | Selects the browser whose data will be read |
-| **Import into** | Selects a different browser, ChatGPT Codex, or optional Browserless Cloud |
+| **Import into** | Selects a different browser, ChatGPT Codex, Cursor browser, or optional Browserless Cloud |
 | **Cookies** | Moves cookies and supported session attributes; on by default |
 | **History URLs** | Adds visited URLs without their original timestamps or titles |
 | **Daily sync** | Runs at one fixed local time; off by default |
@@ -197,7 +199,7 @@ The official CLI records the Browserless upload-disclaimer acceptance timestamp 
 | **Restart Codex automatically** | Force quits Codex for a manual sync and reopens it only after success; off by default |
 | **Check for updates** | Finds a newer GitHub release, verifies its DMG, and offers install + relaunch |
 
-Automation uses the saved source, destination, and data choices for local transfers. A scheduled Codex sync safely exits without making changes when Codex is open. Browserless cloud uploads are always manual and require an explicit upload action.
+Automation uses the saved source, destination, and data choices for local transfers. A scheduled embedded-browser sync safely exits without making changes when its destination app is open. Browserless cloud uploads are always manual and require an explicit upload action.
 
 ## CLI
 
@@ -215,14 +217,14 @@ browser-cookie-bridge disable-app-login
 browser-cookie-bridge remove-schedule
 ```
 
-Supported source IDs are `brave`, `chrome`, `edge`, `arc`, `vivaldi`, `opera`, and `comet`. Target IDs are the same plus `codex` and `browserless`. The same browser cannot be both endpoints. Browserless requires `BROWSERLESS_TOKEN` and the explicit `--allow-cloud-upload` flag; the native app supplies the token from Keychain without placing it in the OS command line or app configuration.
+Supported source IDs are `brave`, `chrome`, `edge`, `arc`, `vivaldi`, `opera`, and `comet`. Target IDs are the same plus `codex`, `cursor`, and `browserless`. The same browser cannot be both endpoints. Browserless requires `BROWSERLESS_TOKEN` and the explicit `--allow-cloud-upload` flag; the native app supplies the token from Keychain without placing it in the OS command line or app configuration.
 
 ## How it works
 
 | Path | Transfer method |
 |---|---|
 | **Browser → browser** | Unpacked extensions connect to a short-lived broker on IPv4 loopback. Selected data stays in memory and is never written to logs. |
-| **Browser → Codex** | The app reads the selected local Chromium profile, creates a consistent Codex SQLite backup, merges into a working copy, validates it, then replaces the destination atomically. |
+| **Browser → Codex / Cursor** | The app reads the selected local Chromium profile, creates a consistent destination SQLite backup, merges cookies into a working copy, validates it, then replaces only the embedded browser's cookie database atomically. Codex also supports optional history and full site data. |
 | **Browser → Browserless** | The bundled official Browserless CLI copies a closed local profile, captures cookies/local storage/IndexedDB, and uploads it directly to the selected Browserless region. |
 
 The broker validates a random token and extension origin, limits payload size, and normally exits after five minutes. Only the endpoints selected in the app respond to a transfer.
@@ -231,10 +233,10 @@ The broker validates a random token and extension origin, limits payload size, a
 
 - Cookie values and history URLs are never logged.
 - Browser-to-browser data is held only in broker memory.
-- Codex backups are stored with user-only permissions under `~/Library/Application Support/BraveCodexCookieSync/backups/codex`; the newest 14 are retained.
-- Full site-data import is opt-in and requires both Codex and the source browser to be closed. It replaces compatible Codex origin-storage directories rather than attempting an unsafe LevelDB merge; the previous directories are included in the same backup.
-- The app refuses unknown Codex database schemas instead of guessing.
-- Imported Codex rows use an empty `encrypted_value` because OpenAI's Safe Storage key is protected by a private macOS Keychain access group. Those imported rows can therefore remain readable to software running as your macOS user until the website refreshes them.
+- Direct-import backups are stored with user-only permissions under `~/Library/Application Support/BraveCodexCookieSync/backups/codex` or `backups/cursor`; the newest 14 per destination are retained.
+- Full site-data import is opt-in for Codex and requires both Codex and the source browser to be closed. It replaces compatible origin-storage directories rather than attempting an unsafe LevelDB merge; the previous directories are included in the same backup.
+- The app refuses unknown destination database schemas instead of guessing and writes only to Cursor's dedicated `Partitions/cursor-browser` profile, never Cursor's main application cookie store.
+- Direct imports currently store imported cookie values in SQLite's plaintext `value` column with an empty `encrypted_value`. Those imported rows can therefore remain readable to software running as your macOS user until the website refreshes them.
 - Anyone who can use your logged-in macOS account or modify a generated extension may be able to access transferred browser sessions.
 - The optional Browserless destination sends authenticated state to Browserless under their terms and privacy practices. Its API token is stored in macOS Keychain, uploads are manual, and Browserless CLI telemetry is disabled by the app.
 
@@ -294,4 +296,4 @@ npm run web
 
 [MIT](LICENSE) © 2026 [Apoorv Darshan](https://github.com/apoorvdarshan)
 
-<sub>Not affiliated with Brave, Google, Microsoft, The Browser Company, Vivaldi, Opera, Perplexity, OpenAI, or Browserless. Their names and marks belong to their respective owners.</sub>
+<sub>Not affiliated with Brave, Google, Microsoft, The Browser Company, Vivaldi, Opera, Perplexity, OpenAI, Cursor, or Browserless. Their names and marks belong to their respective owners.</sub>

@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   braveCookiePaths,
   codexCookiePaths,
+  cursorCookiePaths,
   isAppBundleWithIdentifier,
   TARGET_BROWSERS,
 } from "../src/paths.js";
@@ -13,13 +14,19 @@ import {
 test("profile discovery includes current and legacy Chromium cookie locations", () => {
   const brave = braveCookiePaths("/tmp/test-home");
   const codex = codexCookiePaths("/tmp/test-home");
+  const cursor = cursorCookiePaths("/tmp/test-home");
   assert(brave.some((candidate) => candidate.endsWith("Brave-Browser/Default/Cookies")));
   assert(brave.some((candidate) => candidate.endsWith("Brave-Browser/Profile 1/Network/Cookies")));
   assert(codex.some((candidate) => candidate.endsWith("Default/Partitions/codex-browser-app/Cookies")));
+  assert.equal(cursor.length, 1);
+  assert(cursor.some((candidate) => candidate.endsWith("Cursor/Partitions/cursor-browser/Cookies")));
+  assert(cursor.every((candidate) => candidate.includes("/Partitions/cursor-browser/")));
+  assert(!cursor.includes("/tmp/test-home/Library/Application Support/Cursor/Cookies"));
 });
 
 test("Browserless is destination-only", () => {
   assert(TARGET_BROWSERS.includes("browserless"));
+  assert(TARGET_BROWSERS.includes("cursor"));
 });
 
 test("canonical app detection requires the Browser Cookie Bridge bundle identifier", (t) => {
