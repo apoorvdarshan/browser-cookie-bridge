@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Security
+import UniformTypeIdentifiers
 
 extension Notification.Name {
   static let menuBarVisibilityChanged = Notification.Name("BraveCodexSync.menuBarVisibilityChanged")
@@ -96,7 +97,12 @@ final class SyncModel: ObservableObject {
   @Published var browserlessProfileName = "browser-cookie-bridge"
   @Published var browserlessRegion = "sfo"
   @Published var browserlessOnlyDomains = ""
+  @Published var grokBotOnlyDomains = ""
   @Published var showingBrowserlessSetup = false
+  @Published var showingGrokBotResult = false
+  @Published var grokBotPassphrase = ""
+  @Published var grokBotPrompt = ""
+  @Published var grokBotOutputPath = ""
   @Published var browserlessAssessment: BrowserlessProfileAssessment?
   @Published var isInspectingBrowserlessProfile = false
   @Published var uploadProgress = 0.0
@@ -132,9 +138,11 @@ final class SyncModel: ObservableObject {
   }
 
   var isBrowserlessTarget: Bool { selectedTargetID == "browserless" }
+  var isGrokBotTarget: Bool { selectedTargetID == "grok-bot" }
   var isDirectTarget: Bool { selectedTargetID == "codex" || selectedTargetID == "cursor" }
   var targetName: String {
     if isBrowserlessTarget { return "Browserless Cloud" }
+    if isGrokBotTarget { return "Grok Bot" }
     if selectedTargetID == "cursor" { return "Cursor" }
     return selectedTargetBrowser?.name ?? "ChatGPT Codex"
   }
@@ -153,7 +161,10 @@ final class SyncModel: ObservableObject {
     isBrowserlessTarget && (!browserlessConfigured || sourceBrowserRunning || selectedSourceID == "comet")
   }
   var cursorHasNoDataSelected: Bool { selectedTargetID == "cursor" && !cookiesEnabled }
-  var syncBlocked: Bool { !runtimeReady || directTargetBlocked || sourceSiteDataBlocked || browserlessBlocked || cursorHasNoDataSelected }
+  var grokBotHasNoDataSelected: Bool { isGrokBotTarget && !cookiesEnabled }
+  var syncBlocked: Bool {
+    !runtimeReady || directTargetBlocked || sourceSiteDataBlocked || browserlessBlocked || cursorHasNoDataSelected || grokBotHasNoDataSelected
+  }
   var formattedUploadElapsed: String {
     let minutes = uploadElapsedSeconds / 60
     let seconds = uploadElapsedSeconds % 60
@@ -162,8 +173,19 @@ final class SyncModel: ObservableObject {
   var sourceIcon: NSImage { browserIcon(selectedBrowser) }
   var targetIcon: NSImage {
     if isBrowserlessTarget { return browserlessIcon }
+    if isGrokBotTarget { return grokBotIcon }
     if selectedTargetID == "cursor" { return cursorIcon }
     return selectedTargetBrowser.map(browserIcon) ?? codexIcon
+  }
+  var grokBotIcon: NSImage {
+    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anysphere.sand") {
+      return NSWorkspace.shared.icon(forFile: url.path)
+    }
+    if let url = Bundle.main.url(forResource: "grok-bot", withExtension: "png", subdirectory: "BrowserIcons"),
+       let image = NSImage(contentsOf: url) {
+      return image
+    }
+    return NSImage(systemSymbolName: "sparkle", accessibilityDescription: "Grok Bot") ?? NSImage()
   }
   var browserlessIcon: NSImage {
     bundledIcon("browserless")
@@ -281,7 +303,7 @@ final class SyncModel: ObservableObject {
       let configuredSource = config.sourceBrowser ?? "brave"
       selectedSourceID = browsers.contains(where: { $0.id == configuredSource }) ? configuredSource : "brave"
       let configuredTarget = config.targetBrowser ?? "codex"
-      selectedTargetID = configuredTarget == "codex" || configuredTarget == "cursor" || configuredTarget == "browserless" || browsers.contains(where: { $0.id == configuredTarget })
+      selectedTargetID = configuredTarget == "codex" || configuredTarget == "cursor" || configuredTarget == "browserless" || configuredTarget == "grok-bot" || browsers.contains(where: { $0.id == configuredTarget })
         ? configuredTarget
         : "codex"
       if selectedTargetID == selectedSourceID { selectedTargetID = "codex" }
@@ -292,7 +314,7 @@ final class SyncModel: ObservableObject {
       rememberedSiteStorageEnabled = config.rememberedImports?.siteStorage ?? loadedSiteStorageEnabled
       historyEnabled = loadedHistoryEnabled
       siteStorageEnabled = loadedSiteStorageEnabled
-      if selectedTargetID == "cursor" {
+      if selectedTargetID == "cursor" || selectedTargetID == "grok-bot" {
         historyEnabled = false
         siteStorageEnabled = false
       }
@@ -303,6 +325,7 @@ final class SyncModel: ObservableObject {
       browserlessProfileName = config.browserless?.profileName ?? "browser-cookie-bridge"
       browserlessRegion = config.browserless?.region ?? "sfo"
       browserlessOnlyDomains = (config.browserless?.onlyDomains ?? []).joined(separator: ", ")
+      grokBotOnlyDomains = (config.grokBot?.onlyDomains ?? []).joined(separator: ", ")
     }
     browserlessConfigured = BrowserlessCredentialStore.read() != nil
     NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: menuBarEnabled)
@@ -327,7 +350,7 @@ final class SyncModel: ObservableObject {
   }
 
   func selectTarget(_ id: String) {
-    let validTarget = id == "codex" || id == "cursor" || id == "browserless" || browsers.contains(where: { $0.id == id })
+    let validTarget = id == "codex" || id == "cursor" || id == "browserless" || id == "grok-bot" || browsers.contains(where: { $0.id == id })
     guard validTarget, id != selectedTargetID, id != selectedSourceID else { return }
     let wasCursor = selectedTargetID == "cursor"
     if id == "cursor" && !wasCursor {
@@ -335,7 +358,7 @@ final class SyncModel: ObservableObject {
       rememberedSiteStorageEnabled = siteStorageEnabled
     }
     selectedTargetID = id
-    if id == "cursor" {
+    if id == "cursor" || id == "grok-bot" {
       historyEnabled = false
       siteStorageEnabled = false
     } else if wasCursor {
@@ -354,14 +377,14 @@ final class SyncModel: ObservableObject {
   }
 
   func setHistoryEnabled(_ enabled: Bool) {
-    guard selectedTargetID != "cursor" else { return }
+    guard selectedTargetID != "cursor", selectedTargetID != "grok-bot" else { return }
     historyEnabled = enabled
     rememberedHistoryEnabled = enabled
     persistPreferences(successMessage: enabled ? "History URL import enabled" : "History import disabled")
   }
 
   func setSiteStorageEnabled(_ enabled: Bool) {
-    guard selectedTargetID != "cursor" else { return }
+    guard selectedTargetID != "cursor", selectedTargetID != "grok-bot" else { return }
     siteStorageEnabled = enabled
     rememberedSiteStorageEnabled = enabled
     persistPreferences(successMessage: enabled ? "Full site-data import enabled" : "Full site-data import disabled")
@@ -501,6 +524,11 @@ final class SyncModel: ObservableObject {
     }
   }
 
+  func setGrokBotOnlyDomains(_ value: String) {
+    grokBotOnlyDomains = value
+    persistPreferences(successMessage: "Grok Bot domain filter updated")
+  }
+
   func syncNow(showMenuBarAlert: Bool = false) {
     guard !isSyncing else {
       if isBrowserlessTarget {
@@ -517,6 +545,10 @@ final class SyncModel: ObservableObject {
       if showMenuBarAlert {
         postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: .warning)
       }
+      return
+    }
+    if isGrokBotTarget {
+      startGrokBotExport(showMenuBarAlert: showMenuBarAlert)
       return
     }
     if selectedTargetID == "codex" && siteStorageEnabled && autoRestartBoth && (sourceBrowserRunning || codexRunning) {
@@ -653,18 +685,43 @@ final class SyncModel: ObservableObject {
     }
   }
 
-  private func startSync(showMenuBarAlert: Bool, reopenCodexOnSuccess: Bool, reopenSourceOnSuccess: Bool = false) {
+  private func startGrokBotExport(showMenuBarAlert: Bool) {
+    let panel = NSSavePanel()
+    panel.title = "Save Grok Bot transfer file"
+    panel.nameFieldStringValue = "GrokBot-Import.bcbx"
+    panel.canCreateDirectories = true
+    panel.isExtensionHidden = false
+    if #available(macOS 12.0, *) {
+      panel.allowedContentTypes = [UTType(filenameExtension: "bcbx") ?? .data]
+    } else {
+      panel.allowedFileTypes = ["bcbx"]
+    }
+    panel.begin { [weak self] response in
+      guard let self else { return }
+      guard response == .OK, let url = panel.url else { return }
+      self.startSync(showMenuBarAlert: showMenuBarAlert, reopenCodexOnSuccess: false, grokBotOutputPath: url.path)
+    }
+  }
+
+  private func startSync(showMenuBarAlert: Bool, reopenCodexOnSuccess: Bool, reopenSourceOnSuccess: Bool = false, grokBotOutputPath: String? = nil) {
     isSyncing = true
     uploadCanceling = false
     state = .syncing
-    primaryStatus = isBrowserlessTarget ? "Uploading authenticated state" : "Transferring selected data"
-    secondaryStatus = isDirectTarget
+    primaryStatus = isGrokBotTarget
+      ? "Creating Grok Bot transfer file"
+      : isBrowserlessTarget ? "Uploading authenticated state" : "Transferring selected data"
+    secondaryStatus = isGrokBotTarget
+      ? "Encrypting selected cookie sessions from \(selectedBrowser.name)…"
+      : isDirectTarget
       ? "Backing up \(targetName) and merging \(selectedBrowser.name) locally…"
       : isBrowserlessTarget
         ? "Sending \(selectedBrowser.name) to Browserless \(browserlessRegion.uppercased()) only for this request…"
         : "Waiting for \(selectedBrowser.name) and \(targetName)…"
     var environment: [String: String] = [:]
     var arguments = ["sync", "--timeout", isBrowserlessTarget ? "900" : "300"]
+    if let grokBotOutputPath {
+      arguments.append(contentsOf: ["--output", grokBotOutputPath])
+    }
     if isBrowserlessTarget {
       guard let token = BrowserlessCredentialStore.read() else {
         isSyncing = false
@@ -696,12 +753,21 @@ final class SyncModel: ObservableObject {
         self.secondaryStatus = "No cloud profile was changed; temporary profile data was removed"
       } else if success {
         self.state = partial ? .warning : .success
-        self.primaryStatus = self.isBrowserlessTarget
-          ? (partial ? "Browserless profile uploaded with omissions" : "Browserless profile uploaded")
-          : self.isDirectTarget
-          ? (partial ? "\(self.targetName) sync completed with warnings" : "\(self.targetName) sessions updated")
-          : (partial ? "Partially synced" : "Transfer complete")
-        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and \(self.targetName) are up to date"
+        if self.isGrokBotTarget, let result = self.parseGrokBotResult(from: output) {
+          self.grokBotPassphrase = result.passphrase
+          self.grokBotPrompt = result.prompt
+          self.grokBotOutputPath = result.outputPath
+          self.showingGrokBotResult = true
+          self.primaryStatus = partial ? "Grok Bot transfer created with warnings" : "Grok Bot transfer file ready"
+          self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Attach the .bcbx file to any Grok Bot and paste the prompt"
+        } else {
+          self.primaryStatus = self.isBrowserlessTarget
+            ? (partial ? "Browserless profile uploaded with omissions" : "Browserless profile uploaded")
+            : self.isDirectTarget
+            ? (partial ? "\(self.targetName) sync completed with warnings" : "\(self.targetName) sessions updated")
+            : (partial ? "Partially synced" : "Transfer complete")
+          self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and \(self.targetName) are up to date"
+        }
       } else {
         self.state = .error
         self.primaryStatus = "Sync did not finish"
@@ -908,6 +974,7 @@ final class SyncModel: ObservableObject {
       "--browserless-profile", browserlessProfileName,
       "--browserless-region", browserlessRegion,
       "--browserless-domains", browserlessOnlyDomains,
+      "--grok-bot-domains", grokBotOnlyDomains,
     ]
     runCLI(arguments) { [weak self] success, output in
       guard let self else { return }
@@ -917,6 +984,8 @@ final class SyncModel: ObservableObject {
         self.primaryStatus = successMessage
         self.secondaryStatus = self.isBrowserlessTarget
           ? "Cloud uploads run only after you click Upload"
+          : self.isGrokBotTarget
+            ? "Transfer files are created only when you click Create transfer file"
           : "This choice is saved for manual and daily syncs"
       } else {
         self.state = .error
@@ -1093,7 +1162,22 @@ final class SyncModel: ObservableObject {
   }
 
   private var requiredExtensionIDs: [String] {
-    isDirectTarget || selectedTargetID == "browserless" ? [] : [selectedSourceID, selectedTargetID]
+    isDirectTarget || selectedTargetID == "browserless" || isGrokBotTarget ? [] : [selectedSourceID, selectedTargetID]
+  }
+
+  private struct GrokBotResultPayload: Decodable {
+    let outputPath: String
+    let passphrase: String
+    let prompt: String
+  }
+
+  private func parseGrokBotResult(from output: String) -> GrokBotResultPayload? {
+    guard let line = output.split(separator: "\n").map(String.init).last(where: { $0.hasPrefix("BCB_GROK_RESULT ") }) else {
+      return nil
+    }
+    let json = line.replacingOccurrences(of: "BCB_GROK_RESULT ", with: "")
+    guard let data = json.data(using: .utf8) else { return nil }
+    return try? JSONDecoder().decode(GrokBotResultPayload.self, from: data)
   }
 
   private func updateEndpointRunningStatus() {
@@ -1138,6 +1222,16 @@ final class SyncModel: ObservableObject {
       state = .ready
       primaryStatus = "Ready to sync directly"
       secondaryStatus = "\(targetName) is closed — a backup will be created before anything changes"
+    } else if isGrokBotTarget {
+      if grokBotHasNoDataSelected {
+        state = .warning
+        primaryStatus = "Turn on Cookies to export for Grok Bot"
+        secondaryStatus = "Grok Bot transfer files include cookie sessions only"
+      } else {
+        state = .ready
+        primaryStatus = "Ready to create a Grok Bot transfer file"
+        secondaryStatus = "Creates an encrypted .bcbx bundle with a one-time key and bundled importer"
+      }
     } else if isBrowserlessTarget {
       if selectedSourceID == "comet" {
         state = .warning
@@ -1237,6 +1331,7 @@ private struct AppConfig: Decodable {
   let rememberedImports: RememberedImports?
   let ui: UISettings?
   let browserless: BrowserlessSettings?
+  let grokBot: GrokBotSettings?
 
   struct Schedule: Decodable {
     let hour: Int
@@ -1265,6 +1360,10 @@ private struct AppConfig: Decodable {
   struct BrowserlessSettings: Decodable {
     let profileName: String?
     let region: String?
+    let onlyDomains: [String]?
+  }
+
+  struct GrokBotSettings: Decodable {
     let onlyDomains: [String]?
   }
 }

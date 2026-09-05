@@ -12,6 +12,10 @@ import {
 import { isChromiumBrowserRunning, readChromiumProfile } from "./chromium-reader.js";
 import { uploadBrowserlessProfile } from "./browserless.js";
 import { inspectBrowserlessProfile } from "./browserless-preflight.js";
+import {
+  grokBotSummary,
+  writeGrokBotBundle,
+} from "./grok-bot-export.js";
 import { installConfig, installRuntime, readConfig, updatePreferences } from "./config.js";
 import {
   braveCookiePaths,
@@ -49,7 +53,7 @@ Commands:
   install-app [--no-open] [--replace-system-from-source]
   bootstrap-bundled --app-path /Applications/Browser Cookie Bridge.app
   preferences --source brave --target codex --cookies on --history off --site-storage off --menu-bar on --auto-check-updates on --auto-restart-codex off --auto-restart-both off
-  sync [--timeout 300] [--allow-cloud-upload]
+  sync [--timeout 300] [--allow-cloud-upload] [--output /path/GrokBot-Import.bcbx]
   browserless-preflight
   doctor
   enable-login-sync
@@ -137,6 +141,7 @@ function preferences(args) {
     browserlessProfileName: stringFlag(args, "--browserless-profile", existing.browserless?.profileName || "browser-cookie-bridge"),
     browserlessRegion: stringFlag(args, "--browserless-region", existing.browserless?.region || "sfo"),
     browserlessOnlyDomains: optionalStringFlag(args, "--browserless-domains", (existing.browserless?.onlyDomains || []).join(",")),
+    grokBotOnlyDomains: optionalStringFlag(args, "--grok-bot-domains", (existing.grokBot?.onlyDomains || []).join(",")),
   });
   console.log(
     `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, site-storage=${config.imports.siteStorage ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}, auto-check-updates=${config.ui.autoCheckUpdates ? "on" : "off"}, auto-restart-codex=${config.ui.autoRestartCodex ? "on" : "off"}, auto-restart-both=${config.ui.autoRestartBoth ? "on" : "off"}`,
@@ -261,6 +266,9 @@ function setup(args) {
     console.log(`Source browser: ${config.sourceBrowser} (captured locally by the Browserless CLI)`);
     console.log(`Cloud destination: Browserless ${config.browserless?.region || "sfo"} / ${config.browserless?.profileName || "browser-cookie-bridge"}`);
     console.log("Browserless uploads are manual-only and require --allow-cloud-upload.");
+  } else if (config.targetBrowser === "grok-bot") {
+    console.log(`Source browser: ${config.sourceBrowser} (read locally; no extension required)`);
+    console.log("Target integration: encrypted Grok Bot transfer file (.bcbx); attach it to any Grok Bot and run the bundled importer.");
   } else {
     console.log(`Source extension (${config.sourceBrowser}): ${installedExtensionDir(undefined, config.sourceBrowser)}`);
     console.log(`Target extension (${config.targetBrowser}): ${installedExtensionDir(undefined, config.targetBrowser)}`);
@@ -279,6 +287,39 @@ async function sync(args, { signal } = {}) {
   const target = config.targetBrowser || "codex";
   const seconds = integerFlag(args, "--timeout", target === "browserless" ? 900 : 300, 5, 3600);
   const directTarget = isDirectTarget(target);
+  if (target === "grok-bot") {
+    if (config.imports?.cookies === false) {
+      throw new Error("Grok Bot export requires cookies. Turn on Cookies and try again.");
+    }
+    if (config.imports?.history === true || config.imports?.siteStorage === true) {
+      throw new Error("Grok Bot export supports cookie sessions only.");
+    }
+    const outputPath = stringFlag(args, "--output", "");
+    if (!outputPath) throw new Error("Grok Bot export requires --output /path/GrokBot-Import.bcbx");
+    const source = config.sourceBrowser || "brave";
+    const payload = readChromiumProfile({
+      browser: source,
+      imports: { cookies: true, history: false },
+    });
+    console.log(`Read ${payload.cookies.length} of ${payload.cookieStats.total} cookies (${payload.cookieStats.skipped} unavailable) from ${source}.`);
+    const result = writeGrokBotBundle({
+      outputPath,
+      cookies: payload.cookies,
+      sourceBrowser: source,
+      onlyDomains: config.grokBot?.onlyDomains || [],
+    });
+    result.sourceCookieSkipped = payload.cookieStats.skipped;
+    console.log(grokBotSummary(result));
+    console.log(`BCB_GROK_RESULT ${JSON.stringify({
+      outputPath: result.outputPath,
+      passphrase: result.passphrase,
+      cookieCount: result.cookieCount,
+      domainCount: result.domainCount,
+      domains: result.domains,
+      prompt: result.prompt,
+    })}`);
+    return result;
+  }
   if (target === "browserless") {
     if (!args.includes("--allow-cloud-upload")) {
       throw new Error("Browserless cloud uploads are manual-only. Start one from the app or pass --allow-cloud-upload explicitly.");
@@ -454,6 +495,8 @@ function doctor() {
       ? `Target integration: direct local ${directTargetName(target)} browser merge (${directTargetName(target)} must be closed)`
       : target === "browserless"
         ? `Target integration: optional Browserless cloud upload (${config?.browserless?.region || "sfo"}); manual only`
+        : target === "grok-bot"
+          ? "Target integration: encrypted Grok Bot transfer file (.bcbx); manual only"
       : `Target extension: ${status(installedExtensionDir(home, target))}`,
   );
   console.log(`Daily schedule: ${status(launchAgentPath(home))}`);
@@ -482,6 +525,8 @@ function enableLoginSync() {
     ? `A sync starts when you sign in and updates ${directTargetName(config.targetBrowser)} only when it is closed.`
     : config.targetBrowser === "browserless"
       ? "Browserless uploads remain manual-only; login sync will not send data to the cloud."
+      : config.targetBrowser === "grok-bot"
+        ? "Grok Bot transfer files remain manual-only; login sync will not create cloud bundles."
     : "A sync starts when you sign in and waits up to five minutes for both browser extensions.");
 }
 
@@ -504,6 +549,7 @@ function setAppLogin(enabled) {
     browserlessProfileName: existing.browserless?.profileName,
     browserlessRegion: existing.browserless?.region,
     browserlessOnlyDomains: existing.browserless?.onlyDomains,
+    grokBotOnlyDomains: existing.grokBot?.onlyDomains,
   });
   if (enabled) {
     const appPath = installedAppPath();

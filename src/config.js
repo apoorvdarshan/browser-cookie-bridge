@@ -50,8 +50,8 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
     imports: {
       cookies: existing.imports?.cookies !== false,
       passwords: false,
-      history: configuredTarget !== "cursor" && existing.imports?.history === true,
-      siteStorage: configuredTarget !== "cursor" && existing.imports?.siteStorage === true,
+      history: configuredTarget !== "cursor" && configuredTarget !== "grok-bot" && existing.imports?.history === true,
+      siteStorage: configuredTarget !== "cursor" && configuredTarget !== "grok-bot" && existing.imports?.siteStorage === true,
     },
     rememberedImports,
     ui: {
@@ -65,6 +65,9 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
       profileName: cleanProfileName(existing.browserless?.profileName) || "browser-cookie-bridge",
       region: ["sfo", "lon", "ams"].includes(existing.browserless?.region) ? existing.browserless.region : "sfo",
       onlyDomains: cleanDomains(existing.browserless?.onlyDomains),
+    },
+    grokBot: {
+      onlyDomains: cleanDomains(existing.grokBot?.onlyDomains),
     },
     schedule: { hour, minute },
     createdAt: existing.createdAt || new Date().toISOString(),
@@ -94,6 +97,7 @@ export function updatePreferences({
   browserlessProfileName,
   browserlessRegion,
   browserlessOnlyDomains,
+  grokBotOnlyDomains,
 }) {
   const config = readConfig(home);
   if (!SOURCE_BROWSERS.includes(sourceBrowser)) {
@@ -122,8 +126,8 @@ export function updatePreferences({
   config.imports = {
     cookies: Boolean(cookies),
     passwords: false,
-    history: targetBrowser !== "cursor" && effectiveHistory,
-    siteStorage: targetBrowser !== "cursor" && effectiveSiteStorage,
+    history: targetBrowser !== "cursor" && targetBrowser !== "grok-bot" && effectiveHistory,
+    siteStorage: targetBrowser !== "cursor" && targetBrowser !== "grok-bot" && effectiveSiteStorage,
   };
   config.rememberedImports = targetBrowser === "cursor"
     ? rememberedImports
@@ -141,6 +145,9 @@ export function updatePreferences({
     profileName: cleanProfileName(browserlessProfileName ?? config.browserless?.profileName) || "browser-cookie-bridge",
     region,
     onlyDomains: cleanDomains(browserlessOnlyDomains ?? config.browserless?.onlyDomains),
+  };
+  config.grokBot = {
+    onlyDomains: cleanDomains(grokBotOnlyDomains ?? config.grokBot?.onlyDomains),
   };
   config.updatedAt = new Date().toISOString();
   writePrivateJson(configPath(home), config);

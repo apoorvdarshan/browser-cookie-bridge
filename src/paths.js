@@ -11,7 +11,7 @@ export const DEFAULT_PORT = 43128;
 export const EXTENSION_ID = "ihanfnkcipmlhmokbcinlkdfcfheofjb";
 export const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}`;
 export const SOURCE_BROWSERS = ["brave", "chrome", "edge", "arc", "vivaldi", "opera", "comet"];
-export const TARGET_BROWSERS = [...SOURCE_BROWSERS, "codex", "cursor", "browserless"];
+export const TARGET_BROWSERS = [...SOURCE_BROWSERS, "codex", "cursor", "browserless", "grok-bot"];
 
 export function projectRoot() {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");

@@ -26,6 +26,7 @@ test("profile discovery includes current and legacy Chromium cookie locations", 
 
 test("Browserless is destination-only", () => {
   assert(TARGET_BROWSERS.includes("browserless"));
+  assert(TARGET_BROWSERS.includes("grok-bot"));
   assert(TARGET_BROWSERS.includes("cursor"));
 });
 

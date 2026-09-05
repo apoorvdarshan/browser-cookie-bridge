@@ -239,6 +239,9 @@ struct ContentView: View {
     .sheet(isPresented: $model.showingBrowserlessSetup) {
       BrowserlessSetupSheet().environmentObject(model)
     }
+    .sheet(isPresented: $model.showingGrokBotResult) {
+      GrokBotResultSheet().environmentObject(model)
+    }
   }
 
   private var header: some View {
@@ -291,7 +294,7 @@ struct ContentView: View {
       .buttonStyle(.plain)
       .foregroundStyle(.secondary)
       .help("Refresh status")
-      if !model.isDirectTarget && !model.isBrowserlessTarget {
+      if !model.isDirectTarget && !model.isBrowserlessTarget && !model.isGrokBotTarget {
         Button("Extension setup…") { showingSetup = true }
           .controlSize(.small)
       }
@@ -384,18 +387,18 @@ struct SyncPanel: View {
     if model.isBrowserlessTarget && model.uploadCanceling { return "Canceling…" }
     if model.isBrowserlessTarget && model.isSyncing { return "Cancel upload" }
     if model.isSyncing { return "Syncing…" }
-    if model.cursorHasNoDataSelected { return "Turn on Cookies" }
+    if model.cursorHasNoDataSelected || model.grokBotHasNoDataSelected { return "Turn on Cookies" }
     if model.directTargetBlocked { return "Close \(model.targetName) first" }
     if model.isBrowserlessTarget && !model.browserlessConfigured { return "Connect Browserless" }
     if model.isBrowserlessTarget && model.selectedSourceID == "comet" { return "Choose another browser" }
     if model.isBrowserlessTarget && model.sourceBrowserRunning { return "Close \(model.selectedBrowser.name) first" }
-    return model.isBrowserlessTarget ? "Upload now" : "Sync now"
+    return model.isGrokBotTarget ? "Create transfer file" : model.isBrowserlessTarget ? "Upload now" : "Sync now"
   }
 
   private var syncButtonIcon: String {
     if model.isBrowserlessTarget && model.isSyncing { return "xmark.circle.fill" }
     if model.syncBlocked { return model.isBrowserlessTarget && !model.browserlessConfigured ? "key.fill" : "xmark.circle.fill" }
-    return model.isBrowserlessTarget ? "icloud.and.arrow.up.fill" : "arrow.triangle.2.circlepath"
+    return model.isBrowserlessTarget ? "icloud.and.arrow.up.fill" : model.isGrokBotTarget ? "arrow.up.doc.fill" : "arrow.triangle.2.circlepath"
   }
 
 }
@@ -479,6 +482,12 @@ struct TargetPicker: View {
             iconWidth: 66,
             iconHeight: 38
           ) { model.selectTarget("codex") }
+          EndpointButton(
+            icon: model.grokBotIcon,
+            name: "Grok Bot",
+            selected: model.selectedTargetID == "grok-bot",
+            disabled: model.isWorking || model.isSyncing
+          ) { model.selectTarget("grok-bot") }
         }
       }
     }
@@ -571,6 +580,34 @@ struct PreferencesPanel: View {
               .help("Rescan local profile size")
             }
           }
+        } else if model.isGrokBotTarget {
+          PreferenceRow(
+            icon: "network",
+            color: Theme.accent,
+            title: "Cookies",
+            detail: "Encrypted cookie sessions for Grok Bot's shared cloud browser"
+          ) {
+            Toggle("", isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }))
+              .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
+          }
+          RowDivider()
+          PreferenceRow(icon: "externaldrive.badge.plus", color: .secondary, title: "Full site data", detail: "Not included in Grok Bot transfer files", muted: true) {
+            FixedBadge("Excluded")
+          }
+          RowDivider()
+          PreferenceRow(icon: "clock.arrow.circlepath", color: .secondary, title: "History URLs", detail: "Not included in Grok Bot transfer files", muted: true) {
+            FixedBadge("Excluded")
+          }
+          RowDivider()
+          PreferenceRow(icon: "line.3.horizontal.decrease.circle", color: Theme.accent, title: "Only these domains", detail: "Leave blank to export every readable cookie") {
+            TextField("example.com, app.example.com", text: Binding(
+              get: { model.grokBotOnlyDomains },
+              set: { model.setGrokBotOnlyDomains($0) }
+            ))
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 220)
+            .disabled(model.isWorking || model.isSyncing)
+          }
         } else {
           PreferenceRow(
             icon: "network",
@@ -646,8 +683,8 @@ struct PreferencesPanel: View {
         }
 
         SectionLabel(title: "Automation", detail: "Runs in the background", separated: true)
-        PreferenceRow(icon: "clock.badge.checkmark", color: Theme.accent, title: "Daily sync", detail: model.isBrowserlessTarget ? "Unavailable for cloud uploads" : (model.dailyEnabled ? "At the selected local time" : "Off")) {
-          if model.isBrowserlessTarget {
+        PreferenceRow(icon: "clock.badge.checkmark", color: Theme.accent, title: "Daily sync", detail: model.isBrowserlessTarget || model.isGrokBotTarget ? "Unavailable for this destination" : (model.dailyEnabled ? "At the selected local time" : "Off")) {
+          if model.isBrowserlessTarget || model.isGrokBotTarget {
             FixedBadge("Manual only")
           } else {
             HStack(spacing: 8) {
@@ -666,8 +703,8 @@ struct PreferencesPanel: View {
           }
         }
         RowDivider()
-        PreferenceRow(icon: "sunrise.fill", color: Theme.accent, title: "Sync at login", detail: model.isBrowserlessTarget ? "Unavailable for cloud uploads" : (model.loginSyncEnabled ? "Once whenever you sign in" : "Off")) {
-          if model.isBrowserlessTarget {
+        PreferenceRow(icon: "sunrise.fill", color: Theme.accent, title: "Sync at login", detail: model.isBrowserlessTarget || model.isGrokBotTarget ? "Unavailable for this destination" : (model.loginSyncEnabled ? "Once whenever you sign in" : "Off")) {
+          if model.isBrowserlessTarget || model.isGrokBotTarget {
             FixedBadge("Manual only")
           } else {
             Toggle("", isOn: Binding(get: { model.loginSyncEnabled }, set: { model.setLoginSyncEnabled($0) }))
@@ -894,7 +931,7 @@ struct ExtensionSetupSheet: View {
           Button("Open page") { model.openExtensions(for: model.selectedSourceID) }
           Button("Show folder") { model.revealExtension(model.selectedSourceID) }
         }
-        if !model.isDirectTarget {
+        if !model.isDirectTarget && !model.isGrokBotTarget {
           Divider().padding(.leading, 58)
           SetupEndpointRow(icon: model.targetIcon, title: model.targetName, detail: "Load the destination extension") {
             Button("Open page") { model.openExtensions(for: model.selectedTargetID) }
@@ -907,6 +944,8 @@ struct ExtensionSetupSheet: View {
 
       Text(model.isDirectTarget
         ? "\(model.targetName) uses a direct local merge, so no extension is required. Quit \(model.targetName) before syncing. Password access is never requested."
+        : model.isGrokBotTarget
+          ? "Grok Bot uses a one-time encrypted transfer file, so no extension is required. Create the .bcbx bundle, attach it to any Grok Bot, and paste the prompt."
         : "In both endpoints, enable Developer mode and choose Load unpacked. Password access is never requested.")
         .font(.system(size: 10.5))
         .foregroundStyle(.secondary)
@@ -1119,4 +1158,74 @@ struct SetupStateBadge: View {
 enum Theme {
   static let accent = Color(red: 0.46, green: 0.46, blue: 0.48)
   static let active = Color(red: 0.54, green: 0.12, blue: 0.18)
+}
+
+struct GrokBotResultSheet: View {
+  @EnvironmentObject private var model: SyncModel
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack(alignment: .top, spacing: 12) {
+        Image(nsImage: model.grokBotIcon)
+          .resizable()
+          .scaledToFit()
+          .frame(width: 24, height: 24)
+          .frame(width: 40, height: 40)
+          .background(Theme.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+        VStack(alignment: .leading, spacing: 3) {
+          Text("Grok Bot transfer ready")
+            .font(.system(size: 18, weight: .bold, design: .rounded))
+          Text(URL(fileURLWithPath: model.grokBotOutputPath).lastPathComponent)
+            .font(.system(size: 11.5))
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+      }
+
+      VStack(alignment: .leading, spacing: 8) {
+        Text("One-time decryption key")
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(.secondary)
+        Text(model.grokBotPassphrase)
+          .font(.system(size: 15, weight: .semibold, design: .monospaced))
+          .textSelection(.enabled)
+          .padding(10)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+      }
+
+      VStack(alignment: .leading, spacing: 8) {
+        Text("Prompt for Grok Bot")
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(.secondary)
+        ScrollView {
+          Text(model.grokBotPrompt)
+            .font(.system(size: 11))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .textSelection(.enabled)
+        }
+        .frame(height: 180)
+        .padding(10)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+      }
+
+      HStack {
+        Button("Reveal file") {
+          let url = URL(fileURLWithPath: model.grokBotOutputPath)
+          NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+        Button("Copy prompt") {
+          NSPasteboard.general.clearContents()
+          NSPasteboard.general.setString(model.grokBotPrompt, forType: .string)
+        }
+        Spacer()
+        Button("Done") { dismiss() }
+          .keyboardShortcut(.defaultAction)
+      }
+      .controlSize(.regular)
+    }
+    .padding(20)
+    .frame(width: 520)
+  }
 }
