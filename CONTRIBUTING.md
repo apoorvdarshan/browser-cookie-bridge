@@ -4,12 +4,12 @@ Thanks for helping improve Browser Cookie Bridge. Contributions are welcome, esp
 
 ## Before you start
 
-- Read the [security policy](SECURITY.md) before working with cookie, broker, updater, or Codex database code.
+- Read the [security policy](SECURITY.md) before working with cookie, broker, updater, Codex or Cursor database, or Grok Bot export code.
 - Search [existing issues](https://github.com/apoorvdarshan/browser-cookie-bridge/issues) before opening a duplicate.
 - Use the [bug report form](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml) for reproducible problems.
 - For a vulnerability, follow the private reporting instructions in [SECURITY.md](SECURITY.md). Do not open a public issue.
 
-Never include real cookie values, session tokens, browser profiles, generated extension tokens, or other private browsing data in an issue, commit, fixture, screenshot, or log.
+Never include real cookie values, session tokens, browser profiles, generated extension tokens, Grok Bot `.bcbx` files, decryption keys, or other private browsing data in an issue, commit, fixture, screenshot, or log.
 
 ## Development requirements
 
@@ -18,6 +18,7 @@ Never include real cookie values, session tokens, browser profiles, generated ex
 - Xcode Command Line Tools: `xcode-select --install`
 - At least one supported Chromium browser for manual transfer testing
 - ChatGPT Codex or Cursor only when testing the corresponding direct destination
+- Grok Bot only when testing the encrypted `.bcbx` export path, using disposable cookies and never attaching a real bundle to a bot or pasting cookie values into chat
 
 ## Set up the project
 
@@ -41,7 +42,7 @@ The app is installed as `~/Applications/Browser Cookie Bridge.app`. This command
 | Path | Purpose |
 |---|---|
 | `macos-app/` | Native SwiftUI app, app metadata, icons, and menu-bar assets |
-| `src/` | Broker, browser reader, embedded-browser importer, scheduling, installer, and updater |
+| `src/` | Broker, browser reader, embedded-browser importer, Grok Bot export, scheduling, installer, and updater |
 | `extension-template/` | Unpacked Chromium extension copied into each local endpoint folder |
 | `bin/` | CLI entry point |
 | `test/` | Node test suite |
@@ -84,13 +85,14 @@ Use `--arch x64` for the Intel artifact. The builder downloads the pinned offici
 
 Check the UI in both light and dark appearances where relevant. Verify labels, keyboard focus, VoiceOver descriptions, disabled states, progress states, and error messages. Include a screenshot or short recording in the pull request for visible UI changes, but remove all private browser data first.
 
-For transfer changes, use disposable test profiles and non-sensitive test accounts. Verify the source and destination combination you changed, plus one unaffected path. Codex or Cursor must be completely closed before testing its direct import.
+For transfer changes, use disposable test profiles and non-sensitive test accounts. Verify the source and destination combination you changed, plus one unaffected path. Codex or Cursor must be completely closed before testing its direct import. Grok Bot tests should create a temporary `.bcbx` file and never commit the bundle, passphrase, or cookie values.
 
 ## Safety rules
 
 Changes must preserve these guarantees:
 
-- Cookie values and history URLs are never logged.
+- Cookie values and history URLs are never logged. Grok Bot decryption keys must not be logged either.
+- The Grok Bot importer must not print cookie names or values, and must remain limited to the cloud-computer import path.
 - Browser-to-browser payloads remain local and are not persisted by the broker.
 - Generated broker tokens and configuration files keep user-only permissions.
 - Direct embedded-browser changes are made through a destination-specific backup and working copy, followed by SQLite integrity checks.

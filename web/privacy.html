@@ -71,8 +71,8 @@
       <div class="shell">
         <p class="kicker">Policy</p>
         <h1>Privacy, in plain language.</h1>
-        <p>Browser Cookie Bridge is local-first. Local browser, Codex, and Cursor transfers stay on your Mac; Browserless Cloud is a separate optional destination that uploads only after an explicit action.</p>
-        <div class="legal-meta">Effective September 4, 2026 · Version 1.4</div>
+        <p>Browser Cookie Bridge is local-first. Local browser, Codex, and Cursor transfers stay on your Mac. Grok Bot writes a one-time encrypted transfer file that you attach yourself. Browserless Cloud is a separate optional destination that uploads only after an explicit action.</p>
+        <div class="legal-meta">Effective September 5, 2026 · Version 1.5</div>
       </div>
     </section>
 
@@ -85,7 +85,7 @@
       <article class="legal-content">
         <section id="summary">
           <h2>Summary</h2>
-          <div class="legal-callout"><p><strong>The short version:</strong> local transfers do not send browser data to the developer or a remote relay. If you explicitly select Browserless Cloud and click Upload, authenticated profile state is sent directly to Browserless under its policies.</p></div>
+          <div class="legal-callout"><p><strong>The short version:</strong> local transfers do not send browser data to the developer or a remote relay. Grok Bot export writes an encrypted file on your Mac; you attach it. If you explicitly select Browserless Cloud and click Upload, authenticated profile state is sent directly to Browserless under its policies.</p></div>
         </section>
 
         <section id="app-data">
@@ -106,7 +106,10 @@
           <p>Selected data passes through a short-lived broker bound to IPv4 loopback. The broker holds transfer payloads in memory, requires a random local token and expected extension origin, and does not write cookie values or history URLs to logs.</p>
 
           <h3>ChatGPT Codex and Cursor import</h3>
-          <p>For a Codex or Cursor destination, the app reads the selected local Chromium profile and works with the destination's embedded-browser data while that app is closed. It creates a destination-specific backup and separate working copy, validates the cookie database, and replaces it only after checks pass. Cursor import is limited to cookies in Cursor's dedicated browser partition; history and Full site data are excluded. Codex additionally supports history and optional Full site data. For Codex Full site data, the source browser must also be closed; compatible origin-storage directories are backed up and replaced as complete units rather than merged while live.</p>
+          <p>For a Codex or Cursor destination, the app reads the selected local Chromium profile and works with the destination's embedded-browser data while that app is closed. It creates a destination-specific backup and separate working copy, validates the cookie database, and replaces it only after checks pass. Cursor import is experimental and limited to cookies in Cursor's dedicated browser partition; history and Full site data are excluded. The app writes only to that partition and never to Cursor's main application cookie store. Codex additionally supports history and optional Full site data. For Codex Full site data, the source browser must also be closed; compatible origin-storage directories are backed up and replaced as complete units rather than merged while live.</p>
+
+          <h3>Grok Bot encrypted transfer</h3>
+          <p>When you select Grok Bot, the app reads cookie sessions from the selected local Chromium profile and writes an encrypted <code>.bcbx</code> bundle on your Mac. History and Full site data are excluded. Daily sync and Sync at login never create these files. The bundle contains a manifest, encrypted cookie payload, bundled importer, and a prompt; cookie values are encrypted with AES-256-GCM and a one-time key. The app shows that key and the prompt in a result sheet so you can attach the file to any Grok Bot. The importer is meant to run on the Grok Bot cloud computer only, must not log or print cookie names or values, reports only import counts, and then deletes the unzipped files and the bundle copy. Enter the one-time key privately when asked. Do not paste cookie values into chat.</p>
 
           <h3>Optional Browserless Cloud upload</h3>
           <p>When you select Browserless Cloud, connect an account, review the warning, and click Upload, the app uses the official Browserless CLI to send cookies, local storage, and IndexedDB from the selected closed browser profile to the region and profile name you chose. History and saved passwords are not included. This is a direct request to Browserless, not a developer-operated relay.</p>
@@ -131,7 +134,7 @@
         <section id="sharing">
           <h2>Sharing and sale</h2>
           <p>Browser Cookie Bridge does not sell personal information. It does not send cookie values, history URLs, generated tokens, or browser databases to the developer, advertisers, or data brokers.</p>
-          <p>Your selected destination browser receives the data you explicitly transfer. The destination browser and websites you visit remain governed by their own privacy practices.</p>
+          <p>Your selected destination browser receives the data you explicitly transfer. The destination browser and websites you visit remain governed by their own privacy practices. If you attach a Grok Bot transfer file, the Grok Bot cloud computer receives the cookies you chose to export after you provide the one-time key.</p>
           <p>If you select Browserless Cloud, Browserless receives the authenticated profile state you explicitly upload. Browserless's terms, privacy policy, account controls, retention, and infrastructure govern that copy.</p>
         </section>
 
@@ -143,6 +146,7 @@
             <li>Daily sync can remain off or run at a local time you choose.</li>
             <li>Sync at login, Open at login, menu-bar visibility, and automatic update checks can each be disabled.</li>
             <li>You decide which source and destination browsers participate.</li>
+            <li>Grok Bot export is optional, destination-only, and manual-only; you choose the save location and whether to attach the file.</li>
             <li>Browserless Cloud is optional, destination-only, and manual-only; you can disconnect it and remove its Keychain token at any time.</li>
             <li>You can stop using the app and remove its local files at any time.</li>
           </ul>
@@ -150,7 +154,7 @@
 
         <section id="security">
           <h2>Security</h2>
-          <p>Cookies are credentials. Protect your macOS account, use only profiles you own and trust, and never share generated extension folders or backups. Directly imported cookies are stored in SQLite's plaintext value column and can remain readable to software running as your macOS user until the relevant website refreshes them.</p>
+          <p>Cookies are credentials. Protect your macOS account, use only profiles you own and trust, and never share generated extension folders, backups, Grok Bot <code>.bcbx</code> files, or decryption keys. Directly imported cookies are stored in SQLite's plaintext value column and can remain readable to software running as your macOS user until the relevant website refreshes them.</p>
           <p>For the full threat model and private vulnerability reporting instructions, read the <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">Security Policy</a>.</p>
         </section>
 

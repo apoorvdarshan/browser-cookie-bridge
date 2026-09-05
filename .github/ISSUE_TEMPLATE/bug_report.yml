@@ -42,6 +42,8 @@ body:
       label: Import destination
       options:
         - ChatGPT Codex
+        - Cursor browser
+        - Grok Bot
         - Brave
         - Chrome
         - Edge
