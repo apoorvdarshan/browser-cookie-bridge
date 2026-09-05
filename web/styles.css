@@ -504,6 +504,18 @@ h3 {
   z-index: 2;
 }
 
+.route-endpoint-destination .route-icons img:first-child {
+  z-index: 3;
+}
+
+.route-endpoint-destination .route-icons img:nth-child(2) {
+  z-index: 2;
+}
+
+.route-icons img[src$=".png"] {
+  padding: 2px;
+}
+
 .route-endpoint strong {
   display: block;
   overflow: hidden;
@@ -766,6 +778,66 @@ h3 {
 
 .browser-track .codex-browser {
   min-width: 190px;
+  border-color: rgba(217, 148, 59, 0.3);
+}
+
+.destination-strip {
+  margin-top: 22px;
+}
+
+.destination-strip-label {
+  margin: 0 0 12px;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.destination-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.destination-track article {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: min(100%, 176px);
+  padding: 12px 16px 12px 12px;
+  background: rgba(238, 233, 223, 0.035);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.destination-track img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.destination-track img[src$=".png"] {
+  border-radius: 10px;
+}
+
+.destination-track span {
+  color: rgba(238, 233, 223, 0.72);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.destination-track small {
+  display: block;
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.destination-track .destination-chip {
   border-color: rgba(217, 148, 59, 0.3);
 }
 
@@ -1175,6 +1247,12 @@ h3 {
 .data-row p {
   margin: 0;
   color: rgba(17, 17, 16, 0.58);
+}
+
+.data-row code,
+.faq-list code {
+  font-family: var(--mono);
+  font-size: 0.92em;
 }
 
 .data-row-head {

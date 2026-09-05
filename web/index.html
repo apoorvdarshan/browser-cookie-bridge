@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#151514" />
-  <meta name="description" content="Browser Cookie Bridge moves signed-in sessions locally between Chromium browsers and ChatGPT Codex, with an optional explicit Browserless Cloud upload." />
+  <meta name="description" content="Browser Cookie Bridge moves signed-in sessions locally between Chromium browsers, ChatGPT Codex, and Cursor, writes an encrypted Grok Bot transfer file, and can upload to Browserless Cloud when you choose." />
   <meta name="author" content="Apoorv Darshan" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta property="og:site_name" content="Browser Cookie Bridge" />
   <meta property="og:title" content="Browser Cookie Bridge — Local session transfer for macOS" />
-  <meta property="og:description" content="Local-first browser session transfer on macOS with an optional Browserless Cloud destination." />
+  <meta property="og:description" content="Local-first session transfer on macOS: Chromium browsers, ChatGPT Codex, experimental Cursor import, encrypted Grok Bot export, and optional Browserless Cloud." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://cookiebridge.apoorvdarshan.com/" />
   <meta property="og:image" content="https://cookiebridge.apoorvdarshan.com/assets/hero-transfer.webp" />
@@ -20,7 +20,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:creator" content="@apoorvdarshan" />
   <meta name="twitter:title" content="Browser Cookie Bridge — Local session transfer for macOS" />
-  <meta name="twitter:description" content="Local-first browser session transfer on macOS with an optional Browserless Cloud destination." />
+  <meta name="twitter:description" content="Local-first session transfer on macOS: Chromium browsers, ChatGPT Codex, experimental Cursor import, encrypted Grok Bot export, and optional Browserless Cloud." />
   <meta name="twitter:image" content="https://cookiebridge.apoorvdarshan.com/assets/hero-transfer.webp" />
   <meta name="twitter:image:alt" content="Browser Cookie Bridge transferring a browser session locally on macOS" />
   <title>Browser Cookie Bridge — Local session transfer for macOS</title>
@@ -45,7 +45,7 @@
           "@id": "https://cookiebridge.apoorvdarshan.com/#software",
           "name": "Browser Cookie Bridge",
           "url": "https://cookiebridge.apoorvdarshan.com/",
-          "description": "A native macOS utility for local-first session transfer between Chromium browsers and ChatGPT Codex, with an optional Browserless Cloud upload.",
+          "description": "A native macOS utility for local-first session transfer between Chromium browsers, ChatGPT Codex, and experimental Cursor import, plus encrypted Grok Bot export and an optional Browserless Cloud upload.",
           "image": "https://cookiebridge.apoorvdarshan.com/assets/hero-transfer.webp",
           "applicationCategory": "UtilitiesApplication",
           "operatingSystem": "macOS 13.5 or later",
@@ -109,7 +109,7 @@
         <div class="hero-copy" data-reveal>
           <div class="eyebrow"><span class="live-dot"></span> Native macOS utility · v1.5.0</div>
           <h1>Your browser sessions.<br /><em>Across the browsers you use.</em></h1>
-          <p class="hero-lede">Move signed-in sessions locally between Chromium browsers and ChatGPT Codex—or explicitly upload an authenticated profile to your Browserless account. No cookie logs.</p>
+          <p class="hero-lede">Move signed-in sessions locally between Chromium browsers, ChatGPT Codex, and experimental Cursor import—or write an encrypted Grok Bot file you attach yourself. Browserless Cloud is a separate, explicit upload. No cookie logs.</p>
 
           <div class="hero-actions">
             <a class="button button-primary" href="https://github.com/apoorvdarshan/browser-cookie-bridge/releases/latest/download/Browser-Cookie-Bridge-arm64.dmg">Download for Apple silicon <span aria-hidden="true">↓</span></a>
@@ -150,8 +150,10 @@
               <span class="route-label">Import into</span>
               <div class="route-icons">
                 <img src="assets/browsers/chatgpt-codex.svg" alt="ChatGPT Codex" />
+                <img src="assets/browsers/cursor.svg" alt="Cursor" />
+                <img src="assets/browsers/grok-bot.png" alt="Grok Bot" />
               </div>
-              <strong>ChatGPT Codex</strong>
+              <strong>Pick a destination</strong>
             </div>
           </div>
           <div class="route-foot">
@@ -177,9 +179,9 @@
         <div class="section-heading split-heading" data-reveal>
           <div>
             <p class="kicker">What it solves</p>
-            <h2>One login.<br />Seven browsers.<br /><span>Cloud only by choice.</span></h2>
+            <h2>One login.<br />Seven browsers.<br /><span>Five destinations.</span></h2>
           </div>
-          <p>Signing into the same sites across browser profiles is repetitive. Local transfers remain the default; Browserless appears as a separate, optional cloud destination with an explicit warning.</p>
+          <p>Signing into the same sites across profiles is repetitive. Local browser, Codex, and experimental Cursor transfers stay on this Mac. Grok Bot writes an encrypted file you attach yourself. Browserless is a separate, optional cloud upload.</p>
         </div>
 
         <div class="browser-marquee" data-reveal aria-label="Supported browsers">
@@ -191,8 +193,17 @@
             <article><img src="assets/browsers/vivaldi.svg" alt="" /><span>Vivaldi</span></article>
             <article><img src="assets/browsers/opera.svg" alt="" /><span>Opera</span></article>
             <article><img src="assets/browsers/comet.svg" alt="" /><span>Comet</span></article>
-            <article class="codex-browser"><img src="assets/browsers/chatgpt-codex.svg" alt="" /><span>ChatGPT Codex <small>Import only</small></span></article>
-            <article class="codex-browser"><img src="assets/browsers/browserless.svg" alt="" /><span>Browserless <small>Optional cloud</small></span></article>
+          </div>
+        </div>
+
+        <div class="destination-strip" data-reveal aria-label="Transfer destinations">
+          <p class="destination-strip-label">Destinations</p>
+          <div class="destination-track">
+            <article><img src="assets/browsers/chrome.svg" alt="" /><span>Another browser <small>Local</small></span></article>
+            <article class="destination-chip"><img src="assets/browsers/chatgpt-codex.svg" alt="" /><span>ChatGPT Codex <small>Import</small></span></article>
+            <article class="destination-chip"><img src="assets/browsers/cursor.svg" alt="" /><span>Cursor <small>Experimental</small></span></article>
+            <article class="destination-chip"><img src="assets/browsers/grok-bot.png" alt="" /><span>Grok Bot <small>Encrypted .bcbx</small></span></article>
+            <article class="destination-chip"><img src="assets/browsers/browserless.svg" alt="" /><span>Browserless <small>Optional cloud</small></span></article>
           </div>
         </div>
 
@@ -204,7 +215,7 @@
               <p>Both endpoints stay visible. The app identifies what connected, what failed, and which browser needs attention—without vague background errors.</p>
               <ul class="check-list">
                 <li>Cookies enabled by default</li>
-                <li>History is always optional</li>
+                <li>History is optional where supported</li>
                 <li>Passwords remain unavailable</li>
               </ul>
             </div>
@@ -247,7 +258,7 @@
         <div class="process-list">
           <article data-reveal>
             <div class="process-number">1</div>
-            <div><h3>Choose both endpoints</h3><p>Select a source browser and a local destination, ChatGPT Codex, or the clearly marked Browserless Cloud option.</p></div>
+            <div><h3>Choose both endpoints</h3><p>Select a source browser and a destination: another Chromium browser, ChatGPT Codex, experimental Cursor, a Grok Bot transfer file, or the clearly marked Browserless Cloud option.</p></div>
             <span class="process-note">Saved automatically</span>
           </article>
           <article data-reveal>
@@ -257,8 +268,8 @@
           </article>
           <article data-reveal>
             <div class="process-number">3</div>
-            <div><h3>Review the result</h3><p>Browserless uploads show a local size preflight, live progress, elapsed time, cancellation, auto-fit omissions, and cloud-profile verification.</p></div>
-            <span class="process-note">Observable uploads</span>
+            <div><h3>Review the result</h3><p>Local transfers confirm the merge. A Grok Bot export shows the file, one-time key, and prompt. Browserless uploads show preflight, progress, omissions, and cloud-profile verification.</p></div>
+            <span class="process-note">Observable results</span>
           </article>
         </div>
 
@@ -279,7 +290,7 @@
         <div class="safety-copy" data-reveal>
           <p class="kicker">Safety before convenience</p>
           <h2>Cookies are credentials.<br /><span>The app treats them that way.</span></h2>
-          <p>Codex transfers work on a separate copy, run SQLite integrity checks, and replace the destination only after validation. If replacement fails, the original backup is restored.</p>
+          <p>Codex and Cursor transfers work on a separate copy, run SQLite integrity checks, and replace the destination only after validation. If replacement fails, the original backup is restored.</p>
           <a class="text-link" href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/SECURITY.md">Read the security policy <span>↗</span></a>
         </div>
 
@@ -289,7 +300,8 @@
           <div><span>Password-store access</span><strong>Never</strong></div>
           <div><span>Remote relay for local paths</span><strong>None</strong></div>
           <div><span>Browserless cloud upload</span><strong>Explicit + verified</strong></div>
-          <div><span>Codex pre-change backup</span><strong>Always</strong></div>
+          <div><span>Grok Bot .bcbx export</span><strong>Local + you attach</strong></div>
+          <div><span>Codex / Cursor pre-change backup</span><strong>Always</strong></div>
           <div><span>Unknown database schema</span><strong>Fail closed</strong></div>
           <div><span>Backups retained</span><strong>14 newest</strong></div>
         </div>
@@ -305,8 +317,9 @@
         <div class="data-table" data-reveal>
           <div class="data-row data-row-head"><span>Data</span><span>Support</span><span>What to expect</span></div>
           <div class="data-row"><strong>Cookies & sessions</strong><span><i class="status-dot status-on"></i> Default</span><p>Supported values, domain, path, expiry, security, SameSite, and partition attributes.</p></div>
-          <div class="data-row"><strong>History URLs</strong><span><i class="status-dot status-partial"></i> Optional</span><p>URLs transfer; original visit times and page titles cannot be preserved.</p></div>
-          <div class="data-row"><strong>Full site data</strong><span><i class="status-dot status-partial"></i> Optional</span><p>For Codex, compatible Local Storage, IndexedDB, session, and service-worker stores can be replaced from a closed source profile with backup and rollback. Browserless uses its separate fitted cloud capture.</p></div>
+          <div class="data-row"><strong>History URLs</strong><span><i class="status-dot status-partial"></i> Optional</span><p>Supported for browser and Codex targets. Excluded for Cursor and Grok Bot. Original visit times and page titles cannot be preserved.</p></div>
+          <div class="data-row"><strong>Full site data</strong><span><i class="status-dot status-partial"></i> Optional</span><p>For Codex, compatible Local Storage, IndexedDB, session, and service-worker stores can be replaced from a closed source profile with backup and rollback. Cursor and Grok Bot stay cookies-only. Browserless uses its separate fitted cloud capture.</p></div>
+          <div class="data-row"><strong>Encrypted Grok Bot export</strong><span><i class="status-dot status-partial"></i> Manual</span><p>Cookie sessions only, written to a local <code>.bcbx</code> file with a one-time key. You attach the file yourself—the app does not upload it.</p></div>
           <div class="data-row"><strong>Passwords</strong><span><i class="status-dot"></i> Never</span><p>Chromium extensions cannot read the browser password store.</p></div>
           <div class="data-row"><strong>Bookmarks & autofill</strong><span><i class="status-dot"></i> Never</span><p>Bookmarks, payment data, autofill, and iCloud Keychain remain untouched.</p></div>
         </div>
@@ -386,10 +399,12 @@
 
         <div class="faq-list" data-reveal data-delay="1">
           <details open><summary>Why must Codex be closed?<span></span></summary><p>Codex can overwrite or ignore offline database changes while its Chromium process is running. By default the app blocks direct import until Codex is completely closed. You may optionally enable automatic restart for manual syncs: the app force quits Codex, waits for its database to close, transfers and validates the data, then reopens Codex only after success. Scheduled and login syncs never force quit it.</p></details>
-          <details><summary>Do other browsers need to be closed?<span></span></summary><p>No for cookie-only extension transfers. Codex must be closed for direct import. When Full site data is enabled, the selected source browser must also be closed because Local Storage and IndexedDB use live LevelDB files. For manual syncs, the optional Restart both automatically switch can force quit the source and Codex, then reopen only the apps that were running after a successful transfer. Browserless uploads likewise require a closed source profile.</p></details>
+          <details><summary>Do other browsers need to be closed?<span></span></summary><p>No for cookie-only extension transfers. Codex and Cursor must be closed for direct import. When Full site data is enabled, the selected source browser must also be closed because Local Storage and IndexedDB use live LevelDB files. For manual Codex syncs, the optional Restart both automatically switch can force quit the source and Codex, then reopen only the apps that were running after a successful transfer. Cursor has no automatic restart. Browserless uploads likewise require a closed source profile. Grok Bot export does not need the destination app closed.</p></details>
+          <details><summary>What does Cursor import do?<span></span></summary><p>Experimental and destination-only. It imports cookies into Cursor's dedicated browser partition, not Cursor's main application cookie store. History and Full site data are excluded. Quit Cursor completely before import—the app does not restart it. Unknown schemas fail closed.</p></details>
+          <details><summary>How does Grok Bot transfer work?<span></span></summary><p>Grok Bot cannot receive a local database merge. The app writes an encrypted <code>.bcbx</code> file on your Mac with a one-time key. You attach that file yourself—this is not a cloud upload by the app. History and Full site data are excluded. Daily sync and Sync at login never create these files. Keep the key off chat logs, and never paste cookie values into chat.</p></details>
           <details><summary>What leaves my Mac with Browserless?<span></span></summary><p>Only after you select Browserless Cloud and click Upload, cookies, local storage, and IndexedDB from the chosen profile are sent directly to your selected Browserless region. The app first measures local sizes without reading their contents, then reports progress and any origins omitted to fit Browserless's 2 MB serialized-profile cap. History and saved passwords are excluded. The token stays in macOS Keychain, CLI telemetry is disabled, and cloud uploads never run on a schedule or at login.</p></details>
           <details><summary>Does this move passwords?<span></span></summary><p>No. Browser extensions cannot access Chromium's password store. Browser Cookie Bridge does not access passwords, Keychain items, payment data, bookmarks, or autofill.</p></details>
-          <details><summary>Does it overwrite all destination cookies?<span></span></summary><p>The importer merges selected records using their cookie identity fields. Existing unrelated destination cookies remain in place. Codex is backed up before any replacement.</p></details>
+          <details><summary>Does it overwrite all destination cookies?<span></span></summary><p>The importer merges selected records using their cookie identity fields. Existing unrelated destination cookies remain in place. Codex and Cursor are backed up before any replacement.</p></details>
           <details><summary>Will every website stay signed in?<span></span></summary><p>Not always. Full site data improves compatibility by adding origin storage beyond cookies, but some sites bind sessions to a device, browser, hardware-backed credential, IP address, or other risk signals and may still ask you to sign in again.</p></details>
           <details><summary>Do I need Node.js or Xcode?<span></span></summary><p>No when you use Homebrew or the DMG. Node.js and Xcode Command Line Tools are needed only for the npm and source installation methods.</p></details>
           <details><summary>Will macOS trust the downloaded app?<span></span></summary><p>Yes. Public DMGs are SHA-256 verified, signed with the project's Apple Developer ID, and notarized by Apple. Open the DMG, drag the app to Applications, and launch it normally.</p></details>
@@ -423,7 +438,7 @@
       <div class="footer-column"><strong>Support</strong><a href="https://tally.so/r/J9j0D4">Windows waitlist</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a><a href="https://ko-fi.com/apoorvdarshan">Ko-fi</a><a href="https://x.com/apoorvdarshan">Follow on X</a></div>
       <div class="footer-column"><strong>Legal</strong><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/LICENSE">MIT License</a></div>
     </div>
-    <div class="shell footer-note">Not affiliated with Brave, Google, Microsoft, The Browser Company, Vivaldi, Opera, Perplexity, or OpenAI. Their names and marks belong to their respective owners.</div>
+    <div class="shell footer-note">Not affiliated with Brave, Google, Microsoft, The Browser Company, Vivaldi, Opera, Perplexity, OpenAI, Cursor, xAI, or Browserless. Their names and marks belong to their respective owners.</div>
   </footer>
 </body>
 </html>
