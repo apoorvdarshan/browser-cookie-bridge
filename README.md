@@ -16,6 +16,7 @@
   <a href="https://www.npmjs.com/package/browser-cookie-bridge"><img src="https://img.shields.io/npm/v/browser-cookie-bridge?logo=npm&color=CB3837" alt="browser-cookie-bridge on npm" /></a>
   <img src="https://img.shields.io/badge/local--first-cloud%20optional-C68B3C" alt="Local-first, cloud optional" />
   <img src="https://img.shields.io/github/stars/apoorvdarshan/browser-cookie-bridge?logo=github&color=C68B3C" alt="GitHub stars" />
+  <a href="https://www.producthunt.com/products/browser-cookie-bridge-2"><img src="https://img.shields.io/badge/Product%20Hunt-View%20launch-DA552F?logo=producthunt&logoColor=white" alt="Browser Cookie Bridge on Product Hunt" /></a>
   <a href="https://tally.so/r/J9j0D4"><img src="https://img.shields.io/badge/Windows-Join%20waitlist-8E2735?logo=windows&logoColor=white" alt="Join the Browser Cookie Bridge Windows waitlist" /></a>
   <img src="https://img.shields.io/badge/license-MIT-3DA639" alt="MIT License" />
 </p>
@@ -29,6 +30,7 @@
   <a href="#security--privacy">Security</a> ·
   <a href="CONTRIBUTING.md">Contribute</a> ·
   <a href="https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml">Report a bug</a> ·
+  <a href="https://www.producthunt.com/products/browser-cookie-bridge-2">Product Hunt</a> ·
   <a href="https://tally.so/r/J9j0D4">Windows waitlist</a> ·
   <a href="#support">Support</a>
 </p>
@@ -46,7 +48,7 @@
 
 ---
 
-> **Version 1.5.0 adds experimental Cursor browser import and encrypted Grok Bot `.bcbx` export.** Cursor is destination-only and currently imports cookie sessions into its dedicated browser partition. Grok Bot writes a one-time encrypted transfer file with a bundled importer and a one-time key: attach the `.bcbx` file to any Grok Bot, paste the prompt, and enter the key privately when asked. Cookie values must never be logged or pasted into chat. The optional Codex restart flow from 1.4.0 is unchanged and remains off by default.
+> **Version 1.5.1 restores the [Product Hunt](https://www.producthunt.com/products/browser-cookie-bridge-2) launch link.** Version 1.5.0 added experimental Cursor browser import and encrypted Grok Bot `.bcbx` export. Cursor is destination-only and currently imports cookie sessions into its dedicated browser partition. Grok Bot writes a one-time encrypted transfer file with a bundled importer and a one-time key: attach the `.bcbx` file to any Grok Bot, paste the prompt, and enter the key privately when asked. Cookie values must never be logged or pasted into chat. The optional Codex restart flow from 1.4.0 is unchanged and remains off by default.
 
 ## Why Browser Cookie Bridge
 
@@ -297,8 +299,9 @@ If Browser Cookie Bridge is useful to you:
 - 🐛 **[Report a bug](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml)** — never include cookie values or tokens
 - ☕ **[Support on Ko-fi](https://ko-fi.com/apoorvdarshan)**
 - 𝕏 **Follow [@apoorvdarshan](https://x.com/apoorvdarshan)**
+- 🚀 **[View on Product Hunt](https://www.producthunt.com/products/browser-cookie-bridge-2)**
 
-The product screenshot and transparent cookie logo live in [`marketing/`](marketing/).
+Product screenshots, the transparent cookie logo, and launch artwork live in [`marketing/`](marketing/).
 
 ## Website
 

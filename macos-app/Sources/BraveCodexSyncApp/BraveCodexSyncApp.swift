@@ -9,6 +9,7 @@ private enum ProjectLinks {
   static let license = URL(string: "https://github.com/apoorvdarshan/browser-cookie-bridge/blob/main/LICENSE")!
   static let koFi = URL(string: "https://ko-fi.com/apoorvdarshan")!
   static let x = URL(string: "https://x.com/apoorvdarshan")!
+  static let productHunt = URL(string: "https://www.producthunt.com/products/browser-cookie-bridge-2")!
 }
 
 @main
@@ -201,6 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     menu.addItem(.separator())
     addLink("Support on Ko-fi", url: ProjectLinks.koFi, to: menu)
     addLink("Follow @apoorvdarshan on X", url: ProjectLinks.x, to: menu)
+    addLink("View on Product Hunt", url: ProjectLinks.productHunt, to: menu)
   }
 
   private func addLink(_ title: String, url: URL, to menu: NSMenu) {
@@ -741,6 +743,8 @@ struct PreferencesPanel: View {
         ProjectLinkRow(icon: "heart", title: "Support on Ko-fi", detail: "Sponsor development", url: ProjectLinks.koFi)
         RowDivider()
         ProjectLinkRow(icon: "person.crop.circle.badge.plus", title: "Follow @apoorvdarshan on X", detail: "Developer updates", url: ProjectLinks.x)
+        RowDivider()
+        ProjectLinkRow(icon: "megaphone", title: "View on Product Hunt", detail: "Follow the launch and leave feedback", url: ProjectLinks.productHunt)
       }
     }
   }

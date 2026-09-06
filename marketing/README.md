@@ -10,4 +10,6 @@ Source artwork for Browser Cookie Bridge.
 - `product-hunt/ph-02-how-it-works.png` — Product Hunt gallery 2 (`1270×760`)
 - `product-hunt/ph-03-local-first.png` — Product Hunt gallery 3 (`1270×760`)
 
+Launch page: [producthunt.com/products/browser-cookie-bridge-2](https://www.producthunt.com/products/browser-cookie-bridge-2)
+
 Browser, OpenAI, ChatGPT, and Codex marks visible inside the product screenshots belong to their respective owners.
