@@ -48,13 +48,13 @@
 
 ---
 
-> **Version 1.5.1 restores the [Product Hunt](https://www.producthunt.com/products/browser-cookie-bridge-2) launch link.** Version 1.5.0 added experimental Cursor browser import and encrypted Grok Bot `.bcbx` export. Cursor is destination-only and currently imports cookie sessions into its dedicated browser partition. Grok Bot writes a one-time encrypted transfer file with a bundled importer and a one-time key: attach the `.bcbx` file to any Grok Bot, paste the prompt, and enter the key privately when asked. Cookie values must never be logged or pasted into chat. The optional Codex restart flow from 1.4.0 is unchanged and remains off by default.
+> **Version 1.5.1 restores the [Product Hunt](https://www.producthunt.com/products/browser-cookie-bridge-2) launch link.** Version 1.5.0 added experimental Cursor browser import and encrypted Grok Bot `.bcbx` export. Cursor is destination-only and currently imports cookie sessions into its dedicated browser partition. Grok Bot writes an encrypted transfer file with an embedded decryption key and bundled importer: attach the `.bcbx` file to any Grok Bot and paste the prompt—no separate key entry. Treat the bundle as credentials because anyone with the file can decrypt it. Cookie values must never be logged or pasted into chat. The optional Codex restart flow from 1.4.0 is unchanged and remains off by default.
 
 ## Why Browser Cookie Bridge
 
 Signing into the same sites across several browsers is repetitive. Export files are awkward, password managers do not move active sessions, and embedded app browsers do not always offer an import button.
 
-Browser Cookie Bridge gives those browser profiles a small, native control panel. Local browser, Codex, and Cursor transfers stay on the Mac. Grok Bot uses a one-time encrypted transfer file that you attach yourself. If you explicitly select Browserless Cloud and click Upload, the app can instead send authenticated profile state to your own Browserless account.
+Browser Cookie Bridge gives those browser profiles a small, native control panel. Local browser, Codex, and Cursor transfers stay on the Mac. Grok Bot uses an encrypted transfer file with an embedded decryption key that you attach yourself. If you explicitly select Browserless Cloud and click Upload, the app can instead send authenticated profile state to your own Browserless account.
 
 ## Windows waitlist
 
@@ -66,7 +66,7 @@ Browser Cookie Bridge currently ships for macOS. A separate Windows app is being
 - 🗃️ **Optional full site data for Codex** — replace Codex's compatible Local Storage, IndexedDB, Session Storage, service-worker, and related origin stores from a closed source profile, with backup and rollback. Off by default.
 - 🌐 **Seven Chromium browsers** — Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Perplexity Comet can be sources or destinations.
 - ✨ **ChatGPT Codex and experimental Cursor import** — merge cookie sessions into either app's built-in browser; Codex also supports optional history and full site data. Both are destination-only. Cursor import is experimental: it writes only to Cursor's dedicated `Partitions/cursor-browser` profile and refuses unknown schemas.
-- 🤖 **Encrypted Grok Bot transfer (`.bcbx`)** — export cookie sessions into a local encrypted bundle with a one-time key and bundled importer. The destination tile uses the official Grok Bot app icon. Attach the file to any Grok Bot; the importer runs on the cloud computer only. Manual only.
+- 🤖 **Encrypted Grok Bot transfer (`.bcbx`)** — export cookie sessions into a local encrypted bundle with an embedded decryption key and bundled importer. The destination tile uses the official Grok Bot app icon. Attach the file to any Grok Bot; the importer runs on the cloud computer only. Manual only.
 - 🔁 **Optional Codex restart** — manual Sync can force quit a running Codex instance and reopen it only after a successful local transfer; off by default.
 - 🔄 **Optional two-app restart** — Full site data can force quit the selected source browser and Codex, then reopen only the apps that were running after a successful transfer; off by default.
 - ☁️ **Optional Browserless upload** — create or refresh a Browserless authenticated profile with cookies, local storage, and IndexedDB; see a local size preflight, live progress, cancellation, and post-upload verification.
@@ -164,21 +164,21 @@ An open destination app blocks the transfer. The optional **Restart Codex automa
 
 No browser extension is needed for this path.
 
-Grok Bot cannot receive a local database merge. The app writes a one-time encrypted transfer file that you attach to any Grok Bot.
+Grok Bot cannot receive a local database merge. The app writes an encrypted transfer file that you attach to any Grok Bot.
 
 1. Select a source browser and **Grok Bot** as the destination. The tile uses the official Grok Bot app icon.
 2. Keep **Cookies** on. History URLs and Full site data are excluded from Grok Bot transfer files.
 3. Optionally limit the export with **Only these domains**. Leave it blank to include every readable cookie.
 4. Press **Create transfer file** and choose where to save `GrokBot-Import.bcbx`.
-5. The result sheet shows the one-time decryption key and the prompt to paste. Use **Reveal file** or **Copy prompt**. Keep the key off chat logs; do not paste cookie values into chat.
-6. Attach the `.bcbx` file to any Grok Bot, paste the prompt, then enter the one-time key privately through Agent Computer when asked.
+5. The result sheet shows a sensitivity warning and the prompt to paste. Use **Reveal file** or **Copy prompt**. Do not paste cookie values into chat.
+6. Attach the `.bcbx` file to any Grok Bot and paste the prompt. The bundled importer decrypts automatically—no separate key entry.
 
-The bundle is a zip-compatible `.bcbx` file containing `manifest.json`, encrypted `payload.enc`, `import.mjs`, and `PROMPT.txt`. Cookies are encrypted with AES-256-GCM using a scrypt-derived key. The file is written with user-only permissions (`0600`). Daily sync and Sync at login never create Grok Bot bundles.
+The bundle is a zip-compatible `.bcbx` file containing `manifest.json`, encrypted `payload.enc`, `decryption.key`, `import.mjs`, and `PROMPT.txt`. Cookies are encrypted with AES-256-GCM using a scrypt-derived key; the same key is stored in `decryption.key` inside the bundle so the importer can decrypt without user input. Treat the file as credentials—anyone with the bundle can read the cookies. The file is written with user-only permissions (`0600`). Daily sync and Sync at login never create Grok Bot bundles.
 
 On the Grok Bot cloud computer the bundled importer:
 
 1. Expects you to unzip `GrokBot-Import.bcbx` and run `node import.mjs`.
-2. Prompts for the one-time decryption key. Do not print cookie names or values.
+2. Reads the embedded decryption key and decrypts the payload automatically. Do not print cookie names or values.
 3. Injects cookies into the cloud browser and reports only how many cookies were imported.
 4. Deletes the unzipped files and the bundle copy.
 
@@ -243,7 +243,7 @@ browser-cookie-bridge disable-app-login
 browser-cookie-bridge remove-schedule
 ```
 
-Supported source IDs are `brave`, `chrome`, `edge`, `arc`, `vivaldi`, `opera`, and `comet`. Target IDs are the same plus `codex`, `cursor`, `browserless`, and `grok-bot`. The same browser cannot be both endpoints. Cursor import currently supports cookies only. Grok Bot export requires `--output /path/GrokBot-Import.bcbx` and writes cookies only; `--grok-bot-domains` optionally limits the bundle. The CLI prints a one-time decryption key after export—keep it private and never paste cookie values into chat. Browserless requires `BROWSERLESS_TOKEN` and the explicit `--allow-cloud-upload` flag; the native app supplies the token from Keychain without placing it in the OS command line or app configuration.
+Supported source IDs are `brave`, `chrome`, `edge`, `arc`, `vivaldi`, `opera`, and `comet`. Target IDs are the same plus `codex`, `cursor`, `browserless`, and `grok-bot`. The same browser cannot be both endpoints. Cursor import currently supports cookies only. Grok Bot export requires `--output /path/GrokBot-Import.bcbx` and writes cookies only; `--grok-bot-domains` optionally limits the bundle. The bundle includes an embedded decryption key—treat it as credentials and never paste cookie values into chat. Browserless requires `BROWSERLESS_TOKEN` and the explicit `--allow-cloud-upload` flag; the native app supplies the token from Keychain without placing it in the OS command line or app configuration.
 
 ## How it works
 
@@ -251,16 +251,16 @@ Supported source IDs are `brave`, `chrome`, `edge`, `arc`, `vivaldi`, `opera`, a
 |---|---|
 | **Browser → browser** | Unpacked extensions connect to a short-lived broker on IPv4 loopback. Selected data stays in memory and is never written to logs. |
 | **Browser → Codex / Cursor** | The app reads the selected local Chromium profile, creates a consistent destination SQLite backup, merges cookies into a working copy, validates it, then replaces only the embedded browser's cookie database atomically. Codex also supports optional history and full site data. Cursor import is experimental and limited to the dedicated browser-partition cookie store. |
-| **Browser → Grok Bot** | The app reads the selected local Chromium profile, encrypts cookie sessions into a `.bcbx` bundle with a one-time key, and writes that file locally. You attach it to a Grok Bot; the bundled importer decrypts and injects cookies on the cloud computer only. |
+| **Browser → Grok Bot** | The app reads the selected local Chromium profile, encrypts cookie sessions into a `.bcbx` bundle with an embedded decryption key, and writes that file locally. You attach it to a Grok Bot; the bundled importer decrypts and injects cookies on the cloud computer only. |
 | **Browser → Browserless** | The bundled official Browserless CLI copies a closed local profile, captures cookies/local storage/IndexedDB, and uploads it directly to the selected Browserless region. |
 
 The broker validates a random token and extension origin, limits payload size, and normally exits after five minutes. Only the endpoints selected in the app respond to a transfer.
 
 ## Security & privacy
 
-- Cookie values and history URLs are never logged. Never paste cookie values or Grok Bot decryption keys into chat.
+- Cookie values and history URLs are never logged. Never paste cookie values into chat.
 - Browser-to-browser data is held only in broker memory.
-- Grok Bot `.bcbx` files are encrypted locally with AES-256-GCM. Treat the bundle and its one-time key as credentials. Enter the key privately through Agent Computer when the importer asks; do not ask Grok Bot to print cookie names or values. The bundled importer reports only import counts, then deletes the unzipped files and the bundle copy.
+- Grok Bot `.bcbx` files encrypt cookie payloads with AES-256-GCM but include the decryption key inside the bundle (`decryption.key`). Treat the entire file as credentials—anyone with the bundle can read the cookies. Do not share it or paste cookie values into chat. The bundled importer decrypts automatically, reports only import counts, then deletes the unzipped files and the bundle copy. Legacy v1 bundles without an embedded key still prompt for a separate passphrase.
 - Direct-import backups are stored with user-only permissions under `~/Library/Application Support/BraveCodexCookieSync/backups/codex` or `backups/cursor`; the newest 14 per destination are retained.
 - Full site-data import is opt-in for Codex and requires both Codex and the source browser to be closed. It replaces compatible origin-storage directories rather than attempting an unsafe LevelDB merge; the previous directories are included in the same backup.
 - The app refuses unknown destination database schemas instead of guessing and writes only to Cursor's dedicated `Partitions/cursor-browser` profile, never Cursor's main application cookie store.

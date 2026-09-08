@@ -9,7 +9,7 @@ Thanks for helping improve Browser Cookie Bridge. Contributions are welcome, esp
 - Use the [bug report form](https://github.com/apoorvdarshan/browser-cookie-bridge/issues/new?template=bug_report.yml) for reproducible problems.
 - For a vulnerability, follow the private reporting instructions in [SECURITY.md](SECURITY.md). Do not open a public issue.
 
-Never include real cookie values, session tokens, browser profiles, generated extension tokens, Grok Bot `.bcbx` files, decryption keys, or other private browsing data in an issue, commit, fixture, screenshot, or log.
+Never include real cookie values, session tokens, browser profiles, generated extension tokens, Grok Bot `.bcbx` files, or other private browsing data in an issue, commit, fixture, screenshot, or log.
 
 ## Development requirements
 
@@ -85,13 +85,13 @@ Use `--arch x64` for the Intel artifact. The builder downloads the pinned offici
 
 Check the UI in both light and dark appearances where relevant. Verify labels, keyboard focus, VoiceOver descriptions, disabled states, progress states, and error messages. Include a screenshot or short recording in the pull request for visible UI changes, but remove all private browser data first.
 
-For transfer changes, use disposable test profiles and non-sensitive test accounts. Verify the source and destination combination you changed, plus one unaffected path. Codex or Cursor must be completely closed before testing its direct import. Grok Bot tests should create a temporary `.bcbx` file and never commit the bundle, passphrase, or cookie values.
+For transfer changes, use disposable test profiles and non-sensitive test accounts. Verify the source and destination combination you changed, plus one unaffected path. Codex or Cursor must be completely closed before testing its direct import. Grok Bot tests should create a temporary `.bcbx` file and never commit the bundle or cookie values.
 
 ## Safety rules
 
 Changes must preserve these guarantees:
 
-- Cookie values and history URLs are never logged. Grok Bot decryption keys must not be logged either.
+- Cookie values and history URLs are never logged.
 - The Grok Bot importer must not print cookie names or values, and must remain limited to the cloud-computer import path.
 - Browser-to-browser payloads remain local and are not persisted by the broker.
 - Generated broker tokens and configuration files keep user-only permissions.

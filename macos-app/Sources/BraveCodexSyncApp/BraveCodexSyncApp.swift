@@ -949,7 +949,7 @@ struct ExtensionSetupSheet: View {
       Text(model.isDirectTarget
         ? "\(model.targetName) uses a direct local merge, so no extension is required. Quit \(model.targetName) before syncing. Password access is never requested."
         : model.isGrokBotTarget
-          ? "Grok Bot uses a one-time encrypted transfer file, so no extension is required. Create the .bcbx bundle, attach it to any Grok Bot, and paste the prompt."
+          ? "Grok Bot uses an encrypted transfer file with an embedded decryption key, so no extension is required. Create the .bcbx bundle, attach it to any Grok Bot, and paste the prompt."
         : "In both endpoints, enable Developer mode and choose Load unpacked. Password access is never requested.")
         .font(.system(size: 10.5))
         .foregroundStyle(.secondary)
@@ -1188,12 +1188,13 @@ struct GrokBotResultSheet: View {
       }
 
       VStack(alignment: .leading, spacing: 8) {
-        Text("One-time decryption key")
+        Text("Sensitive transfer file")
           .font(.system(size: 11, weight: .semibold))
           .foregroundStyle(.secondary)
-        Text(model.grokBotPassphrase)
-          .font(.system(size: 15, weight: .semibold, design: .monospaced))
-          .textSelection(.enabled)
+        Text("The .bcbx bundle includes the decryption key. Anyone with the file can read your cookies—treat it like a password and do not share it.")
+          .font(.system(size: 11))
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
           .padding(10)
           .frame(maxWidth: .infinity, alignment: .leading)
           .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
