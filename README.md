@@ -48,7 +48,7 @@
 
 ---
 
-> **Version 1.5.1 restores the [Product Hunt](https://www.producthunt.com/products/browser-cookie-bridge-2) launch link.** Version 1.5.0 added experimental Cursor browser import and encrypted Grok Bot `.bcbx` export. Cursor is destination-only and currently imports cookie sessions into its dedicated browser partition. Grok Bot writes an encrypted transfer file with an embedded decryption key and bundled importer: attach the `.bcbx` file to any Grok Bot and paste the prompt—no separate key entry. Treat the bundle as credentials because anyone with the file can decrypt it. Cookie values must never be logged or pasted into chat. The optional Codex restart flow from 1.4.0 is unchanged and remains off by default.
+> **Version 1.5.2:** Grok Bot `.bcbx` bundles embed the decryption key, so import needs no passphrase—treat the file as credentials because anyone with it can decrypt the cookies. Version 1.5.1 restored the [Product Hunt](https://www.producthunt.com/products/browser-cookie-bridge-2) launch link. Version 1.5.0 added experimental Cursor browser import and encrypted Grok Bot `.bcbx` export. Cursor is destination-only and currently imports cookie sessions into its dedicated browser partition. Attach the `.bcbx` file to any Grok Bot and paste the prompt; the bundled importer decrypts automatically. Cookie values must never be logged or pasted into chat. The optional Codex restart flow from 1.4.0 is unchanged and remains off by default.
 
 ## Why Browser Cookie Bridge
 
