@@ -7,13 +7,15 @@ import { createZipArchive, readZipArchive } from "./zip-store.js";
 
 export const BUNDLE_EXTENSION = "bcbx";
 export const DEFAULT_BUNDLE_NAME = "GrokBot-Import.bcbx";
+export const BUNDLE_FORMAT_VERSION = 2;
+export const EMBEDDED_KEY_FILENAME = "decryption.key";
+
 export const GROK_BOT_PROMPT = `On your Grok Bot cloud computer only — do not access my local Mac and do not print cookie values.
 
 1. Save the attached GrokBot-Import.bcbx to the cloud computer.
 2. Unzip it: unzip -o GrokBot-Import.bcbx -d bcb-import && cd bcb-import
 3. Run: node import.mjs
-4. When prompted, ask me to take over and type the one-time decryption key privately through Agent Computer.
-5. Report only how many cookies were imported per domain, then delete the bcb-import folder and any copies of the bundle.`;
+4. Report only how many cookies were imported per domain, then delete the bcb-import folder and any copies of the bundle.`;
 
 const KDF = { name: "scrypt", N: 16384, r: 8, p: 1, keyLength: 32 };
 const SAME_SITE = {
@@ -50,7 +52,9 @@ export function buildGrokBotBundle({
   const domains = uniqueDomains(exportCookies);
   const manifest = {
     format: "browser-cookie-bridge-grok-bot",
-    version: 1,
+    version: BUNDLE_FORMAT_VERSION,
+    keyDelivery: "embedded",
+    keyFile: EMBEDDED_KEY_FILENAME,
     createdAt: now.toISOString(),
     sourceBrowser,
     cookieCount: exportCookies.length,
@@ -66,6 +70,7 @@ export function buildGrokBotBundle({
   const archive = createZipArchive([
     { name: "manifest.json", data: Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8") },
     { name: "payload.enc", data: payloadBody },
+    { name: EMBEDDED_KEY_FILENAME, data: Buffer.from(`${passphrase}\n`, "utf8") },
     { name: "import.mjs", data: Buffer.from(importerSource, "utf8") },
     { name: "PROMPT.txt", data: Buffer.from(`${GROK_BOT_PROMPT}\n`, "utf8") },
   ]);
@@ -138,6 +143,7 @@ export function parseGrokBotBundle(buffer) {
   return {
     manifest,
     payload: entries.get("payload.enc"),
+    embeddedKey: entries.get(EMBEDDED_KEY_FILENAME)?.toString("utf8").trim() || "",
     importer: entries.get("import.mjs")?.toString("utf8") || "",
     prompt: entries.get("PROMPT.txt")?.toString("utf8") || "",
   };
@@ -148,7 +154,7 @@ export function grokBotSummary(result) {
   const skipped = result.sourceCookieSkipped
     ? ` ${result.sourceCookieSkipped} source cookie${result.sourceCookieSkipped === 1 ? " was" : "s were"} unreadable or unsupported.`
     : "";
-  return `Grok Bot transfer file created: ${result.cookieCount} cookies across ${domainNote} from ${result.sourceBrowser}.${skipped} Attach ${path.basename(result.outputPath)} to any Grok Bot, paste the prompt, then enter the one-time key privately when asked.`;
+  return `Grok Bot transfer file created: ${result.cookieCount} cookies across ${domainNote} from ${result.sourceBrowser}.${skipped} Attach ${path.basename(result.outputPath)} to any Grok Bot and paste the prompt. The bundle includes the decryption key—treat the file as credentials and do not share it.`;
 }
 
 export function filterCookies(cookies, onlyDomains = []) {

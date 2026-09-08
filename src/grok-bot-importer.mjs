@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { stdin as input, stdout as output } from "node:process";
 
 const CDP_PORTS = [9222, 9223, 9224, 9228, 9229, 9400];
+const EMBEDDED_KEY_FILENAME = "decryption.key";
 const SAME_SITE = {
   unspecified: "Lax",
   no_restriction: "None",
@@ -29,7 +30,7 @@ export async function main(argv = process.argv.slice(2)) {
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   validateManifest(manifest);
-  const passphrase = await readPassphrase();
+  const passphrase = await resolveDecryptionKey({ manifest, bundleDir });
   const cookies = decryptPayload({
     manifest,
     encrypted: fs.readFileSync(payloadPath),
@@ -42,14 +43,37 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 export function validateManifest(manifest) {
-  if (manifest?.format !== "browser-cookie-bridge-grok-bot" || manifest?.version !== 1) {
+  if (manifest?.format !== "browser-cookie-bridge-grok-bot") {
     throw new Error("Unsupported Browser Cookie Bridge Grok Bot bundle.");
+  }
+  if (manifest?.version !== 1 && manifest?.version !== 2) {
+    throw new Error("Unsupported Browser Cookie Bridge Grok Bot bundle version.");
   }
   for (const key of ["salt", "iv", "authTag"]) {
     if (typeof manifest[key] !== "string" || !manifest[key]) {
       throw new Error(`Bundle manifest is missing ${key}.`);
     }
   }
+}
+
+export async function resolveDecryptionKey({ manifest, bundleDir }) {
+  if (manifest.version === 2) {
+    if (manifest.keyDelivery !== "embedded") {
+      throw new Error("Unsupported Grok Bot bundle key delivery method.");
+    }
+    const keyFile = typeof manifest.keyFile === "string" && manifest.keyFile
+      ? manifest.keyFile
+      : EMBEDDED_KEY_FILENAME;
+    const keyPath = path.join(bundleDir, keyFile);
+    if (!fs.existsSync(keyPath)) {
+      throw new Error(`Embedded decryption key file is missing: ${keyFile}`);
+    }
+    const key = fs.readFileSync(keyPath, "utf8").trim();
+    if (!key) throw new Error("Embedded decryption key file is empty.");
+    return key;
+  }
+
+  return readPassphrase();
 }
 
 export function decryptPayload({ manifest, encrypted, passphrase }) {
@@ -164,7 +188,7 @@ function reportSummary(result, domains) {
 }
 
 function cleanup(bundleDir, bundlePath) {
-  for (const name of ["manifest.json", "payload.enc", "import.mjs", "PROMPT.txt"]) {
+  for (const name of ["manifest.json", "payload.enc", EMBEDDED_KEY_FILENAME, "import.mjs", "PROMPT.txt"]) {
     fs.rmSync(path.join(bundleDir, name), { force: true });
   }
   fs.rmSync(bundlePath, { force: true });

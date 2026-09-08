@@ -312,7 +312,6 @@ async function sync(args, { signal } = {}) {
     console.log(grokBotSummary(result));
     console.log(`BCB_GROK_RESULT ${JSON.stringify({
       outputPath: result.outputPath,
-      passphrase: result.passphrase,
       cookieCount: result.cookieCount,
       domainCount: result.domainCount,
       domains: result.domains,

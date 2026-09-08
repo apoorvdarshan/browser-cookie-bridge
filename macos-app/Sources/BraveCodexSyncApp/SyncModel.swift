@@ -100,7 +100,6 @@ final class SyncModel: ObservableObject {
   @Published var grokBotOnlyDomains = ""
   @Published var showingBrowserlessSetup = false
   @Published var showingGrokBotResult = false
-  @Published var grokBotPassphrase = ""
   @Published var grokBotPrompt = ""
   @Published var grokBotOutputPath = ""
   @Published var browserlessAssessment: BrowserlessProfileAssessment?
@@ -754,7 +753,6 @@ final class SyncModel: ObservableObject {
       } else if success {
         self.state = partial ? .warning : .success
         if self.isGrokBotTarget, let result = self.parseGrokBotResult(from: output) {
-          self.grokBotPassphrase = result.passphrase
           self.grokBotPrompt = result.prompt
           self.grokBotOutputPath = result.outputPath
           self.showingGrokBotResult = true
@@ -1167,7 +1165,6 @@ final class SyncModel: ObservableObject {
 
   private struct GrokBotResultPayload: Decodable {
     let outputPath: String
-    let passphrase: String
     let prompt: String
   }
 
@@ -1230,7 +1227,7 @@ final class SyncModel: ObservableObject {
       } else {
         state = .ready
         primaryStatus = "Ready to create a Grok Bot transfer file"
-        secondaryStatus = "Creates an encrypted .bcbx bundle with a one-time key and bundled importer"
+        secondaryStatus = "Creates an encrypted .bcbx bundle with an embedded decryption key and bundled importer"
       }
     } else if isBrowserlessTarget {
       if selectedSourceID == "comet" {

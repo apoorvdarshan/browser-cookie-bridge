@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
+  BUNDLE_FORMAT_VERSION,
   buildGrokBotBundle,
   cookieMatchesDomains,
   filterCookies,
@@ -12,7 +13,7 @@ import {
   parseGrokBotBundle,
   writeGrokBotBundle,
 } from "../src/grok-bot-export.js";
-import { decryptPayload, validateManifest } from "../src/grok-bot-importer.mjs";
+import { decryptPayload, resolveDecryptionKey, validateManifest } from "../src/grok-bot-importer.mjs";
 
 const SAMPLE_COOKIES = [
   {
@@ -40,30 +41,44 @@ const SAMPLE_COOKIES = [
   },
 ];
 
-test("Grok Bot bundle encrypts cookies and round-trips with the one-time key", () => {
-  const passphrase = "test-passphrase-123";
+test("Grok Bot bundle encrypts cookies and auto-decrypts with the embedded key", async () => {
   const bundle = buildGrokBotBundle({
     cookies: SAMPLE_COOKIES,
     sourceBrowser: "brave",
     onlyDomains: ["example.com"],
-    passphrase,
     importerSource: "// test importer\n",
   });
   const parsed = parseGrokBotBundle(bundle.archive);
   validateManifest(parsed.manifest);
+  assert.equal(parsed.manifest.version, BUNDLE_FORMAT_VERSION);
+  assert.equal(parsed.manifest.keyDelivery, "embedded");
+  assert.equal(parsed.embeddedKey, bundle.passphrase);
   assert.match(parsed.importer, /test importer/);
   assert.match(parsed.prompt, /Grok Bot cloud computer only/);
+  assert.doesNotMatch(parsed.prompt, /one-time decryption key/i);
   assert.ok(!parsed.importer.includes("abc123"));
   assert.ok(!Buffer.from(bundle.archive).includes(Buffer.from("abc123")));
 
-  const decrypted = decryptPayload({
-    manifest: parsed.manifest,
-    encrypted: parsed.payload,
-    passphrase,
-  });
-  assert.equal(decrypted.length, 1);
-  assert.equal(decrypted[0].name, "session");
-  assert.equal(decrypted[0].domain, ".example.com");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "grok-bot-import-"));
+  try {
+    fs.writeFileSync(path.join(directory, "manifest.json"), JSON.stringify(parsed.manifest));
+    fs.writeFileSync(path.join(directory, "payload.enc"), parsed.payload);
+    fs.writeFileSync(path.join(directory, "decryption.key"), `${parsed.embeddedKey}\n`);
+
+    const passphrase = await resolveDecryptionKey({ manifest: parsed.manifest, bundleDir: directory });
+    assert.equal(passphrase, bundle.passphrase);
+
+    const decrypted = decryptPayload({
+      manifest: parsed.manifest,
+      encrypted: parsed.payload,
+      passphrase,
+    });
+    assert.equal(decrypted.length, 1);
+    assert.equal(decrypted[0].name, "session");
+    assert.equal(decrypted[0].domain, ".example.com");
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("Grok Bot bundle writer creates a private .bcbx file", () => {
@@ -74,7 +89,6 @@ test("Grok Bot bundle writer creates a private .bcbx file", () => {
     cookies: SAMPLE_COOKIES,
     sourceBrowser: "brave",
     onlyDomains: [],
-    passphrase: "writer-passphrase",
   });
   assert.equal(result.outputPath, outputPath);
   assert.ok(fs.existsSync(outputPath));
@@ -82,6 +96,8 @@ test("Grok Bot bundle writer creates a private .bcbx file", () => {
   assert.equal(mode, 0o600);
   const parsed = parseGrokBotBundle(fs.readFileSync(outputPath));
   assert.equal(parsed.manifest.cookieCount, 2);
+  assert.equal(parsed.manifest.version, BUNDLE_FORMAT_VERSION);
+  assert.ok(parsed.embeddedKey);
 });
 
 test("domain filtering and summary text stay explicit", () => {
@@ -98,14 +114,14 @@ test("domain filtering and summary text stay explicit", () => {
     sourceCookieSkipped: 1,
   });
   assert.match(summary, /Grok Bot transfer file created/);
-  assert.match(summary, /one-time key privately/);
+  assert.match(summary, /treat the file as credentials/);
+  assert.doesNotMatch(summary, /one-time key privately/);
 });
 
-test("wrong passphrase fails closed", () => {
+test("wrong embedded key fails closed", () => {
   const bundle = buildGrokBotBundle({
     cookies: SAMPLE_COOKIES,
     sourceBrowser: "brave",
-    passphrase: "correct-key",
     importerSource: "// importer\n",
   });
   const parsed = parseGrokBotBundle(bundle.archive);
@@ -113,4 +129,60 @@ test("wrong passphrase fails closed", () => {
     () => decryptPayload({ manifest: parsed.manifest, encrypted: parsed.payload, passphrase: "wrong-key" }),
     /Unsupported state|auth|decrypt/i,
   );
+});
+
+test("v2 bundles fail closed when the embedded key file is missing", async () => {
+  const manifest = {
+    format: "browser-cookie-bridge-grok-bot",
+    version: 2,
+    keyDelivery: "embedded",
+    keyFile: "decryption.key",
+    salt: "abc",
+    iv: "def",
+    authTag: "ghi",
+  };
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "grok-bot-missing-key-"));
+  try {
+    await assert.rejects(
+      () => resolveDecryptionKey({ manifest, bundleDir: directory }),
+      /Embedded decryption key file is missing/,
+    );
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("legacy v1 bundles still accept a prompted passphrase", async () => {
+  const passphrase = "legacy-passphrase";
+  const salt = crypto.randomBytes(16);
+  const iv = crypto.randomBytes(12);
+  const key = crypto.scryptSync(passphrase, salt, 32, { N: 16384, r: 8, p: 1 });
+  const payload = Buffer.from(JSON.stringify({ cookies: [{ name: "a", value: "b", domain: ".example.com", path: "/" }] }), "utf8");
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(payload), cipher.final(), cipher.getAuthTag()]);
+  const manifest = {
+    format: "browser-cookie-bridge-grok-bot",
+    version: 1,
+    salt: salt.toString("base64url"),
+    iv: iv.toString("base64url"),
+    authTag: encrypted.subarray(encrypted.length - 16).toString("base64url"),
+    kdf: { N: 16384, r: 8, p: 1 },
+  };
+  validateManifest(manifest);
+
+  const previous = process.env.BCB_IMPORT_KEY;
+  process.env.BCB_IMPORT_KEY = passphrase;
+  try {
+    const resolved = await resolveDecryptionKey({ manifest, bundleDir: os.tmpdir() });
+    assert.equal(resolved, passphrase);
+    const decrypted = decryptPayload({
+      manifest,
+      encrypted: encrypted.subarray(0, encrypted.length - 16),
+      passphrase: resolved,
+    });
+    assert.equal(decrypted.length, 1);
+  } finally {
+    if (previous === undefined) delete process.env.BCB_IMPORT_KEY;
+    else process.env.BCB_IMPORT_KEY = previous;
+  }
 });
