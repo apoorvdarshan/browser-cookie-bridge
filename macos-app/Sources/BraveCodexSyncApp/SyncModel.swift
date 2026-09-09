@@ -197,7 +197,11 @@ final class SyncModel: ObservableObject {
       ?? appIcon(bundleIdentifier: "com.openai.codex", fallbackSymbol: "terminal")
   }
   var cursorIcon: NSImage {
-    appIcon(bundleIdentifier: "com.todesktop.230313mzl4w4u92", fallbackSymbol: "cursorarrow.square")
+    if let url = Bundle.main.url(forResource: "cursor", withExtension: "png", subdirectory: "BrowserIcons"),
+       let image = NSImage(contentsOf: url) {
+      return image
+    }
+    return appIcon(bundleIdentifier: "com.todesktop.230313mzl4w4u92", fallbackSymbol: "cursorarrow.square")
   }
 
   func browserIcon(_ browser: BrowserChoice) -> NSImage {
