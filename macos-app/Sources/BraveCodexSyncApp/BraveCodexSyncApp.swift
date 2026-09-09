@@ -473,7 +473,10 @@ struct TargetPicker: View {
             icon: model.cursorIcon,
             name: "Cursor browser",
             selected: model.selectedTargetID == "cursor",
-            disabled: model.isWorking || model.isSyncing
+            disabled: model.isWorking || model.isSyncing,
+            buttonWidth: 44,
+            iconWidth: 40,
+            iconHeight: 40
           ) { model.selectTarget("cursor") }
           EndpointButton(
             icon: model.codexIcon,
