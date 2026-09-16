@@ -116,54 +116,100 @@ export function decryptChromiumCookieValue({ domain, encryptedValue, password })
   return plaintext.subarray(32).toString();
 }
 
-function readCookies({ databasePath, password }) {
-  if (databasePath === null) throw new Error("Cookie database was not found");
+const COOKIE_QUERY = `
+  SELECT host_key, top_frame_site_key, name, value, encrypted_value, path,
+         CAST(expires_utc AS TEXT) AS expires_utc,
+         is_secure, is_httponly, has_expires, is_persistent, samesite,
+         has_cross_site_ancestor
+  FROM cookies
+`;
+
+function isLockError(error) {
+  return /database is locked|SQLITE_BUSY|SQLITE_LOCKED|locking protocol|unable to open database/i.test(String(error?.message || error));
+}
+
+function queryCookieRows(databasePath) {
   const database = new DatabaseSync(databasePath, { readOnly: true });
   try {
-    const rows = database.prepare(`
-      SELECT host_key, top_frame_site_key, name, value, encrypted_value, path,
-             CAST(expires_utc AS TEXT) AS expires_utc,
-             is_secure, is_httponly, has_expires, is_persistent, samesite,
-             has_cross_site_ancestor
-      FROM cookies
-    `).all();
-    const cookies = [];
-    let skipped = 0;
-    for (const row of rows) {
-      try {
-        const value = row.value || decryptChromiumCookieValue({
-          domain: row.host_key,
-          encryptedValue: row.encrypted_value,
-          password,
-        });
-        const persistent = Boolean(row.has_expires && row.is_persistent && row.expires_utc > 0);
-        cookies.push({
-          name: row.name,
-          value,
-          domain: row.host_key,
-          hostOnly: !row.host_key.startsWith("."),
-          path: row.path,
-          secure: Boolean(row.is_secure),
-          httpOnly: Boolean(row.is_httponly),
-          sameSite: ({ "-1": "unspecified", 0: "no_restriction", 1: "lax", 2: "strict" })[row.samesite] || "unspecified",
-          session: !persistent,
-          ...(persistent ? { expirationDate: chromiumToUnixSeconds(row.expires_utc) } : {}),
-          ...(row.top_frame_site_key ? {
-            partitionKey: {
-              topLevelSite: row.top_frame_site_key,
-              hasCrossSiteAncestor: Boolean(row.has_cross_site_ancestor),
-            },
-          } : {}),
-        });
-      } catch {
-        // An individual malformed or obsolete cookie must not block the rest of the profile.
-        skipped += 1;
-      }
-    }
-    return { cookies, total: rows.length, skipped };
+    return database.prepare(COOKIE_QUERY).all();
   } finally {
     database.close();
   }
+}
+
+/**
+ * Chromium holds its cookie store with exclusive SQLite locking while the browser runs, which makes a direct
+ * read-only open fail with "database is locked". Copying the file (plus any WAL/journal sidecars) into a
+ * private temporary directory sidesteps the advisory lock; the copy is removed immediately after reading.
+ */
+export function readCookieRowsFromSnapshot(databasePath) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "bcb-cookie-snapshot-"));
+  fs.chmodSync(directory, 0o700);
+  try {
+    const target = path.join(directory, "Cookies");
+    fs.copyFileSync(databasePath, target);
+    for (const suffix of ["-journal", "-wal", "-shm"]) {
+      const sidecar = `${databasePath}${suffix}`;
+      if (fs.existsSync(sidecar)) fs.copyFileSync(sidecar, `${target}${suffix}`);
+    }
+    return queryCookieRows(target);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+export function readCookieRows(databasePath, { snapshot = readCookieRowsFromSnapshot } = {}) {
+  try {
+    return queryCookieRows(databasePath);
+  } catch (error) {
+    if (!isLockError(error)) throw error;
+    try {
+      return snapshot(databasePath);
+    } catch (snapshotError) {
+      throw new Error(
+        `Cookie database is locked by the browser and a temporary snapshot could not be read (${snapshotError.message}). Close the source browser and try again.`,
+      );
+    }
+  }
+}
+
+function readCookies({ databasePath, password }) {
+  if (databasePath === null) throw new Error("Cookie database was not found");
+  const rows = readCookieRows(databasePath);
+  const cookies = [];
+  let skipped = 0;
+  for (const row of rows) {
+    try {
+      const value = row.value || decryptChromiumCookieValue({
+        domain: row.host_key,
+        encryptedValue: row.encrypted_value,
+        password,
+      });
+      const persistent = Boolean(row.has_expires && row.is_persistent && row.expires_utc > 0);
+      cookies.push({
+        name: row.name,
+        value,
+        domain: row.host_key,
+        hostOnly: !row.host_key.startsWith("."),
+        path: row.path,
+        secure: Boolean(row.is_secure),
+        httpOnly: Boolean(row.is_httponly),
+        sameSite: ({ "-1": "unspecified", 0: "no_restriction", 1: "lax", 2: "strict" })[row.samesite] || "unspecified",
+        session: !persistent,
+        ...(persistent ? { expirationDate: chromiumToUnixSeconds(row.expires_utc) } : {}),
+        ...(row.top_frame_site_key ? {
+          partitionKey: {
+            topLevelSite: row.top_frame_site_key,
+            hasCrossSiteAncestor: Boolean(row.has_cross_site_ancestor),
+          },
+        } : {}),
+      });
+    } catch {
+      // An individual malformed or obsolete cookie must not block the rest of the profile.
+      skipped += 1;
+    }
+  }
+  return { cookies, total: rows.length, skipped };
 }
 
 function readHistory(databasePath) {
@@ -182,12 +228,19 @@ function readSafeStoragePassword(definition, browser) {
   const args = ["find-generic-password", "-w", "-s", definition.safeStorageService];
   if (definition.safeStorageAccount) args.push("-a", definition.safeStorageAccount);
   const result = spawnSync("/usr/bin/security", args, { encoding: "utf8", maxBuffer: 1024 * 1024 });
+  const name = browserDisplayName(browser);
   if (result.status !== 0) {
+    const reason = (result.stderr || result.error?.message || "").trim().split("\n").pop();
+    const detail = reason ? ` (security: ${reason})` : "";
     throw new Error(
-      `${browserDisplayName(browser)} Safe Storage is unavailable. Open ${browserDisplayName(browser)} once, then try again.`,
+      `${name} Safe Storage is unavailable${detail}. Open ${name} once, and if macOS asks whether "security" may use the "${definition.safeStorageService}" keychain item choose Always Allow, then try again.`,
     );
   }
-  return result.stdout.trimEnd();
+  const password = result.stdout.trimEnd();
+  if (!password) {
+    throw new Error(`${name} Safe Storage returned an empty key. Open ${name} once, then try again.`);
+  }
+  return password;
 }
 
 function activeProfileName(root) {

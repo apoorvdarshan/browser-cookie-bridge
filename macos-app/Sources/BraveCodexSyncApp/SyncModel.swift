@@ -24,6 +24,75 @@ struct GrokBotResultPresentation: Sendable {
   let outputPath: String
 }
 
+/// Append-only diagnostics shared by the model and the app delegate.
+/// Lives next to the launchd logs in Application Support so a failed Create/Replace can be
+/// debugged after the fact. The CLI never prints cookie values, so captured output is safe to keep.
+enum AppDiagnostics {
+  private static let lock = NSLock()
+  private static let maxLogBytes = 512 * 1024
+
+  static var logsDirectory: URL {
+    FileManager.default.homeDirectoryForCurrentUser
+      .appending(path: "Library/Application Support/BraveCodexCookieSync/logs")
+  }
+  static var appLogURL: URL { logsDirectory.appending(path: "app.log") }
+  static var lastSyncResultURL: URL { logsDirectory.appending(path: "last-sync-result.json") }
+
+  static func log(_ message: String) {
+    let stamp = ISO8601DateFormatter().string(from: Date())
+    let line = "\(stamp) \(message)\n"
+    lock.withLock {
+      prepareDirectory()
+      let url = appLogURL
+      if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int, size > maxLogBytes {
+        try? FileManager.default.removeItem(at: url)
+      }
+      if let handle = try? FileHandle(forWritingTo: url) {
+        defer { try? handle.close() }
+        _ = try? handle.seekToEnd()
+        try? handle.write(contentsOf: Data(line.utf8))
+      } else {
+        try? Data(line.utf8).write(to: url, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+      }
+    }
+  }
+
+  static func writeLastSyncResult(_ record: SyncResultRecord) {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    encoder.dateEncodingStrategy = .iso8601
+    guard let data = try? encoder.encode(record) else { return }
+    lock.withLock {
+      prepareDirectory()
+      try? data.write(to: lastSyncResultURL, options: .atomic)
+      try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: lastSyncResultURL.path)
+    }
+  }
+
+  private static func prepareDirectory() {
+    try? FileManager.default.createDirectory(
+      at: logsDirectory,
+      withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700]
+    )
+  }
+}
+
+struct SyncResultRecord: Encodable, Sendable {
+  let startedAt: Date
+  let finishedAt: Date
+  let target: String
+  let arguments: [String]
+  let exitStatus: Int32?
+  let terminatedBySignal: Bool
+  let success: Bool
+  let outputPath: String?
+  let bundleWritten: Bool?
+  let presented: Bool
+  let lastLine: String?
+}
+
 struct UpdateMenuState {
   let version: String?
   let checking: Bool
@@ -143,6 +212,11 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   private var runtimeReady = true
   private var rememberedHistoryEnabled = false
   private var rememberedSiteStorageEnabled = false
+  /// True while the status line shows the outcome of an explicit action. The idle "Ready…" text for
+  /// Grok Bot and Browserless must not overwrite it (see `updateEndpointRunningStatus`).
+  private var showingOperationResult = false
+  /// Exit details of the most recent CLI process; set on the main actor immediately before its completion runs.
+  private var lastCLIExit: (status: Int32, signaled: Bool)?
 
   var selectedBrowser: BrowserChoice {
     browsers.first(where: { $0.id == selectedSourceID }) ?? browsers[0]
@@ -494,9 +568,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
         if self.isVersion(release.version, newerThan: self.currentVersion) {
           self.availableUpdateVersion = release.version
           if !self.directTargetBlocked && !self.isSyncing {
-            self.state = .ready
-            self.primaryStatus = "Update \(release.version) available"
-            self.secondaryStatus = "Install it now; the app will relaunch automatically"
+            self.showResult(.ready, "Update \(release.version) available", "Install it now; the app will relaunch automatically")
           }
           if showAlert {
             self.postNativeAlert(
@@ -717,16 +789,57 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     } else {
       panel.allowedFileTypes = ["bcbx"]
     }
+    AppDiagnostics.log("grok-bot: presenting save panel")
     panel.begin { [weak self] response in
       guard let self else { return }
-      guard response == .OK, let url = panel.url else { return }
+      guard response == .OK else {
+        AppDiagnostics.log("grok-bot: save panel dismissed without saving (response \(response.rawValue))")
+        return
+      }
+      guard let chosen = panel.url else {
+        AppDiagnostics.log("grok-bot: save panel returned OK without a URL")
+        self.showResult(
+          .error,
+          "Could not create the Grok Bot transfer file",
+          "macOS did not return a save location. Try again and choose a folder such as Downloads."
+        )
+        self.postNativeAlert(title: self.primaryStatus, message: self.secondaryStatus, kind: .error)
+        return
+      }
+      let url = Self.normalizedGrokBotOutputURL(chosen)
+      AppDiagnostics.log("grok-bot: save panel OK → \(url.path)\(url.path == chosen.path ? "" : " (normalized from \(chosen.path))")")
       self.startSync(showMenuBarAlert: showMenuBarAlert, reopenCodexOnSuccess: false, grokBotOutputPath: url.path)
     }
+  }
+
+  /// The save panel is fed a base name plus a dynamic `.bcbx` UTType; depending on the macOS release it has
+  /// returned `Name.bcbx`, `Name.bcbx.bcbx`, or `Name`. The CLI rejects anything that is not exactly `.bcbx`,
+  /// so normalize here instead of letting the export fail after the user already confirmed Replace.
+  static func normalizedGrokBotOutputURL(_ url: URL) -> URL {
+    var path = url.path
+    while path.lowercased().hasSuffix(".bcbx.bcbx") { path.removeLast(5) }
+    if !path.lowercased().hasSuffix(".bcbx") { path += ".bcbx" }
+    return URL(fileURLWithPath: path)
+  }
+
+  private static func fileWasWritten(atPath path: String, since startedAt: Date) -> Bool {
+    guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+          let modified = attributes[.modificationDate] as? Date else { return false }
+    // Filesystem timestamps can be coarser than Date(); allow a small tolerance.
+    return modified >= startedAt.addingTimeInterval(-2)
+  }
+
+  private func showResult(_ newState: State, _ primary: String, _ secondary: String) {
+    state = newState
+    primaryStatus = primary
+    secondaryStatus = secondary
+    showingOperationResult = true
   }
 
   private func startSync(showMenuBarAlert: Bool, reopenCodexOnSuccess: Bool, reopenSourceOnSuccess: Bool = false, grokBotOutputPath: String? = nil) {
     isSyncing = true
     uploadCanceling = false
+    showingOperationResult = false
     state = .syncing
     primaryStatus = isGrokBotTarget
       ? "Creating Grok Bot transfer file"
@@ -750,6 +863,8 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       guard let token = BrowserlessCredentialStore.read() else {
         isSyncing = false
         browserlessConfigured = false
+        showResult(.error, "Browserless token is missing", "Reconnect Browserless from the Configure… button, then upload again.")
+        postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: .error)
         updateEndpointRunningStatus()
         return
       }
@@ -757,6 +872,9 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       arguments.append("--allow-cloud-upload")
       beginUploadTracking()
     }
+    let startedAt = Date()
+    let target = selectedTargetID
+    let launchArguments = arguments
     activeSyncProcess = runCLI(arguments, environment: environment, onLine: { [weak self] line in
       self?.handleBrowserlessProgress(line)
     }) { [weak self] success, output in
@@ -770,38 +888,55 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
           || output.contains("omitted to fit")
           || output.contains("could not be captured")
       )
+      if let grokBotOutputPath {
+        self.finishGrokBotExport(
+          success: success,
+          partial: partial,
+          output: output,
+          requestedPath: grokBotOutputPath,
+          startedAt: startedAt,
+          arguments: launchArguments
+        )
+        return
+      }
       let canceled = output.contains("Browserless upload canceled") || output.contains("Temporary profile data was removed")
       if canceled {
-        self.state = .canceled
-        self.primaryStatus = "Browserless upload canceled"
-        self.secondaryStatus = "No cloud profile was changed; temporary profile data was removed"
+        self.showResult(.canceled, "Browserless upload canceled", "No cloud profile was changed; temporary profile data was removed")
       } else if success {
-        self.state = partial ? .warning : .success
-        if self.isGrokBotTarget {
-          let parsed = self.parseGrokBotResult(from: output)
-          let outputPath = parsed?.outputPath ?? self.activeGrokBotOutputPath ?? grokBotOutputPath ?? self.grokBotOutputPath
-          let prompt = parsed?.prompt ?? Self.grokBotFallbackPrompt
-          self.presentGrokBotResultSheet(prompt: prompt, outputPath: outputPath)
-          self.activeGrokBotOutputPath = nil
-          self.primaryStatus = partial ? "Grok Bot transfer created with warnings" : "Grok Bot transfer file ready"
-          self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Attach the .bcbx file to any Grok Bot and paste the prompt"
-        } else {
-          self.primaryStatus = self.isBrowserlessTarget
-            ? (partial ? "Browserless profile uploaded with omissions" : "Browserless profile uploaded")
-            : self.isDirectTarget
-            ? (partial ? "\(self.targetName) sync completed with warnings" : "\(self.targetName) sessions updated")
-            : (partial ? "Partially synced" : "Transfer complete")
-          self.secondaryStatus = self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and \(self.targetName) are up to date"
-        }
+        let primary = self.isBrowserlessTarget
+          ? (partial ? "Browserless profile uploaded with omissions" : "Browserless profile uploaded")
+          : self.isDirectTarget
+          ? (partial ? "\(self.targetName) sync completed with warnings" : "\(self.targetName) sessions updated")
+          : (partial ? "Partially synced" : "Transfer complete")
+        self.showResult(
+          partial ? .warning : .success,
+          primary,
+          self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and \(self.targetName) are up to date"
+        )
       } else {
-        self.state = .error
-        self.primaryStatus = "Sync did not finish"
-        self.secondaryStatus = self.lastMeaningfulLine(output) ?? (self.isDirectTarget
-          ? "Quit \(self.targetName) completely, then try again"
-          : self.isBrowserlessTarget
-            ? "Check the API token, close the source browser, and try again"
-          : "Keep both browsers open and check the extensions")
+        self.showResult(
+          .error,
+          "Sync did not finish",
+          self.lastMeaningfulLine(output) ?? (self.isDirectTarget
+            ? "Quit \(self.targetName) completely, then try again"
+            : self.isBrowserlessTarget
+              ? "Check the API token, close the source browser, and try again"
+            : "Keep both browsers open and check the extensions")
+        )
       }
+      AppDiagnostics.writeLastSyncResult(SyncResultRecord(
+        startedAt: startedAt,
+        finishedAt: Date(),
+        target: target,
+        arguments: launchArguments,
+        exitStatus: self.lastCLIExit?.status,
+        terminatedBySignal: self.lastCLIExit?.signaled ?? false,
+        success: success,
+        outputPath: nil,
+        bundleWritten: nil,
+        presented: false,
+        lastLine: self.lastMeaningfulLine(output)
+      ))
       self.updateEndpointRunningStatus()
       if success && (reopenCodexOnSuccess || reopenSourceOnSuccess) {
         self.reopenApplicationsAfterSuccessfulSync(
@@ -811,13 +946,76 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
           reopenSource: reopenSourceOnSuccess,
           showMenuBarAlert: showMenuBarAlert
         )
-      } else if showMenuBarAlert {
+      } else if showMenuBarAlert || (!success && !canceled) {
+        // Failures always get a modal alert: a status line that can be missed is not an error report.
         self.postNativeAlert(
           title: self.primaryStatus,
-          message: self.secondaryStatus,
+          message: !success && !canceled
+            ? "\(self.secondaryStatus)\n\nDetails: \(AppDiagnostics.appLogURL.path)"
+            : self.secondaryStatus,
           kind: canceled ? .information : success ? (partial ? .warning : .information) : .error
         )
       }
+    }
+  }
+
+  /// Completes a Grok Bot export. Presentation is driven by whether the `.bcbx` file was actually (re)written,
+  /// not only by the exit status, so the result panel can never be skipped after a successful write and a
+  /// failure can never end with just a status-line change.
+  private func finishGrokBotExport(
+    success: Bool,
+    partial: Bool,
+    output: String,
+    requestedPath: String,
+    startedAt: Date,
+    arguments: [String]
+  ) {
+    let parsed = parseGrokBotResult(from: output)
+    let outputPath = parsed?.outputPath ?? requestedPath
+    let bundleWritten = Self.fileWasWritten(atPath: outputPath, since: startedAt)
+    let fileName = URL(fileURLWithPath: outputPath).lastPathComponent
+    let cliExit = lastCLIExit
+    activeGrokBotOutputPath = nil
+    AppDiagnostics.log(
+      "grok-bot: CLI finished success=\(success) exit=\(cliExit.map { String($0.status) } ?? "nil") "
+        + "signaled=\(cliExit?.signaled ?? false) resultLine=\(parsed != nil) bundleWritten=\(bundleWritten) path=\(outputPath)"
+    )
+
+    let treatAsSuccess = success || bundleWritten
+    AppDiagnostics.writeLastSyncResult(SyncResultRecord(
+      startedAt: startedAt,
+      finishedAt: Date(),
+      target: "grok-bot",
+      arguments: arguments,
+      exitStatus: cliExit?.status,
+      terminatedBySignal: cliExit?.signaled ?? false,
+      success: treatAsSuccess,
+      outputPath: outputPath,
+      bundleWritten: bundleWritten,
+      presented: treatAsSuccess,
+      lastLine: lastMeaningfulLine(output)
+    ))
+    if treatAsSuccess {
+      if !success {
+        AppDiagnostics.log("grok-bot: exit status was non-zero but \(fileName) was rewritten — presenting the result anyway")
+      }
+      showResult(
+        partial ? .warning : .success,
+        partial ? "Grok Bot transfer created with warnings" : "Grok Bot transfer file ready",
+        lastMeaningfulLine(output) ?? "Attach \(fileName) to any Grok Bot and paste the prompt"
+      )
+      updateEndpointRunningStatus()
+      presentGrokBotResultSheet(prompt: parsed?.prompt ?? Self.grokBotFallbackPrompt, outputPath: outputPath)
+    } else {
+      let detail = lastMeaningfulLine(output)
+        ?? "The local sync runtime exited (status \(cliExit.map { String($0.status) } ?? "unknown")) without writing \(fileName)."
+      showResult(.error, "Could not create the Grok Bot transfer file", detail)
+      updateEndpointRunningStatus()
+      postNativeAlert(
+        title: primaryStatus,
+        message: "\(detail)\n\n\(fileName) was not written. Details: \(AppDiagnostics.appLogURL.path)",
+        kind: .error
+      )
     }
   }
 
@@ -935,16 +1133,14 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       guard let self else { return }
       self.isWorking = false
       if success {
-        self.state = .ready
-        self.primaryStatus = enabled ? "Sync at login enabled" : "Sync at login disabled"
-        self.secondaryStatus = enabled
-          ? "A sync starts now and whenever you sign in"
-          : "The fixed daily schedule is unchanged"
+        self.showResult(
+          .ready,
+          enabled ? "Sync at login enabled" : "Sync at login disabled",
+          enabled ? "A sync starts now and whenever you sign in" : "The fixed daily schedule is unchanged"
+        )
       } else {
         self.loginSyncEnabled.toggle()
-        self.state = .error
-        self.primaryStatus = "Could not update login sync"
-        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Run install-app again from the CLI"
+        self.showResult(.error, "Could not update login sync", self.lastMeaningfulLine(output) ?? "Run install-app again from the CLI")
       }
       self.refresh()
     }
@@ -957,14 +1153,14 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       guard let self else { return }
       self.isWorking = false
       if success {
-        self.state = .ready
-        self.primaryStatus = enabled ? "Opens at login" : "Login launch disabled"
-        self.secondaryStatus = enabled ? "The app starts automatically after sign-in" : "Open the app manually when you need it"
+        self.showResult(
+          .ready,
+          enabled ? "Opens at login" : "Login launch disabled",
+          enabled ? "The app starts automatically after sign-in" : "Open the app manually when you need it"
+        )
       } else {
         self.openAtLogin.toggle()
-        self.state = .error
-        self.primaryStatus = "Could not update login launch"
-        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Run install-app again from the CLI"
+        self.showResult(.error, "Could not update login launch", self.lastMeaningfulLine(output) ?? "Run install-app again from the CLI")
       }
       self.refresh()
     }
@@ -1005,17 +1201,17 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       guard let self else { return }
       self.isWorking = false
       if success {
-        self.state = .ready
-        self.primaryStatus = successMessage
-        self.secondaryStatus = self.isBrowserlessTarget
-          ? "Cloud uploads run only after you click Upload"
-          : self.isGrokBotTarget
-            ? "Transfer files are created only when you click Create transfer file"
-          : "This choice is saved for manual and daily syncs"
+        self.showResult(
+          .ready,
+          successMessage,
+          self.isBrowserlessTarget
+            ? "Cloud uploads run only after you click Upload"
+            : self.isGrokBotTarget
+              ? "Transfer files are created only when you click Create transfer file"
+            : "This choice is saved for manual and daily syncs"
+        )
       } else {
-        self.state = .error
-        self.primaryStatus = "Could not save import settings"
-        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Run install-app again from the CLI"
+        self.showResult(.error, "Could not save import settings", self.lastMeaningfulLine(output) ?? "Run install-app again from the CLI")
         self.refresh()
       }
       self.extensionsReady = self.requiredExtensionIDs.allSatisfy {
@@ -1038,14 +1234,14 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       guard let self else { return }
       self.isWorking = false
       if success {
-        self.state = .ready
-        self.primaryStatus = enabled ? "Daily sync enabled" : "Daily sync disabled"
-        self.secondaryStatus = enabled ? "Scheduled for \(self.formattedTime)" : "Use Sync now whenever you need it"
+        self.showResult(
+          .ready,
+          enabled ? "Daily sync enabled" : "Daily sync disabled",
+          enabled ? "Scheduled for \(self.formattedTime)" : "Use Sync now whenever you need it"
+        )
       } else {
         self.dailyEnabled.toggle()
-        self.state = .error
-        self.primaryStatus = "Could not update schedule"
-        self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Run setup again from the CLI"
+        self.showResult(.error, "Could not update schedule", self.lastMeaningfulLine(output) ?? "Run setup again from the CLI")
       }
       self.refresh()
     }
@@ -1058,13 +1254,26 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     onLine: (@MainActor (String) -> Void)? = nil,
     completion: @escaping @MainActor (Bool, String) -> Void
   ) -> Process? {
-    guard let config = loadConfig() else {
-      completion(false, "Configuration missing. Run install-app again.")
+    let command = arguments.first ?? "?"
+    func failBeforeLaunch(_ message: String) -> Process? {
+      AppDiagnostics.log("cli \(command): not started — \(message)")
+      lastCLIExit = nil
+      completion(false, message)
       return nil
+    }
+    guard let config = loadConfig() else {
+      return failBeforeLaunch("Configuration missing or unreadable at \(support.appending(path: "config.json").path). Run install-app again.")
+    }
+    guard FileManager.default.isExecutableFile(atPath: config.nodePath) else {
+      return failBeforeLaunch("Node runtime not found at \(config.nodePath). Run install-app again so config.json points at a working Node.")
+    }
+    guard FileManager.default.fileExists(atPath: runtimeCLI.path) else {
+      return failBeforeLaunch("Local sync runtime missing at \(runtimeCLI.path). Run install-app (npm run build:app) again.")
     }
     let process = Process()
     let output = Pipe()
     let collector = ProcessOutputCollector()
+    let drained = DispatchSemaphore(value: 0)
     process.executableURL = URL(fileURLWithPath: config.nodePath)
     process.arguments = [runtimeCLI.path] + arguments
     process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
@@ -1072,27 +1281,43 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     process.standardError = output
     output.fileHandleForReading.readabilityHandler = { handle in
       let data = handle.availableData
-      guard !data.isEmpty else { return }
+      guard !data.isEmpty else {
+        // EOF: the child closed its side. Stop the handler and let the termination handler finish up.
+        handle.readabilityHandler = nil
+        drained.signal()
+        return
+      }
       let lines = collector.append(data)
       guard let onLine, !lines.isEmpty else { return }
       Task { @MainActor in lines.forEach(onLine) }
     }
     process.terminationHandler = { process in
-      output.fileHandleForReading.readabilityHandler = nil
-      let remainder = output.fileHandleForReading.readDataToEndOfFile()
-      let lines = collector.append(remainder, finish: true)
-      let text = collector.text
+      // Wait for the pipe to drain before snapshotting the output. Previously the termination handler
+      // raced the readability handler for the final chunk, which could drop the last line (BCB_GROK_RESULT).
+      if drained.wait(timeout: .now() + 5) == .timedOut {
+        output.fileHandleForReading.readabilityHandler = nil
+        _ = collector.append(output.fileHandleForReading.readDataToEndOfFile())
+      }
+      let lines = collector.append(Data(), finish: true)
+      let status = process.terminationStatus
+      let signaled = process.terminationReason == .uncaughtSignal
+      var text = collector.text
+      if signaled { text += "\nThe sync process was stopped by signal \(status)." }
+      let snapshot = text
+      let tail = snapshot.split(separator: "\n").suffix(6).joined(separator: " | ")
+      AppDiagnostics.log("cli \(command): exit=\(status) signaled=\(signaled) tail=\(tail)")
       Task { @MainActor in
         if let onLine { lines.forEach(onLine) }
-        completion(process.terminationStatus == 0, text)
+        self.lastCLIExit = (status: status, signaled: signaled)
+        completion(status == 0 && !signaled, snapshot)
       }
     }
     do {
+      AppDiagnostics.log("cli \(command): launching \(config.nodePath) \(runtimeCLI.path) \(arguments.joined(separator: " "))")
       try process.run()
       return process
     } catch {
-      completion(false, error.localizedDescription)
-      return nil
+      return failBeforeLaunch("Could not start \(config.nodePath): \(error.localizedDescription)")
     }
   }
 
@@ -1115,7 +1340,9 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   }
 
   private func lastMeaningfulLine(_ output: String) -> String? {
-    guard let line = output.split(separator: "\n").map(String.init).last(where: { !$0.isEmpty }) else { return nil }
+    // Skip machine-readable lines (BCB_GROK_RESULT, BCB_PROGRESS) so the status shows the human summary.
+    guard let line = output.split(separator: "\n").map(String.init)
+      .last(where: { !$0.isEmpty && !$0.hasPrefix("BCB_") }) else { return nil }
     return line.hasPrefix("Error: ") ? String(line.dropFirst(7)) : line
   }
 
@@ -1208,6 +1435,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     grokBotPrompt = prompt
     grokBotOutputPath = outputPath
     Self.copyGrokBotPromptToPasteboard(prompt)
+    AppDiagnostics.log("grok-bot: prompt copied to pasteboard; posting presentGrokBotResult for \(outputPath)")
     let payload = GrokBotResultPresentation(prompt: prompt, outputPath: outputPath)
     NotificationCenter.default.post(name: .showMainWindow, object: nil)
     NotificationCenter.default.post(name: .presentGrokBotResult, object: payload)
@@ -1261,29 +1489,36 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       primaryStatus = "Ready to sync directly"
       secondaryStatus = "\(targetName) is closed — a backup will be created before anything changes"
     } else if isGrokBotTarget {
+      // This runs after every sync completion and again every 2 seconds from the status timer. Before 1.5.8 the
+      // idle text below unconditionally replaced whatever the last Create transfer file attempt had reported, so a
+      // failed export looked like nothing happened. Blocking conditions still win; results are kept otherwise.
       if grokBotHasNoDataSelected {
+        showingOperationResult = false
         state = .warning
         primaryStatus = "Turn on Cookies to export for Grok Bot"
         secondaryStatus = "Grok Bot transfer files include cookie sessions only"
-      } else {
+      } else if !showingOperationResult {
         state = .ready
         primaryStatus = "Ready to create a Grok Bot transfer file"
         secondaryStatus = "Creates an encrypted .bcbx bundle with an embedded decryption key and bundled importer"
       }
     } else if isBrowserlessTarget {
       if selectedSourceID == "comet" {
+        showingOperationResult = false
         state = .warning
         primaryStatus = "Comet capture is not supported"
         secondaryStatus = "Choose Brave, Chrome, Edge, Arc, Vivaldi, or Opera for Browserless"
       } else if !browserlessConfigured {
+        showingOperationResult = false
         state = .warning
         primaryStatus = "Connect Browserless"
         secondaryStatus = "Your API token will be stored in macOS Keychain, never in the app configuration"
       } else if sourceBrowserRunning {
+        showingOperationResult = false
         state = .warning
         primaryStatus = "Quit \(selectedBrowser.name) before uploading"
         secondaryStatus = "Browserless captures a temporary copy of the closed profile, including local storage and IndexedDB"
-      } else {
+      } else if !showingOperationResult {
         state = .ready
         primaryStatus = "Ready for an explicit cloud upload"
         secondaryStatus = "Only this click sends authenticated state to Browserless \(browserlessRegion.uppercased())"
@@ -1314,13 +1549,9 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
           let result = try? JSONDecoder().decode(UpdateResult.self, from: data) else { return }
     try? FileManager.default.removeItem(at: url)
     if result.status == "success" {
-      state = .success
-      primaryStatus = "Updated to version \(result.version)"
-      secondaryStatus = "Browser Cookie Bridge was installed and relaunched successfully"
+      showResult(.success, "Updated to version \(result.version)", "Browser Cookie Bridge was installed and relaunched successfully")
     } else {
-      state = .error
-      primaryStatus = "Update \(result.version) failed"
-      secondaryStatus = result.message ?? "The previous app has been reopened"
+      showResult(.error, "Update \(result.version) failed", result.message ?? "The previous app has been reopened")
       postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: .error)
     }
   }

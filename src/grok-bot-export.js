@@ -100,7 +100,15 @@ export function writeGrokBotBundle({
   }
   const bundle = buildGrokBotBundle({ cookies, sourceBrowser, onlyDomains, passphrase });
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
-  fs.writeFileSync(resolved, bundle.archive);
+  // Write to a sibling temp file and rename so a Replace either fully succeeds or leaves the previous bundle intact.
+  const temporary = `${resolved}.${process.pid}.tmp`;
+  try {
+    fs.writeFileSync(temporary, bundle.archive, { mode: 0o600 });
+    fs.renameSync(temporary, resolved);
+  } catch (error) {
+    fs.rmSync(temporary, { force: true });
+    throw error;
+  }
   fs.chmodSync(resolved, 0o600);
   return {
     outputPath: resolved,

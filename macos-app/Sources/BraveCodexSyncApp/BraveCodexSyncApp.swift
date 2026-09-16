@@ -162,6 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
   @objc private func showNativeAlert(_ notification: Notification) {
     guard let payload = notification.object as? NativeAlert else { return }
+    AppDiagnostics.log("alert(\(payload.kind)): \(payload.title) — \(payload.message.replacingOccurrences(of: "\n", with: " "))")
     let alert = NSAlert()
     alert.messageText = payload.title
     alert.informativeText = payload.message
@@ -225,6 +226,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   }
 
   private func presentGrokBotResultUI(_ payload: GrokBotResultPresentation) {
+    AppDiagnostics.log("grok-bot: presentGrokBotResultUI reached (model attached: \(model != nil), path: \(payload.outputPath))")
     SyncModel.copyGrokBotPromptToPasteboard(payload.prompt)
     activateForUserAttention()
 
@@ -285,12 +287,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       guard let self, self.grokBotPanelFallbackToken == fallbackToken else { return }
       guard self.grokBotResultPanel === panel else { return }
       if !panel.isVisible || !panel.isKeyWindow {
+        AppDiagnostics.log("grok-bot: result panel not visible/key (visible=\(panel.isVisible) key=\(panel.isKeyWindow)); falling back to NSAlert")
         self.grokBotResultPanel = nil
         panel.orderOut(nil)
         self.showGrokBotResultAlert(
           payload: payload,
           detail: "The transfer file is ready. The prompt is on your clipboard."
         )
+      } else {
+        AppDiagnostics.log("grok-bot: result panel is visible and key")
       }
     }
   }
@@ -301,6 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   }
 
   private func showGrokBotResultAlert(payload: GrokBotResultPresentation, detail: String) {
+    AppDiagnostics.log("grok-bot: showing NSAlert result fallback")
     activateForUserAttention()
     SyncModel.copyGrokBotPromptToPasteboard(payload.prompt)
 
