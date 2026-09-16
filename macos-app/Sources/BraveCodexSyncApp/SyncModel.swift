@@ -1207,7 +1207,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   private func presentGrokBotResultSheet(prompt: String, outputPath: String) {
     grokBotPrompt = prompt
     grokBotOutputPath = outputPath
-    copyGrokBotPromptToPasteboard(prompt)
+    Self.copyGrokBotPromptToPasteboard(prompt)
     let payload = GrokBotResultPresentation(prompt: prompt, outputPath: outputPath)
     NotificationCenter.default.post(name: .showMainWindow, object: nil)
     NotificationCenter.default.post(name: .presentGrokBotResult, object: payload)
