@@ -758,12 +758,14 @@ final class SyncModel: ObservableObject {
         self.secondaryStatus = "No cloud profile was changed; temporary profile data was removed"
       } else if success {
         self.state = partial ? .warning : .success
-        if self.isGrokBotTarget, let result = self.parseGrokBotResult(from: output) {
-          self.grokBotPrompt = result.prompt
-          self.grokBotOutputPath = result.outputPath
-          self.showingGrokBotResult = true
+        if self.isGrokBotTarget {
+          let parsed = self.parseGrokBotResult(from: output)
+          let outputPath = parsed?.outputPath ?? grokBotOutputPath ?? self.grokBotOutputPath
+          self.grokBotOutputPath = outputPath
+          self.grokBotPrompt = parsed?.prompt ?? Self.grokBotFallbackPrompt
           self.primaryStatus = partial ? "Grok Bot transfer created with warnings" : "Grok Bot transfer file ready"
           self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Attach the .bcbx file to any Grok Bot and paste the prompt"
+          self.presentGrokBotResultSheet()
         } else {
           self.primaryStatus = self.isBrowserlessTarget
             ? (partial ? "Browserless profile uploaded with omissions" : "Browserless profile uploaded")
@@ -1167,6 +1169,21 @@ final class SyncModel: ObservableObject {
 
   private var requiredExtensionIDs: [String] {
     isDirectTarget || selectedTargetID == "browserless" || isGrokBotTarget ? [] : [selectedSourceID, selectedTargetID]
+  }
+
+  private static let grokBotFallbackPrompt = """
+On your Grok Bot cloud computer only — do not access my local Mac and do not print cookie values.
+
+1. Save the attached GrokBot-Import.bcbx to the cloud computer.
+2. Unzip it: unzip -o GrokBot-Import.bcbx -d bcb-import && cd bcb-import
+3. Run: node import.mjs
+4. Report only how many cookies were imported per domain, then delete the bcb-import folder and any copies of the bundle.
+"""
+
+  private func presentGrokBotResultSheet() {
+    DispatchQueue.main.async { [weak self] in
+      self?.showingGrokBotResult = true
+    }
   }
 
   private struct GrokBotResultPayload: Decodable {

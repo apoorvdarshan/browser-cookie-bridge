@@ -13,6 +13,7 @@ import { isChromiumBrowserRunning, readChromiumProfile } from "./chromium-reader
 import { uploadBrowserlessProfile } from "./browserless.js";
 import { inspectBrowserlessProfile } from "./browserless-preflight.js";
 import {
+  formatGrokBotResultLine,
   grokBotSummary,
   writeGrokBotBundle,
 } from "./grok-bot-export.js";
@@ -310,13 +311,10 @@ async function sync(args, { signal } = {}) {
     });
     result.sourceCookieSkipped = payload.cookieStats.skipped;
     console.log(grokBotSummary(result));
-    console.log(`BCB_GROK_RESULT ${JSON.stringify({
+    console.log(formatGrokBotResultLine({
       outputPath: result.outputPath,
-      cookieCount: result.cookieCount,
-      domainCount: result.domainCount,
-      domains: result.domains,
       prompt: result.prompt,
-    })}`);
+    }));
     return result;
   }
   if (target === "browserless") {

@@ -157,6 +157,11 @@ export function grokBotSummary(result) {
   return `Grok Bot transfer file created: ${result.cookieCount} cookies across ${domainNote} from ${result.sourceBrowser}.${skipped} Attach ${path.basename(result.outputPath)} to any Grok Bot and paste the prompt. The bundle includes the decryption key—treat the file as credentials and do not share it.`;
 }
 
+/** Machine-readable sync result for the macOS app (keep small — no domain lists). */
+export function formatGrokBotResultLine({ outputPath, prompt }) {
+  return `BCB_GROK_RESULT ${JSON.stringify({ outputPath, prompt })}`;
+}
+
 export function filterCookies(cookies, onlyDomains = []) {
   const domains = normalizeDomainFilters(onlyDomains);
   if (!domains.length) return cookies;

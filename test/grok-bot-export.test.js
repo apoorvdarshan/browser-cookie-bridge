@@ -9,6 +9,8 @@ import {
   buildGrokBotBundle,
   cookieMatchesDomains,
   filterCookies,
+  formatGrokBotResultLine,
+  GROK_BOT_PROMPT,
   grokBotSummary,
   parseGrokBotBundle,
   writeGrokBotBundle,
@@ -98,6 +100,21 @@ test("Grok Bot bundle writer creates a private .bcbx file", () => {
   assert.equal(parsed.manifest.cookieCount, 2);
   assert.equal(parsed.manifest.version, BUNDLE_FORMAT_VERSION);
   assert.ok(parsed.embeddedKey);
+});
+
+test("BCB_GROK_RESULT line stays small and only carries path plus prompt", () => {
+  const domains = Array.from({ length: 800 }, (_, index) => `site-${index}.example`);
+  const line = formatGrokBotResultLine({
+    outputPath: "/tmp/GrokBot-Import.bcbx",
+    prompt: GROK_BOT_PROMPT,
+  });
+  assert.match(line, /^BCB_GROK_RESULT /);
+  const payload = JSON.parse(line.replace(/^BCB_GROK_RESULT /, ""));
+  assert.deepEqual(Object.keys(payload).sort(), ["outputPath", "prompt"]);
+  assert.equal(payload.outputPath, "/tmp/GrokBot-Import.bcbx");
+  assert.equal(payload.prompt, GROK_BOT_PROMPT);
+  assert.ok(line.length < 2048, "result line must not embed domain lists");
+  assert.ok(!line.includes(domains[0]), "domain lists belong in the human summary only");
 });
 
 test("domain filtering and summary text stay explicit", () => {
