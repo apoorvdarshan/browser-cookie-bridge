@@ -44,10 +44,16 @@ enum FullDiskAccess {
   static let instructions =
     "Open System Settings › Privacy & Security › Full Disk Access, turn on \(appName), then quit and reopen the app and try again."
 
-  static func statusTitle() -> String { "Grant Full Disk Access to \(appName)" }
+  /// In-app gate title, e.g. "Grant Full Disk Access to read Brave cookies".
+  static func statusTitle(browserName: String) -> String { "Grant Full Disk Access to read \(browserName) cookies" }
 
   static func statusDetail(browserName: String) -> String {
-    "macOS blocked reading \(browserName)'s cookie database (operation not permitted). Quitting \(browserName) does not fix this — \(instructions)"
+    "macOS blocked \(appName) from reading \(browserName)'s cookie database (operation not permitted). Quitting \(browserName) does not fix this — \(instructions)"
+  }
+
+  /// Two-line version for the main window status row (the full detail is in the tooltip and alerts).
+  static func gateDetail(browserName: String) -> String {
+    "macOS blocked reading \(browserName)'s cookie database. Turn on \(appName) under Privacy & Security › Full Disk Access, then quit and reopen the app"
   }
 
   /// Chromium roots mirrored from src/chromium-reader.js so the app can probe the same file the CLI reads.
@@ -1104,7 +1110,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       case .denied(let detail):
         isSyncing = false
         activeGrokBotOutputPath = nil
-        showResult(.error, FullDiskAccess.statusTitle(), detail)
+        showResult(.error, FullDiskAccess.statusTitle(browserName: selectedBrowser.name), detail)
         updateEndpointRunningStatus()
         postNativeAlert(
           title: primaryStatus,
@@ -1162,7 +1168,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       } else if self.noteFullDiskAccessDenial(in: output) {
         self.showResult(
           .error,
-          FullDiskAccess.statusTitle(),
+          FullDiskAccess.statusTitle(browserName: self.selectedBrowser.name),
           self.lastMeaningfulLine(output) ?? FullDiskAccess.statusDetail(browserName: self.selectedBrowser.name)
         )
       } else {
@@ -1264,7 +1270,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       // EPERM here is TCC, not a lock: the browser is already closed (the quit-browser gate ran before Create),
       // so telling the user to close it again would be wrong. Point at Full Disk Access instead.
       let detail = lastMeaningfulLine(output) ?? FullDiskAccess.statusDetail(browserName: selectedBrowser.name)
-      showResult(.error, FullDiskAccess.statusTitle(), detail)
+      showResult(.error, FullDiskAccess.statusTitle(browserName: selectedBrowser.name), detail)
       updateEndpointRunningStatus()
       postNativeAlert(
         title: primaryStatus,
@@ -1813,8 +1819,8 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       } else if grokBotSourceAccessBlocked {
         showingOperationResult = false
         state = .warning
-        primaryStatus = FullDiskAccess.statusTitle()
-        secondaryStatus = FullDiskAccess.statusDetail(browserName: selectedBrowser.name)
+        primaryStatus = FullDiskAccess.statusTitle(browserName: selectedBrowser.name)
+        secondaryStatus = FullDiskAccess.gateDetail(browserName: selectedBrowser.name)
       } else if !showingOperationResult {
         state = .ready
         primaryStatus = "Ready to create a Grok Bot transfer file"
