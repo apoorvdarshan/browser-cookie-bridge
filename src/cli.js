@@ -9,7 +9,7 @@ import {
   directImportToEmbeddedBrowser,
   isDirectTargetRunning,
 } from "./codex-direct-import.js";
-import { isChromiumBrowserRunning, readChromiumProfile } from "./chromium-reader.js";
+import { isChromiumBrowserRunning, probeCookieDatabaseAccess, readChromiumProfile } from "./chromium-reader.js";
 import { uploadBrowserlessProfile } from "./browserless.js";
 import { inspectBrowserlessProfile } from "./browserless-preflight.js";
 import {
@@ -507,7 +507,23 @@ function doctor() {
   for (const file of brave) console.log(`  Brave: ${file}`);
   for (const file of codex) console.log(`  Codex: ${file}`);
   for (const file of cursor) console.log(`  Cursor: ${file}`);
+  console.log(`Source cookie store access: ${describeSourceCookieAccess(source, home)}`);
   console.log("No cookie names, domains, values, or encryption keys were read.");
+}
+
+export function describeSourceCookieAccess(source, home, probe = probeCookieDatabaseAccess) {
+  let access;
+  try {
+    access = probe({ browser: source, home });
+  } catch (error) {
+    return `unknown (${error.message})`;
+  }
+  if (!access.exists) return "not found";
+  if (access.readable) return `readable (${access.databasePath})`;
+  if (access.permissionDenied) {
+    return `denied by macOS (${access.reason}) — grant Full Disk Access to Browser Cookie Bridge in System Settings › Privacy & Security, then quit and reopen the app`;
+  }
+  return `unreadable (${access.reason})`;
 }
 
 function enableLoginSync() {

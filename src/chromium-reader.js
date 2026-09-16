@@ -85,10 +85,11 @@ export function readChromiumProfile({
           path.join(profilePath, "Cookies"),
         ]),
         password: password ?? readSafeStoragePassword(definition, browser),
+        browser,
       })
     : { cookies: [], total: 0, skipped: 0 };
   const history = imports.history
-    ? readHistory(path.join(profilePath, "History"))
+    ? readHistory(path.join(profilePath, "History"), browser)
     : [];
 
   return {
@@ -124,8 +125,65 @@ const COOKIE_QUERY = `
   FROM cookies
 `;
 
-function isLockError(error) {
+export function isLockError(error) {
   return /database is locked|SQLITE_BUSY|SQLITE_LOCKED|locking protocol|unable to open database/i.test(String(error?.message || error));
+}
+
+/**
+ * macOS TCC (Full Disk Access) denials surface as EPERM from open/copyfile, not as SQLite lock errors.
+ * They must never be reported as "close the browser" because quitting the browser does not fix them.
+ */
+export function isPermissionError(error) {
+  if (error?.code === "EPERM" || error?.code === "EACCES") return true;
+  return /\bEPERM\b|\bEACCES\b|operation not permitted|permission denied|SQLITE_PERM|SQLITE_AUTH/i
+    .test(String(error?.message || error));
+}
+
+export const FULL_DISK_ACCESS_HINT =
+  "Browser Cookie Bridge needs Full Disk Access: open System Settings › Privacy & Security › Full Disk Access, turn on Browser Cookie Bridge, then quit and reopen the app and try again.";
+
+function permissionDeniedError({ browser, filePath, cause }) {
+  const name = browser ? browserDisplayName(browser) : "browser";
+  const reason = cause?.code
+    ? `${cause.code}: ${String(cause.message || "").replace(/^\w+:\s*/, "").split(",")[0]}`
+    : String(cause?.message || cause || "operation not permitted").split("\n")[0];
+  const error = new Error(
+    `macOS denied access to the ${name} ${path.basename(filePath || "Cookies")} database (${reason}). ${FULL_DISK_ACCESS_HINT} Quitting ${name} does not fix this.`,
+  );
+  error.code = "BCB_FULL_DISK_ACCESS";
+  error.cause = cause;
+  return error;
+}
+
+/**
+ * Cheap read probe for the selected browser's cookie store: opens the file read-only without touching SQLite,
+ * so it reports a TCC/Full Disk Access denial even when the browser is closed and the database is not locked.
+ */
+export function probeCookieDatabaseAccess({ browser, home = os.homedir() } = {}) {
+  const definition = BROWSERS[browser];
+  if (!definition) throw new Error(`Unsupported Chromium source: ${browser}`);
+  const root = path.join(home, "Library", "Application Support", ...definition.root);
+  const missing = { browser, databasePath: null, exists: false, readable: false, permissionDenied: false, reason: "not found" };
+  if (!fs.existsSync(root)) return missing;
+  const profilePath = definition.directProfile ? root : path.join(root, activeProfileName(root));
+  const databasePath = firstExisting([
+    path.join(profilePath, "Network", "Cookies"),
+    path.join(profilePath, "Cookies"),
+  ]);
+  if (databasePath === null) return missing;
+  try {
+    fs.closeSync(fs.openSync(databasePath, "r"));
+    return { browser, databasePath, exists: true, readable: true, permissionDenied: false, reason: null };
+  } catch (error) {
+    return {
+      browser,
+      databasePath,
+      exists: true,
+      readable: false,
+      permissionDenied: isPermissionError(error),
+      reason: error.code || error.message,
+    };
+  }
 }
 
 function queryCookieRows(databasePath) {
@@ -158,14 +216,20 @@ export function readCookieRowsFromSnapshot(databasePath) {
   }
 }
 
-export function readCookieRows(databasePath, { snapshot = readCookieRowsFromSnapshot } = {}) {
+export function readCookieRows(databasePath, { snapshot = readCookieRowsFromSnapshot, browser } = {}) {
   try {
     return queryCookieRows(databasePath);
   } catch (error) {
+    if (isPermissionError(error)) throw permissionDeniedError({ browser, filePath: databasePath, cause: error });
     if (!isLockError(error)) throw error;
     try {
       return snapshot(databasePath);
     } catch (snapshotError) {
+      // SQLITE_CANTOPEN ("unable to open database") is ambiguous; the snapshot copy tells us whether the real
+      // cause was a TCC denial (EPERM/EACCES on copyfile) rather than the browser's exclusive lock.
+      if (isPermissionError(snapshotError)) {
+        throw permissionDeniedError({ browser, filePath: databasePath, cause: snapshotError });
+      }
       throw new Error(
         `Cookie database is locked by the browser and a temporary snapshot could not be read (${snapshotError.message}). Close the source browser and try again.`,
       );
@@ -173,9 +237,9 @@ export function readCookieRows(databasePath, { snapshot = readCookieRowsFromSnap
   }
 }
 
-function readCookies({ databasePath, password }) {
+function readCookies({ databasePath, password, browser }) {
   if (databasePath === null) throw new Error("Cookie database was not found");
-  const rows = readCookieRows(databasePath);
+  const rows = readCookieRows(databasePath, { browser });
   const cookies = [];
   let skipped = 0;
   for (const row of rows) {
@@ -212,9 +276,15 @@ function readCookies({ databasePath, password }) {
   return { cookies, total: rows.length, skipped };
 }
 
-function readHistory(databasePath) {
+function readHistory(databasePath, browser) {
   if (!fs.existsSync(databasePath)) return [];
-  const database = new DatabaseSync(databasePath, { readOnly: true });
+  let database;
+  try {
+    database = new DatabaseSync(databasePath, { readOnly: true });
+  } catch (error) {
+    if (isPermissionError(error)) throw permissionDeniedError({ browser, filePath: databasePath, cause: error });
+    throw error;
+  }
   try {
     return database.prepare("SELECT url FROM urls WHERE url LIKE 'http://%' OR url LIKE 'https://%'")
       .all()
