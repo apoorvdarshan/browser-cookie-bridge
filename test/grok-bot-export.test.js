@@ -109,6 +109,7 @@ test("BCB_GROK_RESULT line stays small and only carries path plus prompt", () =>
     prompt: GROK_BOT_PROMPT,
   });
   assert.match(line, /^BCB_GROK_RESULT /);
+  assert.doesNotMatch(line, /\n/);
   const payload = JSON.parse(line.replace(/^BCB_GROK_RESULT /, ""));
   assert.deepEqual(Object.keys(payload).sort(), ["outputPath", "prompt"]);
   assert.equal(payload.outputPath, "/tmp/GrokBot-Import.bcbx");

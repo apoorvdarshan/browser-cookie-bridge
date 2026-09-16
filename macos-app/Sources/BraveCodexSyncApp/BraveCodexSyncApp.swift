@@ -34,6 +34,7 @@ struct BraveCodexSyncApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   weak var model: SyncModel?
   private weak var mainWindow: NSWindow?
+  private var grokBotResultPanel: NSPanel?
   private var statusItem: NSStatusItem?
   private var syncMenuItem: NSMenuItem?
   private var updateMenuItem: NSMenuItem?
@@ -61,6 +62,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       self,
       selector: #selector(syncStateChanged(_:)),
       name: .syncStateChanged,
+      object: nil
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(showMainWindowNotification(_:)),
+      name: .showMainWindow,
+      object: nil
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(presentGrokBotResultNotification(_:)),
+      name: .presentGrokBotResult,
       object: nil
     )
   }
@@ -186,8 +199,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
   }
 
+  @objc private func showMainWindowNotification(_ notification: Notification) {
+    showMainWindow()
+  }
+
+  @objc private func presentGrokBotResultNotification(_ notification: Notification) {
+    guard let model else { return }
+    showMainWindow()
+    grokBotResultPanel?.close()
+    grokBotResultPanel = nil
+    DispatchQueue.main.async { [weak self] in
+      guard let self, let model = self.model else { return }
+      self.presentGrokBotResultPanel(model: model)
+    }
+  }
+
+  private func presentGrokBotResultPanel(model: SyncModel) {
+    let panel = NSPanel(
+      contentRect: NSRect(x: 0, y: 0, width: 520, height: 520),
+      styleMask: [.titled, .closable, .fullSizeContentView],
+      backing: .buffered,
+      defer: false
+    )
+    panel.title = "Grok Bot transfer ready"
+    panel.titlebarAppearsTransparent = false
+    panel.isFloatingPanel = true
+    panel.level = .modalPanel
+    panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+    panel.isReleasedWhenClosed = false
+    panel.center()
+    let dismissPanel = { [weak self] in
+      self?.grokBotResultPanel?.close()
+      self?.grokBotResultPanel = nil
+    }
+    panel.contentView = NSHostingView(
+      rootView: GrokBotResultSheet(onDone: dismissPanel).environmentObject(model)
+    )
+    panel.makeKeyAndOrderFront(nil)
+    NSApp.activate(ignoringOtherApps: true)
+    grokBotResultPanel = panel
+  }
+
   private func showMainWindow() {
     NSApp.setActivationPolicy(.regular)
+    if mainWindow == nil || mainWindow?.isVisible == false {
+      let candidate = NSApp.windows.first(where: { $0.canBecomeMain && $0.title == "Browser Cookie Bridge" })
+        ?? NSApp.windows.first(where: { $0.canBecomeMain })
+        ?? NSApp.windows.first
+      mainWindow = candidate
+      mainWindow?.delegate = self
+    }
     mainWindow?.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
   }
@@ -240,9 +301,6 @@ struct ContentView: View {
     }
     .sheet(isPresented: $model.showingBrowserlessSetup) {
       BrowserlessSetupSheet().environmentObject(model)
-    }
-    .sheet(isPresented: $model.showingGrokBotResult) {
-      GrokBotResultSheet().environmentObject(model)
     }
   }
 
@@ -1170,6 +1228,7 @@ enum Theme {
 struct GrokBotResultSheet: View {
   @EnvironmentObject private var model: SyncModel
   @Environment(\.dismiss) private var dismiss
+  var onDone: (() -> Void)?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -1228,7 +1287,10 @@ struct GrokBotResultSheet: View {
           NSPasteboard.general.setString(model.grokBotPrompt, forType: .string)
         }
         Spacer()
-        Button("Done") { dismiss() }
+        Button("Done") {
+          onDone?()
+          dismiss()
+        }
           .keyboardShortcut(.defaultAction)
       }
       .controlSize(.regular)
