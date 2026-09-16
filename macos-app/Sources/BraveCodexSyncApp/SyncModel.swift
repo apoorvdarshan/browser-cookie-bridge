@@ -691,9 +691,11 @@ final class SyncModel: ObservableObject {
   private func startGrokBotExport(showMenuBarAlert: Bool) {
     let panel = NSSavePanel()
     panel.title = "Save Grok Bot transfer file"
-    panel.nameFieldStringValue = "GrokBot-Import.bcbx"
+    // Base name only: including ".bcbx" here plus allowedContentTypes often makes macOS append a second extension (GrokBot-Import.bcbx.bcbx) and breaks Replace on an existing file.
+    panel.nameFieldStringValue = "GrokBot-Import"
     panel.canCreateDirectories = true
     panel.isExtensionHidden = false
+    panel.allowsOtherFileTypes = false
     if #available(macOS 12.0, *) {
       panel.allowedContentTypes = [UTType(filenameExtension: "bcbx") ?? .data]
     } else {
