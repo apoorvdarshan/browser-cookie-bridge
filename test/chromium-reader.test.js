@@ -12,6 +12,7 @@ import {
   probeCookieDatabaseAccess,
   readChromiumProfile,
   readCookieRows,
+  resolveSourceSnapshot,
 } from "../src/chromium-reader.js";
 import { describeSourceCookieAccess } from "../src/cli.js";
 
@@ -200,6 +201,72 @@ test("an unreadable cookie file fails with the Full Disk Access message end to e
     assert.equal(fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith("bcb-cookie-snapshot-")).length, 0);
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("an app-provided snapshot directory is read instead of the live profile, even while the browser holds its lock", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "browser-cookie-reader-app-snapshot-"));
+  const snapshotDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "bcb-app-snapshot-"));
+  let holder;
+  try {
+    const livePath = createCookieDatabase(home, [[".live.test", "plain", "live-value"]]);
+    // The macOS app copies Cookies plus sidecars with its own Full Disk Access; mimic that with a modified copy
+    // so the assertion proves the reader never opened the live file.
+    fs.copyFileSync(livePath, path.join(snapshotDirectory, "Cookies"));
+    const copy = new DatabaseSync(path.join(snapshotDirectory, "Cookies"));
+    copy.exec("UPDATE cookies SET value = 'snapshot-value'");
+    copy.close();
+    holder = new DatabaseSync(livePath);
+    holder.exec("PRAGMA locking_mode = EXCLUSIVE; UPDATE cookies SET path = '/' WHERE 0;");
+
+    const result = readChromiumProfile({
+      browser: "brave",
+      home,
+      password: "unused",
+      imports: { cookies: true, history: false },
+      snapshotDirectory,
+    });
+    assert.equal(result.cookies.length, 1);
+    assert.equal(result.cookies[0].value, "snapshot-value");
+    assert.deepEqual(result.snapshot, { cookies: true, history: false });
+    assert.equal(result.profileName, "Default");
+    assert.equal(fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith("bcb-cookie-snapshot-")).length, 0);
+
+    // An empty or stale snapshot directory must fall back to the live profile rather than fail.
+    const empty = fs.mkdtempSync(path.join(os.tmpdir(), "bcb-app-snapshot-empty-"));
+    try {
+      holder.close();
+      holder = undefined;
+      const live = readChromiumProfile({ browser: "brave", home, password: "unused", snapshotDirectory: empty });
+      assert.equal(live.cookies[0].value, "live-value");
+      assert.deepEqual(live.snapshot, { cookies: false, history: false });
+    } finally {
+      fs.rmSync(empty, { recursive: true, force: true });
+    }
+  } finally {
+    try { holder?.close(); } catch {}
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(snapshotDirectory, { recursive: true, force: true });
+  }
+});
+
+test("the snapshot directory is taken from BCB_SOURCE_SNAPSHOT_DIR by default", () => {
+  const previous = process.env.BCB_SOURCE_SNAPSHOT_DIR;
+  const snapshotDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "bcb-app-snapshot-env-"));
+  try {
+    fs.writeFileSync(path.join(snapshotDirectory, "Cookies"), "");
+    process.env.BCB_SOURCE_SNAPSHOT_DIR = snapshotDirectory;
+    assert.deepEqual(resolveSourceSnapshot(), {
+      directory: snapshotDirectory,
+      cookies: path.join(snapshotDirectory, "Cookies"),
+      history: null,
+    });
+    delete process.env.BCB_SOURCE_SNAPSHOT_DIR;
+    assert.deepEqual(resolveSourceSnapshot(), { directory: null, cookies: null, history: null });
+  } finally {
+    if (previous === undefined) delete process.env.BCB_SOURCE_SNAPSHOT_DIR;
+    else process.env.BCB_SOURCE_SNAPSHOT_DIR = previous;
+    fs.rmSync(snapshotDirectory, { recursive: true, force: true });
   }
 });
 

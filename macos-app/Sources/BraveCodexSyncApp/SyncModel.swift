@@ -14,9 +14,127 @@ extension Notification.Name {
 
 struct NativeAlert {
   enum Kind { case information, warning, error }
+  /// Optional second button. Kept as data (not a closure) so the alert can be logged and posted through
+  /// NotificationCenter; the app delegate performs the action.
+  enum SecondaryButton {
+    case openFullDiskAccessSettings
+
+    var title: String {
+      switch self {
+      case .openFullDiskAccessSettings: "Open Full Disk Access settings"
+      }
+    }
+  }
   let title: String
   let message: String
   let kind: Kind
+  var secondaryButton: SecondaryButton? = nil
+}
+
+/// macOS TCC: reading another app's cookie database from an app-spawned process requires Full Disk Access.
+/// A denial surfaces as EPERM/EACCES and persists after the browser is quit, so it needs its own guidance.
+enum FullDiskAccess {
+  static let appName = "Browser Cookie Bridge"
+  /// System Settings (macOS 13+) deep link first, then the legacy System Preferences anchor.
+  static let settingsURLs: [URL] = [
+    "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles",
+    "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles",
+  ].compactMap { URL(string: $0) }
+
+  static let instructions =
+    "Open System Settings › Privacy & Security › Full Disk Access, turn on \(appName), then quit and reopen the app and try again."
+
+  static func statusTitle() -> String { "Grant Full Disk Access to \(appName)" }
+
+  static func statusDetail(browserName: String) -> String {
+    "macOS blocked reading \(browserName)'s cookie database (operation not permitted). Quitting \(browserName) does not fix this — \(instructions)"
+  }
+
+  /// Chromium roots mirrored from src/chromium-reader.js so the app can probe the same file the CLI reads.
+  private static let chromiumRoots: [String: (components: [String], directProfile: Bool)] = [
+    "brave": (["BraveSoftware", "Brave-Browser"], false),
+    "chrome": (["Google", "Chrome"], false),
+    "edge": (["Microsoft Edge"], false),
+    "arc": (["Arc", "User Data"], false),
+    "vivaldi": (["Vivaldi"], false),
+    "opera": (["com.operasoftware.Opera"], true),
+    "comet": (["Comet"], false),
+  ]
+
+  @MainActor
+  @discardableResult
+  static func openSettings() -> Bool {
+    for url in settingsURLs where NSWorkspace.shared.open(url) {
+      AppDiagnostics.log("full-disk-access: opened \(url.absoluteString)")
+      return true
+    }
+    AppDiagnostics.log("full-disk-access: could not open System Settings via any known URL")
+    return false
+  }
+
+  /// True when the CLI output describes a TCC denial rather than a locked database or another failure.
+  /// The CLI's Full Disk Access message is the primary contract; the raw EPERM copyfile text is matched as a
+  /// fallback for runtimes that predate it.
+  static func indicatesDenial(in output: String) -> Bool {
+    if output.contains("Full Disk Access") { return true }
+    let eperm = output.range(of: #"\bEPERM\b|operation not permitted"#, options: [.regularExpression, .caseInsensitive]) != nil
+    return eperm && output.contains("Cookies")
+  }
+
+  /// Cheap, SQLite-free probe: opens the selected browser's cookie store read-only from the app process. The app
+  /// is the TCC "responsible process" for the Node CLI it spawns, so the result matches what the CLI will hit.
+  /// Returns true only for a definite EPERM/EACCES on an existing file; anything ambiguous returns false so the
+  /// gate never blocks Create on a guess.
+  static func isCookieStoreReadDenied(browserID: String, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
+    guard let databasePath = cookieDatabasePath(browserID: browserID, home: home) else { return false }
+    let descriptor = Darwin.open(databasePath, O_RDONLY)
+    if descriptor >= 0 {
+      Darwin.close(descriptor)
+      return false
+    }
+    return errno == EPERM || errno == EACCES
+  }
+
+  /// True when a Foundation file error wraps EPERM/EACCES — the signature of a TCC denial.
+  static func isDenial(_ error: Error) -> Bool {
+    var current: NSError? = error as NSError
+    while let candidate = current {
+      if candidate.domain == NSPOSIXErrorDomain && (candidate.code == Int(EPERM) || candidate.code == Int(EACCES)) {
+        return true
+      }
+      if candidate.domain == NSCocoaErrorDomain && candidate.code == NSFileReadNoPermissionError { return true }
+      current = candidate.userInfo[NSUnderlyingErrorKey] as? NSError
+    }
+    return false
+  }
+
+  static func cookieDatabasePath(browserID: String, home: URL) -> String? {
+    guard let root = chromiumRoots[browserID] else { return nil }
+    var rootURL = home.appending(path: "Library/Application Support")
+    for component in root.components { rootURL.append(path: component) }
+    let fileManager = FileManager.default
+    guard fileManager.fileExists(atPath: rootURL.path) else { return nil }
+    let profile = root.directProfile ? rootURL : rootURL.appending(path: activeProfileName(root: rootURL))
+    for candidate in ["Network/Cookies", "Cookies"] {
+      let path = profile.appending(path: candidate).path
+      if fileManager.fileExists(atPath: path) { return path }
+    }
+    return nil
+  }
+
+  private static func activeProfileName(root: URL) -> String {
+    let fileManager = FileManager.default
+    if let data = try? Data(contentsOf: root.appending(path: "Local State")),
+       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let lastUsed = (json["profile"] as? [String: Any])?["last_used"] as? String,
+       !lastUsed.isEmpty,
+       fileManager.fileExists(atPath: root.appending(path: lastUsed).path) {
+      return lastUsed
+    }
+    if fileManager.fileExists(atPath: root.appending(path: "Default").path) { return "Default" }
+    let entries = (try? fileManager.contentsOfDirectory(atPath: root.path)) ?? []
+    return entries.first { $0.range(of: #"^Profile \d+$"#, options: .regularExpression) != nil } ?? "Default"
+  }
 }
 
 struct GrokBotResultPresentation: Sendable {
@@ -76,6 +194,83 @@ enum AppDiagnostics {
       withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700]
     )
+  }
+}
+
+/// A private copy of the source browser's SQLite stores taken by the app process itself.
+///
+/// The app is the TCC client that holds Full Disk Access. The Node binary from `config.nodePath` (a Homebrew
+/// install on local `npm run build:app` builds) is a *different* TCC client and is denied when it opens or
+/// copies another app's Cookies database, even though the app was granted access. Copying with FileManager
+/// here and handing the CLI the copy (via `BCB_SOURCE_SNAPSHOT_DIR`) sidesteps that, and — because the copy
+/// includes the WAL/journal sidecars — also lets the source browser stay open during a Grok Bot Create.
+struct SourceSnapshot: Sendable {
+  static let environmentKey = "BCB_SOURCE_SNAPSHOT_DIR"
+  static let sidecarSuffixes = ["-journal", "-wal", "-shm"]
+  static let directoryPrefix = "bcb-cookie-snapshot-"
+
+  let directory: URL
+  let files: [String]
+
+  static func root(support: URL) -> URL { support.appending(path: "snapshots") }
+
+  /// Copies `Cookies` (and `History` when requested) plus sidecars into a fresh 0700 directory. Returns nil when
+  /// the browser has no cookie store yet. Throws (after removing any partial copy) when the copy itself fails;
+  /// callers use `FullDiskAccess.isDenial` to tell a TCC denial from other errors.
+  static func take(
+    browserID: String,
+    includeHistory: Bool,
+    support: URL,
+    home: URL = FileManager.default.homeDirectoryForCurrentUser
+  ) throws -> SourceSnapshot? {
+    guard let cookiesPath = FullDiskAccess.cookieDatabasePath(browserID: browserID, home: home) else { return nil }
+    let fileManager = FileManager.default
+    let cookiesURL = URL(fileURLWithPath: cookiesPath)
+    var profileURL = cookiesURL.deletingLastPathComponent()
+    if profileURL.lastPathComponent == "Network" { profileURL.deleteLastPathComponent() }
+
+    let rootURL = root(support: support)
+    try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    let directory = rootURL.appending(path: directoryPrefix + UUID().uuidString)
+    try fileManager.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+
+    var sources = [cookiesURL]
+    if includeHistory {
+      let history = profileURL.appending(path: "History")
+      if fileManager.fileExists(atPath: history.path) { sources.append(history) }
+    }
+    var copied: [String] = []
+    do {
+      for source in sources {
+        // Copy the main file first, then any sidecars so the CLI opens a consistent WAL-mode database.
+        let names = [source.lastPathComponent] + sidecarSuffixes.map { source.lastPathComponent + $0 }
+        for name in names {
+          let from = source.deletingLastPathComponent().appending(path: name)
+          guard fileManager.fileExists(atPath: from.path) else { continue }
+          let to = directory.appending(path: name)
+          try fileManager.copyItem(at: from, to: to)
+          try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: to.path)
+          copied.append(name)
+        }
+      }
+    } catch {
+      try? fileManager.removeItem(at: directory)
+      throw error
+    }
+    return SourceSnapshot(directory: directory, files: copied)
+  }
+
+  func discard() {
+    try? FileManager.default.removeItem(at: directory)
+  }
+
+  /// Snapshots are removed as soon as the CLI exits; anything left behind means a previous run was killed.
+  static func removeStale(support: URL) {
+    let rootURL = root(support: support)
+    guard let entries = try? FileManager.default.contentsOfDirectory(at: rootURL, includingPropertiesForKeys: nil) else { return }
+    for entry in entries where entry.lastPathComponent.hasPrefix(directoryPrefix) {
+      try? FileManager.default.removeItem(at: entry)
+    }
   }
 }
 
@@ -169,6 +364,9 @@ final class SyncModel: ObservableObject {
   @Published var codexRunning = false
   @Published var cursorRunning = false
   @Published var sourceBrowserRunning = false
+  /// macOS denied reading the selected browser's cookie store (TCC / Full Disk Access). Set by the native probe
+  /// or by a CLI failure that reported the denial; cleared when the probe can read the file again.
+  @Published var sourceCookieAccessDenied = false
   @Published var browserlessConfigured = false
   @Published var browserlessProfileName = "browser-cookie-bridge"
   @Published var browserlessRegion = "sfo"
@@ -217,6 +415,9 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   private var showingOperationResult = false
   /// Exit details of the most recent CLI process; set on the main actor immediately before its completion runs.
   private var lastCLIExit: (status: Int32, signaled: Bool)?
+  /// A CLI run reported a Full Disk Access denial. Kept until the native probe confirms the file is readable
+  /// again (which requires the user to grant access and relaunch), so the gate does not flicker.
+  private var cliReportedAccessDenied = false
 
   var selectedBrowser: BrowserChoice {
     browsers.first(where: { $0.id == selectedSourceID }) ?? browsers[0]
@@ -251,10 +452,11 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   }
   var cursorHasNoDataSelected: Bool { selectedTargetID == "cursor" && !cookiesEnabled }
   var grokBotHasNoDataSelected: Bool { isGrokBotTarget && !cookiesEnabled }
-  /// Chromium holds its cookie database (and the Keychain-backed decryption path) open while running, so a
-  /// `.bcbx` export fails with EPERM/locked-database errors. Block up front instead of surfacing that after the fact.
-  var grokBotSourceBrowserBlocked: Bool { isGrokBotTarget && sourceBrowserRunning }
-  var grokBotBlocked: Bool { grokBotHasNoDataSelected || grokBotSourceBrowserBlocked }
+  /// macOS refuses to let this app read the source browser's cookie store (TCC). The source browser may stay
+  /// open for Grok Bot — the app snapshots the database itself — so only a Full Disk Access denial blocks
+  /// Create, and the button becomes a shortcut to System Settings.
+  var grokBotSourceAccessBlocked: Bool { isGrokBotTarget && sourceCookieAccessDenied }
+  var grokBotBlocked: Bool { grokBotHasNoDataSelected || grokBotSourceAccessBlocked }
   var syncBlocked: Bool {
     !runtimeReady || directTargetBlocked || sourceSiteDataBlocked || browserlessBlocked || cursorHasNoDataSelected || grokBotBlocked
   }
@@ -323,6 +525,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
 
   init() {
     runtimeReady = bootstrapBundledRuntimeIfNeeded()
+    SourceSnapshot.removeStale(support: support)
     let calendar = Calendar.current
     scheduleTime = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     updateEndpointRunningStatus()
@@ -624,6 +827,15 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     persistPreferences(successMessage: "Grok Bot domain filter updated")
   }
 
+  func openFullDiskAccessSettings() {
+    guard !FullDiskAccess.openSettings() else { return }
+    postNativeAlert(
+      title: "Could not open System Settings",
+      message: FullDiskAccess.instructions,
+      kind: .warning
+    )
+  }
+
   func syncNow(showMenuBarAlert: Bool = false) {
     guard !isSyncing else {
       if isBrowserlessTarget {
@@ -638,7 +850,12 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     updateEndpointRunningStatus()
     guard !syncBlocked else {
       if showMenuBarAlert {
-        postNativeAlert(title: primaryStatus, message: secondaryStatus, kind: .warning)
+        postNativeAlert(
+          title: primaryStatus,
+          message: secondaryStatus,
+          kind: .warning,
+          secondaryButton: grokBotSourceAccessBlocked ? .openFullDiskAccessSettings : nil
+        )
       }
       return
     }
@@ -876,12 +1093,37 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       arguments.append("--allow-cloud-upload")
       beginUploadTracking()
     }
+    let sourceSnapshot: SourceSnapshot?
+    if isGrokBotTarget || isDirectTarget {
+      switch takeSourceSnapshot() {
+      case .taken(let snapshot):
+        sourceSnapshot = snapshot
+        environment[SourceSnapshot.environmentKey] = snapshot.directory.path
+      case .unavailable:
+        sourceSnapshot = nil
+      case .denied(let detail):
+        isSyncing = false
+        activeGrokBotOutputPath = nil
+        showResult(.error, FullDiskAccess.statusTitle(), detail)
+        updateEndpointRunningStatus()
+        postNativeAlert(
+          title: primaryStatus,
+          message: "\(detail)\n\nDetails: \(AppDiagnostics.appLogURL.path)",
+          kind: .error,
+          secondaryButton: .openFullDiskAccessSettings
+        )
+        return
+      }
+    } else {
+      sourceSnapshot = nil
+    }
     let startedAt = Date()
     let target = selectedTargetID
     let launchArguments = arguments
     activeSyncProcess = runCLI(arguments, environment: environment, onLine: { [weak self] line in
       self?.handleBrowserlessProgress(line)
     }) { [weak self] success, output in
+      sourceSnapshot?.discard()
       guard let self else { return }
       self.activeSyncProcess = nil
       self.isSyncing = false
@@ -916,6 +1158,12 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
           partial ? .warning : .success,
           primary,
           self.lastMeaningfulLine(output) ?? "\(self.selectedBrowser.name) and \(self.targetName) are up to date"
+        )
+      } else if self.noteFullDiskAccessDenial(in: output) {
+        self.showResult(
+          .error,
+          FullDiskAccess.statusTitle(),
+          self.lastMeaningfulLine(output) ?? FullDiskAccess.statusDetail(browserName: self.selectedBrowser.name)
         )
       } else {
         self.showResult(
@@ -952,12 +1200,14 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
         )
       } else if showMenuBarAlert || (!success && !canceled) {
         // Failures always get a modal alert: a status line that can be missed is not an error report.
+        let accessDenied = !success && FullDiskAccess.indicatesDenial(in: output)
         self.postNativeAlert(
           title: self.primaryStatus,
           message: !success && !canceled
             ? "\(self.secondaryStatus)\n\nDetails: \(AppDiagnostics.appLogURL.path)"
             : self.secondaryStatus,
-          kind: canceled ? .information : success ? (partial ? .warning : .information) : .error
+          kind: canceled ? .information : success ? (partial ? .warning : .information) : .error,
+          secondaryButton: accessDenied ? .openFullDiskAccessSettings : nil
         )
       }
     }
@@ -1010,6 +1260,18 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       )
       updateEndpointRunningStatus()
       presentGrokBotResultSheet(prompt: parsed?.prompt ?? Self.grokBotFallbackPrompt, outputPath: outputPath)
+    } else if noteFullDiskAccessDenial(in: output) {
+      // EPERM here is TCC, not a lock: the browser is already closed (the quit-browser gate ran before Create),
+      // so telling the user to close it again would be wrong. Point at Full Disk Access instead.
+      let detail = lastMeaningfulLine(output) ?? FullDiskAccess.statusDetail(browserName: selectedBrowser.name)
+      showResult(.error, FullDiskAccess.statusTitle(), detail)
+      updateEndpointRunningStatus()
+      postNativeAlert(
+        title: primaryStatus,
+        message: "\(detail)\n\n\(fileName) was not written. Details: \(AppDiagnostics.appLogURL.path)",
+        kind: .error,
+        secondaryButton: .openFullDiskAccessSettings
+      )
     } else {
       let detail = lastMeaningfulLine(output)
         ?? "The local sync runtime exited (status \(cliExit.map { String($0.status) } ?? "unknown")) without writing \(fileName)."
@@ -1021,6 +1283,52 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
         kind: .error
       )
     }
+  }
+
+  private enum SourceSnapshotOutcome {
+    case taken(SourceSnapshot)
+    /// Nothing to copy or a non-permission failure: the CLI falls back to reading the profile itself.
+    case unavailable
+    /// The app process itself was refused (TCC). Launching the CLI would only fail the same way.
+    case denied(String)
+  }
+
+  /// Copies the source cookie store with the app's own Full Disk Access before the CLI starts, so a Homebrew
+  /// Node binary never has to open the live database and the source browser can stay open.
+  private func takeSourceSnapshot() -> SourceSnapshotOutcome {
+    let includeHistory = isDirectTarget && historyEnabled
+    do {
+      guard let snapshot = try SourceSnapshot.take(
+        browserID: selectedSourceID,
+        includeHistory: includeHistory,
+        support: support,
+        home: home
+      ) else {
+        AppDiagnostics.log("snapshot: no cookie store found for \(selectedBrowser.name); the CLI will read the profile directly")
+        return .unavailable
+      }
+      AppDiagnostics.log("snapshot: copied \(snapshot.files.joined(separator: ", ")) for \(selectedBrowser.name) into \(snapshot.directory.lastPathComponent)")
+      return .taken(snapshot)
+    } catch {
+      if FullDiskAccess.isDenial(error) {
+        AppDiagnostics.log("snapshot: macOS denied copying the \(selectedBrowser.name) cookie store — \(error.localizedDescription)")
+        cliReportedAccessDenied = true
+        sourceCookieAccessDenied = true
+        return .denied(FullDiskAccess.statusDetail(browserName: selectedBrowser.name))
+      }
+      AppDiagnostics.log("snapshot: could not copy the \(selectedBrowser.name) cookie store (\(error.localizedDescription)); the CLI will read the profile directly")
+      return .unavailable
+    }
+  }
+
+  /// Records a Full Disk Access denial reported by the CLI so the in-app gate appears immediately, before the
+  /// next native probe runs. Returns whether the output described such a denial.
+  private func noteFullDiskAccessDenial(in output: String) -> Bool {
+    guard FullDiskAccess.indicatesDenial(in: output) else { return false }
+    AppDiagnostics.log("full-disk-access: CLI reported a TCC denial for \(selectedBrowser.name)")
+    cliReportedAccessDenied = true
+    sourceCookieAccessDenied = true
+    return true
   }
 
   private func reopenApplicationsAfterSuccessfulSync(
@@ -1462,6 +1770,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       $0.bundleIdentifier == selectedBrowser.bundleIdentifier
     }
     guard !isSyncing else { return }
+    refreshSourceCookieAccess()
     if !runtimeReady {
       state = .error
       primaryStatus = "Local sync runtime could not be refreshed"
@@ -1501,11 +1810,11 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
         state = .warning
         primaryStatus = "Turn on Cookies to export for Grok Bot"
         secondaryStatus = "Grok Bot transfer files include cookie sessions only"
-      } else if grokBotSourceBrowserBlocked {
+      } else if grokBotSourceAccessBlocked {
         showingOperationResult = false
         state = .warning
-        primaryStatus = "Quit \(selectedBrowser.name) before creating"
-        secondaryStatus = "Cookies cannot be read while \(selectedBrowser.name) is open. Quit it completely, then create the transfer file"
+        primaryStatus = FullDiskAccess.statusTitle()
+        secondaryStatus = FullDiskAccess.statusDetail(browserName: selectedBrowser.name)
       } else if !showingOperationResult {
         state = .ready
         primaryStatus = "Ready to create a Grok Bot transfer file"
@@ -1533,6 +1842,27 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
         secondaryStatus = "Only this click sends authenticated state to Browserless \(browserlessRegion.uppercased())"
       }
     }
+  }
+
+  /// Runs from the 2-second status timer while Grok Bot is selected. The probe is a single open(2) on the
+  /// cookie file (no SQLite, no child process), so it is cheap enough to poll and reflects a TCC change
+  /// as soon as the relaunched app can read the file again.
+  private func refreshSourceCookieAccess() {
+    guard isGrokBotTarget else {
+      sourceCookieAccessDenied = false
+      cliReportedAccessDenied = false
+      return
+    }
+    let denied = FullDiskAccess.isCookieStoreReadDenied(browserID: selectedSourceID)
+    if denied != sourceCookieAccessDenied && !cliReportedAccessDenied {
+      AppDiagnostics.log("full-disk-access: \(selectedBrowser.name) cookie store read \(denied ? "denied (EPERM/EACCES)" : "allowed")")
+    }
+    if !denied && cliReportedAccessDenied && FullDiskAccess.cookieDatabasePath(browserID: selectedSourceID, home: home) != nil {
+      // The file is readable again from this process, so the earlier CLI denial is resolved.
+      AppDiagnostics.log("full-disk-access: \(selectedBrowser.name) cookie store is readable again; clearing CLI-reported denial")
+      cliReportedAccessDenied = false
+    }
+    sourceCookieAccessDenied = denied || cliReportedAccessDenied
   }
 
   private var currentVersion: String {
@@ -1572,10 +1902,15 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     )
   }
 
-  private func postNativeAlert(title: String, message: String, kind: NativeAlert.Kind) {
+  private func postNativeAlert(
+    title: String,
+    message: String,
+    kind: NativeAlert.Kind,
+    secondaryButton: NativeAlert.SecondaryButton? = nil
+  ) {
     NotificationCenter.default.post(
       name: .nativeAlert,
-      object: NativeAlert(title: title, message: message, kind: kind)
+      object: NativeAlert(title: title, message: message, kind: kind, secondaryButton: secondaryButton)
     )
   }
 }

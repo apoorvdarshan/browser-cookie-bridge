@@ -172,8 +172,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     case .error: .critical
     }
     alert.addButton(withTitle: "OK")
+    if let secondary = payload.secondaryButton {
+      alert.addButton(withTitle: secondary.title)
+    }
     NSApp.activate(ignoringOtherApps: true)
-    alert.runModal()
+    let response = alert.runModal()
+    guard response == .alertSecondButtonReturn, let secondary = payload.secondaryButton else { return }
+    switch secondary {
+    case .openFullDiskAccessSettings:
+      if let model { model.openFullDiskAccessSettings() } else { FullDiskAccess.openSettings() }
+    }
   }
 
   @objc private func updateStateChanged(_ notification: Notification) {
@@ -489,6 +497,8 @@ struct SyncPanel: View {
                 model.cancelSync()
               } else if model.isBrowserlessTarget && !model.browserlessConfigured {
                 model.showingBrowserlessSetup = true
+              } else if model.grokBotSourceAccessBlocked {
+                model.openFullDiskAccessSettings()
               } else {
                 model.syncNow()
               }
@@ -505,7 +515,9 @@ struct SyncPanel: View {
             .disabled(
               model.uploadCanceling
                 || (model.isSyncing && !model.isBrowserlessTarget)
-                || (!model.isSyncing && model.syncBlocked && !(model.isBrowserlessTarget && !model.browserlessConfigured))
+                || (!model.isSyncing && model.syncBlocked
+                    && !(model.isBrowserlessTarget && !model.browserlessConfigured)
+                    && !model.grokBotSourceAccessBlocked)
             )
             .keyboardShortcut(.return, modifiers: .command)
           }
@@ -548,12 +560,13 @@ struct SyncPanel: View {
     if model.isBrowserlessTarget && !model.browserlessConfigured { return "Connect Browserless" }
     if model.isBrowserlessTarget && model.selectedSourceID == "comet" { return "Choose another browser" }
     if model.isBrowserlessTarget && model.sourceBrowserRunning { return "Close \(model.selectedBrowser.name) first" }
-    if model.grokBotSourceBrowserBlocked { return "Close \(model.selectedBrowser.name) first" }
+    if model.grokBotSourceAccessBlocked { return "Grant Full Disk Access…" }
     return model.isGrokBotTarget ? "Create transfer file" : model.isBrowserlessTarget ? "Upload now" : "Sync now"
   }
 
   private var syncButtonIcon: String {
     if model.isBrowserlessTarget && model.isSyncing { return "xmark.circle.fill" }
+    if model.grokBotSourceAccessBlocked { return "lock.shield.fill" }
     if model.syncBlocked { return model.isBrowserlessTarget && !model.browserlessConfigured ? "key.fill" : "xmark.circle.fill" }
     return model.isBrowserlessTarget ? "icloud.and.arrow.up.fill" : model.isGrokBotTarget ? "arrow.up.doc.fill" : "arrow.triangle.2.circlepath"
   }

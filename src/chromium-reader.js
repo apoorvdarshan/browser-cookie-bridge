@@ -63,24 +63,45 @@ export function isChromiumBrowserRunning({ browser, processList } = {}) {
   return String(output).split("\n").some((command) => definition.processPattern.test(command.trim()));
 }
 
+/**
+ * Directory of pre-copied source databases (`Cookies`, optionally `History`, plus SQLite sidecars) provided by
+ * the macOS app. The app process holds Full Disk Access; the Node binary from config.nodePath (for example a
+ * Homebrew install) is a separate TCC client and gets EPERM when it opens or copies another app's Cookies file
+ * itself. When this is set the reader never touches the live profile databases.
+ */
+export const SOURCE_SNAPSHOT_ENV = "BCB_SOURCE_SNAPSHOT_DIR";
+
+export function resolveSourceSnapshot(directory = process.env[SOURCE_SNAPSHOT_ENV]) {
+  if (!directory) return { directory: null, cookies: null, history: null };
+  const cookies = path.join(directory, "Cookies");
+  const history = path.join(directory, "History");
+  return {
+    directory,
+    cookies: fs.existsSync(cookies) ? cookies : null,
+    history: fs.existsSync(history) ? history : null,
+  };
+}
+
 export function readChromiumProfile({
   browser,
   imports = { cookies: true, history: false },
   home = os.homedir(),
   password,
+  snapshotDirectory = process.env[SOURCE_SNAPSHOT_ENV],
 } = {}) {
   const definition = BROWSERS[browser];
   if (!definition) throw new Error(`Unsupported Chromium source: ${browser}`);
   const root = path.join(home, "Library", "Application Support", ...definition.root);
   const profileName = definition.directProfile ? "Default" : activeProfileName(root);
   const profilePath = definition.directProfile ? root : path.join(root, profileName);
-  if (!fs.existsSync(profilePath)) {
+  const snapshot = resolveSourceSnapshot(snapshotDirectory);
+  if (!fs.existsSync(profilePath) && !snapshot.cookies) {
     throw new Error(`${browserDisplayName(browser)} profile not found at ${profilePath}`);
   }
 
   const cookieResult = imports.cookies
     ? readCookies({
-        databasePath: firstExisting([
+        databasePath: snapshot.cookies ?? firstExisting([
           path.join(profilePath, "Network", "Cookies"),
           path.join(profilePath, "Cookies"),
         ]),
@@ -89,7 +110,7 @@ export function readChromiumProfile({
       })
     : { cookies: [], total: 0, skipped: 0 };
   const history = imports.history
-    ? readHistory(path.join(profilePath, "History"), browser)
+    ? readHistory(snapshot.history ?? path.join(profilePath, "History"), browser)
     : [];
 
   return {
@@ -98,6 +119,10 @@ export function readChromiumProfile({
     history,
     profileName,
     profilePath,
+    snapshot: {
+      cookies: Boolean(imports.cookies && snapshot.cookies),
+      history: Boolean(imports.history && snapshot.history),
+    },
   };
 }
 

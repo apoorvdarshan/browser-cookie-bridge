@@ -302,7 +302,9 @@ async function sync(args, { signal } = {}) {
       browser: source,
       imports: { cookies: true, history: false },
     });
-    console.log(`Read ${payload.cookies.length} of ${payload.cookieStats.total} cookies (${payload.cookieStats.skipped} unavailable) from ${source}.`);
+    console.log(
+      `Read ${payload.cookies.length} of ${payload.cookieStats.total} cookies (${payload.cookieStats.skipped} unavailable) from ${source}${payload.snapshot?.cookies ? " via the app's snapshot" : ""}.`,
+    );
     console.log(`Writing Grok Bot transfer file to ${path.resolve(outputPath)}…`);
     const result = writeGrokBotBundle({
       outputPath,
