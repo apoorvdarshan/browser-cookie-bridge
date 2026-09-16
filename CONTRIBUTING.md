@@ -95,6 +95,9 @@ After `npm run build:app`, confirm the Grok Bot prompt appears even when the mai
 2. From the menu-bar icon, choose **Show Browser Cookie Bridge**, click **Create transfer file**, and save a disposable `.bcbx` to `/tmp`.
 3. Expect a floating **Grok Bot transfer ready** panel with Reveal file, Copy prompt, and Done; the import prompt should already be on the clipboard.
 4. Repeat step 2 without reopening the main window first (trigger **Create transfer file** from the restored window or menu bar sync path you changed).
+5. Run **Create transfer file** again, pick the same file, and confirm **Replace**. The `.bcbx` mtime must change and the panel (or its NSAlert fallback) must appear again with the prompt on the clipboard.
+6. Force a failure (for example, temporarily point `nodePath` in `~/Library/Application Support/BraveCodexCookieSync/config.json` at a missing binary) and click **Create transfer file** again. Expect a modal error alert — never only a status-line change — and restore the config afterwards.
+7. Check `~/Library/Application Support/BraveCodexCookieSync/logs/app.log` and `logs/last-sync-result.json`: every attempt logs the save-panel result, the CLI launch, its exit status and last output lines, whether the bundle was rewritten, and whether the result UI was presented. These files never contain cookie values.
 
 ## Safety rules
 
