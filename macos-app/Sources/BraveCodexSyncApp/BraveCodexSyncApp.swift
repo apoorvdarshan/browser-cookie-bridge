@@ -23,6 +23,7 @@ struct BraveCodexSyncApp: App {
         .environmentObject(model)
         .frame(width: 644, height: 730)
         .background(AppBackground())
+        .background(SyncModelAttachment(appDelegate: appDelegate, model: model))
     }
     .windowResizability(.contentSize)
     .commands { CommandGroup(replacing: .newItem) {} }
@@ -35,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   weak var model: SyncModel?
   private weak var mainWindow: NSWindow?
   private var grokBotResultPanel: NSPanel?
+  private var pendingGrokBotResult: GrokBotResultPresentation?
+  private var grokBotPanelFallbackToken = UUID()
   private var statusItem: NSStatusItem?
   private var syncMenuItem: NSMenuItem?
   private var updateMenuItem: NSMenuItem?
@@ -98,6 +101,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       let candidate = NSApp.windows.first(where: { $0.canBecomeMain }) ?? NSApp.windows.first
       self.mainWindow = candidate
       candidate?.delegate = self
+      if let pending = self.pendingGrokBotResult {
+        self.pendingGrokBotResult = nil
+        self.presentGrokBotResultUI(pending)
+      }
     }
   }
 
@@ -204,29 +211,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   }
 
   @objc private func presentGrokBotResultNotification(_ notification: Notification) {
-    guard let model else { return }
-    showMainWindow()
-    grokBotResultPanel?.close()
-    grokBotResultPanel = nil
+    let payload: GrokBotResultPresentation
+    if let posted = notification.object as? GrokBotResultPresentation {
+      payload = posted
+    } else if let model {
+      payload = GrokBotResultPresentation(prompt: model.grokBotPrompt, outputPath: model.grokBotOutputPath)
+    } else {
+      return
+    }
     DispatchQueue.main.async { [weak self] in
-      guard let self, let model = self.model else { return }
-      self.presentGrokBotResultPanel(model: model)
+      self?.presentGrokBotResultUI(payload)
     }
   }
 
-  private func presentGrokBotResultPanel(model: SyncModel) {
+  private func presentGrokBotResultUI(_ payload: GrokBotResultPresentation) {
+    SyncModel.copyGrokBotPromptToPasteboard(payload.prompt)
+    activateForUserAttention()
+
+    guard !payload.outputPath.isEmpty else {
+      showGrokBotResultAlert(
+        payload: payload,
+        detail: "The transfer finished, but the app could not determine where the .bcbx file was saved. Check the status message in the main window or run Create transfer file again."
+      )
+      return
+    }
+
+    guard let model else {
+      pendingGrokBotResult = payload
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+        guard let self, let pending = self.pendingGrokBotResult else { return }
+        self.pendingGrokBotResult = nil
+        self.showGrokBotResultAlert(
+          payload: pending,
+          detail: "Your Grok Bot transfer file is ready. The prompt is on your clipboard."
+        )
+      }
+      return
+    }
+
+    grokBotResultPanel?.close()
+    grokBotResultPanel = nil
+    showMainWindow()
+
+    let fallbackToken = UUID()
+    grokBotPanelFallbackToken = fallbackToken
+
     let panel = NSPanel(
       contentRect: NSRect(x: 0, y: 0, width: 520, height: 520),
-      styleMask: [.titled, .closable, .fullSizeContentView],
+      styleMask: [.titled, .closable],
       backing: .buffered,
       defer: false
     )
     panel.title = "Grok Bot transfer ready"
-    panel.titlebarAppearsTransparent = false
     panel.isFloatingPanel = true
-    panel.level = .modalPanel
-    panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+    panel.level = .floating
+    panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .canJoinAllSpaces]
     panel.isReleasedWhenClosed = false
+    panel.hidesOnDeactivate = false
     panel.center()
     let dismissPanel = { [weak self] in
       self?.grokBotResultPanel?.close()
@@ -235,9 +276,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     panel.contentView = NSHostingView(
       rootView: GrokBotResultSheet(onDone: dismissPanel).environmentObject(model)
     )
-    panel.makeKeyAndOrderFront(nil)
-    NSApp.activate(ignoringOtherApps: true)
     grokBotResultPanel = panel
+    panel.orderFrontRegardless()
+    panel.makeKey()
+    activateForUserAttention()
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+      guard let self, self.grokBotPanelFallbackToken == fallbackToken else { return }
+      guard self.grokBotResultPanel === panel else { return }
+      if !panel.isVisible || !panel.isKeyWindow {
+        self.grokBotResultPanel = nil
+        panel.orderOut(nil)
+        self.showGrokBotResultAlert(
+          payload: payload,
+          detail: "The transfer file is ready. The prompt is on your clipboard."
+        )
+      }
+    }
+  }
+
+  private func activateForUserAttention() {
+    NSApp.setActivationPolicy(.regular)
+    NSApp.activate(ignoringOtherApps: true)
+  }
+
+  private func showGrokBotResultAlert(payload: GrokBotResultPresentation, detail: String) {
+    activateForUserAttention()
+    SyncModel.copyGrokBotPromptToPasteboard(payload.prompt)
+
+    let fileName = payload.outputPath.isEmpty
+      ? "GrokBot-Import.bcbx"
+      : URL(fileURLWithPath: payload.outputPath).lastPathComponent
+    let alert = NSAlert()
+    alert.messageText = "Grok Bot transfer ready"
+    alert.informativeText = "\(detail)\n\nFile: \(fileName)"
+    alert.alertStyle = .informational
+    alert.addButton(withTitle: "OK")
+    alert.addButton(withTitle: "Copy prompt")
+    if !payload.outputPath.isEmpty {
+      alert.addButton(withTitle: "Reveal in Finder")
+    }
+
+    let response = alert.runModal()
+    switch response {
+    case .alertSecondButtonReturn:
+      SyncModel.copyGrokBotPromptToPasteboard(payload.prompt)
+    case .alertThirdButtonReturn where !payload.outputPath.isEmpty:
+      let url = URL(fileURLWithPath: payload.outputPath)
+      NSWorkspace.shared.activateFileViewerSelecting([url])
+    default:
+      break
+    }
   }
 
   private func showMainWindow() {
@@ -1223,6 +1312,20 @@ struct SetupStateBadge: View {
 enum Theme {
   static let accent = Color(red: 0.46, green: 0.46, blue: 0.48)
   static let active = Color(red: 0.54, green: 0.12, blue: 0.18)
+}
+
+private struct SyncModelAttachment: NSViewRepresentable {
+  let appDelegate: AppDelegate
+  let model: SyncModel
+
+  func makeNSView(context: Context) -> NSView {
+    DispatchQueue.main.async {
+      appDelegate.attach(model: model)
+    }
+    return NSView(frame: .zero)
+  }
+
+  func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 struct GrokBotResultSheet: View {
