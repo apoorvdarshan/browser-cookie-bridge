@@ -169,9 +169,11 @@ Grok Bot cannot receive a local database merge. The app writes an encrypted tran
 1. Select a source browser and **Grok Bot** as the destination. The tile uses the official Grok Bot app icon.
 2. Keep **Cookies** on. History URLs and Full site data are excluded from Grok Bot transfer files.
 3. Optionally limit the export with **Only these domains**. Leave it blank to include every readable cookie.
-4. Press **Create transfer file** and choose where to save `GrokBot-Import.bcbx`.
+4. Press **Create transfer file** and choose where to save `GrokBot-Import.bcbx`. The source browser can stay open: the app copies its cookie database itself before the export runs.
 5. The result sheet shows a sensitivity warning and the prompt to paste. Use **Reveal file** or **Copy prompt**. Do not paste cookie values into chat.
 6. Attach the `.bcbx` file to any Grok Bot and paste the prompt. The bundled importer decrypts automatically—no separate key entry.
+
+If the app shows **Grant Full Disk Access to read Brave cookies** (Create is blocked until then), macOS is refusing to let it read the browser's cookie store (`EPERM: operation not permitted`). Add Browser Cookie Bridge under **System Settings › Privacy & Security › Full Disk Access**, then quit and reopen the app. Quitting the browser does not fix this. The `doctor` command prints the same check as `Source cookie store access`.
 
 The bundle is a zip-compatible `.bcbx` file containing `manifest.json`, encrypted `payload.enc`, `decryption.key`, `import.mjs`, and `PROMPT.txt`. Cookies are encrypted with AES-256-GCM using a scrypt-derived key; the same key is stored in `decryption.key` inside the bundle so the importer can decrypt without user input. Treat the file as credentials—anyone with the bundle can read the cookies. The file is written with user-only permissions (`0600`). Daily sync and Sync at login never create Grok Bot bundles.
 
