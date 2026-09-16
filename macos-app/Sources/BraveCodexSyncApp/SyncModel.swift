@@ -251,8 +251,12 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   }
   var cursorHasNoDataSelected: Bool { selectedTargetID == "cursor" && !cookiesEnabled }
   var grokBotHasNoDataSelected: Bool { isGrokBotTarget && !cookiesEnabled }
+  /// Chromium holds its cookie database (and the Keychain-backed decryption path) open while running, so a
+  /// `.bcbx` export fails with EPERM/locked-database errors. Block up front instead of surfacing that after the fact.
+  var grokBotSourceBrowserBlocked: Bool { isGrokBotTarget && sourceBrowserRunning }
+  var grokBotBlocked: Bool { grokBotHasNoDataSelected || grokBotSourceBrowserBlocked }
   var syncBlocked: Bool {
-    !runtimeReady || directTargetBlocked || sourceSiteDataBlocked || browserlessBlocked || cursorHasNoDataSelected || grokBotHasNoDataSelected
+    !runtimeReady || directTargetBlocked || sourceSiteDataBlocked || browserlessBlocked || cursorHasNoDataSelected || grokBotBlocked
   }
   var formattedUploadElapsed: String {
     let minutes = uploadElapsedSeconds / 60
@@ -1497,6 +1501,11 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
         state = .warning
         primaryStatus = "Turn on Cookies to export for Grok Bot"
         secondaryStatus = "Grok Bot transfer files include cookie sessions only"
+      } else if grokBotSourceBrowserBlocked {
+        showingOperationResult = false
+        state = .warning
+        primaryStatus = "Quit \(selectedBrowser.name) before creating"
+        secondaryStatus = "Cookies cannot be read while \(selectedBrowser.name) is open. Quit it completely, then create the transfer file"
       } else if !showingOperationResult {
         state = .ready
         primaryStatus = "Ready to create a Grok Bot transfer file"

@@ -547,6 +547,7 @@ struct SyncPanel: View {
     if model.isBrowserlessTarget && !model.browserlessConfigured { return "Connect Browserless" }
     if model.isBrowserlessTarget && model.selectedSourceID == "comet" { return "Choose another browser" }
     if model.isBrowserlessTarget && model.sourceBrowserRunning { return "Close \(model.selectedBrowser.name) first" }
+    if model.grokBotSourceBrowserBlocked { return "Close \(model.selectedBrowser.name) first" }
     return model.isGrokBotTarget ? "Create transfer file" : model.isBrowserlessTarget ? "Upload now" : "Sync now"
   }
 
