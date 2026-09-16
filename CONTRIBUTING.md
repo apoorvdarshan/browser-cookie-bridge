@@ -98,6 +98,7 @@ After `npm run build:app`, confirm the Grok Bot prompt appears even when the mai
 5. Run **Create transfer file** again, pick the same file, and confirm **Replace**. The `.bcbx` mtime must change and the panel (or its NSAlert fallback) must appear again with the prompt on the clipboard.
 6. Force a failure (for example, temporarily point `nodePath` in `~/Library/Application Support/BraveCodexCookieSync/config.json` at a missing binary) and click **Create transfer file** again. Expect a modal error alert — never only a status-line change — and restore the config afterwards.
 7. Check `~/Library/Application Support/BraveCodexCookieSync/logs/app.log` and `logs/last-sync-result.json`: every attempt logs the save-panel result, the CLI launch, its exit status and last output lines, whether the bundle was rewritten, and whether the result UI was presented. These files never contain cookie values.
+8. With the source browser (for example Brave) still open and **Grok Bot** selected, the main window must show **Quit Brave before creating** in the warning state and the sync button must read **Close Brave first** and be disabled. Quit the browser completely; within about two seconds the status must return to **Ready to create a Grok Bot transfer file** and the button to **Create transfer file**. Never rely on the post-failure EPERM alert alone.
 
 ## Safety rules
 
