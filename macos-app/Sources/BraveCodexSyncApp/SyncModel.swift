@@ -8,6 +8,8 @@ extension Notification.Name {
   static let nativeAlert = Notification.Name("BraveCodexSync.nativeAlert")
   static let updateStateChanged = Notification.Name("BraveCodexSync.updateStateChanged")
   static let syncStateChanged = Notification.Name("BraveCodexSync.syncStateChanged")
+  static let showMainWindow = Notification.Name("BraveCodexSync.showMainWindow")
+  static let presentGrokBotResult = Notification.Name("BraveCodexSync.presentGrokBotResult")
 }
 
 struct NativeAlert {
@@ -99,7 +101,6 @@ final class SyncModel: ObservableObject {
   @Published var browserlessOnlyDomains = ""
   @Published var grokBotOnlyDomains = ""
   @Published var showingBrowserlessSetup = false
-  @Published var showingGrokBotResult = false
   @Published var grokBotPrompt = ""
   @Published var grokBotOutputPath = ""
   @Published var browserlessAssessment: BrowserlessProfileAssessment?
@@ -118,6 +119,16 @@ final class SyncModel: ObservableObject {
   private var appLoginAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.app-login.plist") }
   private var endpointStatusTimer: Timer?
   private var updateTimer: Timer?
+  private var activeGrokBotOutputPath: String?
+
+  private static let grokBotFallbackPrompt = """
+On your Grok Bot cloud computer only — do not access my local Mac and do not print cookie values.
+
+1. Save the attached GrokBot-Import.bcbx to the cloud computer.
+2. Unzip it: unzip -o GrokBot-Import.bcbx -d bcb-import && cd bcb-import
+3. Run: node import.mjs
+4. Report only how many cookies were imported per domain, then delete the bcb-import folder and any copies of the bundle.
+"""
   private var didCheckAfterLaunch = false
   private var didConsumeUpdateResult = false
   private var assessedBrowserID: String?
@@ -725,7 +736,10 @@ final class SyncModel: ObservableObject {
     var environment: [String: String] = [:]
     var arguments = ["sync", "--timeout", isBrowserlessTarget ? "900" : "300"]
     if let grokBotOutputPath {
+      activeGrokBotOutputPath = grokBotOutputPath
       arguments.append(contentsOf: ["--output", grokBotOutputPath])
+    } else {
+      activeGrokBotOutputPath = nil
     }
     if isBrowserlessTarget {
       guard let token = BrowserlessCredentialStore.read() else {
@@ -760,12 +774,14 @@ final class SyncModel: ObservableObject {
         self.state = partial ? .warning : .success
         if self.isGrokBotTarget {
           let parsed = self.parseGrokBotResult(from: output)
-          let outputPath = parsed?.outputPath ?? grokBotOutputPath ?? self.grokBotOutputPath
-          self.grokBotOutputPath = outputPath
-          self.grokBotPrompt = parsed?.prompt ?? Self.grokBotFallbackPrompt
+          let outputPath = parsed?.outputPath ?? self.activeGrokBotOutputPath ?? grokBotOutputPath ?? self.grokBotOutputPath
+          let prompt = parsed?.prompt ?? Self.grokBotFallbackPrompt
+          if !outputPath.isEmpty {
+            self.presentGrokBotResultSheet(prompt: prompt, outputPath: outputPath)
+          }
+          self.activeGrokBotOutputPath = nil
           self.primaryStatus = partial ? "Grok Bot transfer created with warnings" : "Grok Bot transfer file ready"
           self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Attach the .bcbx file to any Grok Bot and paste the prompt"
-          self.presentGrokBotResultSheet()
         } else {
           self.primaryStatus = self.isBrowserlessTarget
             ? (partial ? "Browserless profile uploaded with omissions" : "Browserless profile uploaded")
@@ -1171,21 +1187,6 @@ final class SyncModel: ObservableObject {
     isDirectTarget || selectedTargetID == "browserless" || isGrokBotTarget ? [] : [selectedSourceID, selectedTargetID]
   }
 
-  private static let grokBotFallbackPrompt = """
-On your Grok Bot cloud computer only — do not access my local Mac and do not print cookie values.
-
-1. Save the attached GrokBot-Import.bcbx to the cloud computer.
-2. Unzip it: unzip -o GrokBot-Import.bcbx -d bcb-import && cd bcb-import
-3. Run: node import.mjs
-4. Report only how many cookies were imported per domain, then delete the bcb-import folder and any copies of the bundle.
-"""
-
-  private func presentGrokBotResultSheet() {
-    DispatchQueue.main.async { [weak self] in
-      self?.showingGrokBotResult = true
-    }
-  }
-
   private struct GrokBotResultPayload: Decodable {
     let outputPath: String
     let prompt: String
@@ -1198,6 +1199,15 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     let json = line.replacingOccurrences(of: "BCB_GROK_RESULT ", with: "")
     guard let data = json.data(using: .utf8) else { return nil }
     return try? JSONDecoder().decode(GrokBotResultPayload.self, from: data)
+  }
+
+  private func presentGrokBotResultSheet(prompt: String, outputPath: String) {
+    grokBotPrompt = prompt
+    grokBotOutputPath = outputPath
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(prompt, forType: .string)
+    NotificationCenter.default.post(name: .showMainWindow, object: nil)
+    NotificationCenter.default.post(name: .presentGrokBotResult, object: nil)
   }
 
   private func updateEndpointRunningStatus() {

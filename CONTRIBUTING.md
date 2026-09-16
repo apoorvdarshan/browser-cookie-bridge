@@ -87,6 +87,15 @@ Check the UI in both light and dark appearances where relevant. Verify labels, k
 
 For transfer changes, use disposable test profiles and non-sensitive test accounts. Verify the source and destination combination you changed, plus one unaffected path. Codex or Cursor must be completely closed before testing its direct import. Grok Bot tests should create a temporary `.bcbx` file and never commit the bundle or cookie values.
 
+### Manual check: Grok Bot prompt UI from menu-bar mode
+
+After `npm run build:app`, confirm the Grok Bot prompt appears even when the main window was closed:
+
+1. Open Browser Cookie Bridge, choose **Grok Bot** as the destination, and close the main window so the app stays in the menu bar.
+2. From the menu-bar icon, choose **Show Browser Cookie Bridge**, click **Create transfer file**, and save a disposable `.bcbx` to `/tmp`.
+3. Expect a floating **Grok Bot transfer ready** panel with Reveal file, Copy prompt, and Done; the import prompt should already be on the clipboard.
+4. Repeat step 2 without reopening the main window first (trigger **Create transfer file** from the restored window or menu bar sync path you changed).
+
 ## Safety rules
 
 Changes must preserve these guarantees:
