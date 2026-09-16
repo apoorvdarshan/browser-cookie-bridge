@@ -267,7 +267,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     panel.title = "Grok Bot transfer ready"
     panel.isFloatingPanel = true
     panel.level = .floating
-    panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .canJoinAllSpaces]
+    // Avoid custom collectionBehavior: macOS 27 validates combinations and aborts on
+    // moveToActiveSpace + fullScreenAuxiliary + canJoinAllSpaces (see crash 2026-09-16).
     panel.isReleasedWhenClosed = false
     panel.hidesOnDeactivate = false
     panel.center()
