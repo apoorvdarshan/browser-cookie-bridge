@@ -19,6 +19,11 @@ struct NativeAlert {
   let kind: Kind
 }
 
+struct GrokBotResultPresentation: Sendable {
+  let prompt: String
+  let outputPath: String
+}
+
 struct UpdateMenuState {
   let version: String?
   let checking: Bool
@@ -776,9 +781,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
           let parsed = self.parseGrokBotResult(from: output)
           let outputPath = parsed?.outputPath ?? self.activeGrokBotOutputPath ?? grokBotOutputPath ?? self.grokBotOutputPath
           let prompt = parsed?.prompt ?? Self.grokBotFallbackPrompt
-          if !outputPath.isEmpty {
-            self.presentGrokBotResultSheet(prompt: prompt, outputPath: outputPath)
-          }
+          self.presentGrokBotResultSheet(prompt: prompt, outputPath: outputPath)
           self.activeGrokBotOutputPath = nil
           self.primaryStatus = partial ? "Grok Bot transfer created with warnings" : "Grok Bot transfer file ready"
           self.secondaryStatus = self.lastMeaningfulLine(output) ?? "Attach the .bcbx file to any Grok Bot and paste the prompt"
@@ -1204,10 +1207,15 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   private func presentGrokBotResultSheet(prompt: String, outputPath: String) {
     grokBotPrompt = prompt
     grokBotOutputPath = outputPath
+    copyGrokBotPromptToPasteboard(prompt)
+    let payload = GrokBotResultPresentation(prompt: prompt, outputPath: outputPath)
+    NotificationCenter.default.post(name: .showMainWindow, object: nil)
+    NotificationCenter.default.post(name: .presentGrokBotResult, object: payload)
+  }
+
+  static func copyGrokBotPromptToPasteboard(_ prompt: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(prompt, forType: .string)
-    NotificationCenter.default.post(name: .showMainWindow, object: nil)
-    NotificationCenter.default.post(name: .presentGrokBotResult, object: nil)
   }
 
   private func updateEndpointRunningStatus() {
