@@ -35,7 +35,9 @@ Build and install the native app into your user Applications folder:
 npm run build:app
 ```
 
-The app is installed as `~/Applications/Browser Cookie Bridge.app`. This command also creates private local configuration and extension folders under `~/Library/Application Support/BraveCodexCookieSync/`.
+The app is installed as `~/Applications/Browser Cookie Bridge.app`, or replaces the canonical `/Applications` copy if present. This command also creates private local configuration and extension folders under `~/Library/Application Support/BraveCodexCookieSync/`.
+
+Local installs reuse the installed app's signing identity, or select an available Developer ID Application certificate (then Apple Development). You can choose a compatible certificate with `MACOS_SIGNING_IDENTITY`. The installer verifies the signature and compatibility with the previous designated requirement before replacing a signed app. This keeps the identity used for Full Disk Access stable across rebuilds. Switching an existing ad hoc installation to certificate signing may require granting access once. Without a signing certificate, new or previously ad hoc installs still use ad hoc signing and warn that permissions can reset after rebuilds; an existing certificate-signed app is preserved if its identity is unavailable.
 
 ## Project layout
 

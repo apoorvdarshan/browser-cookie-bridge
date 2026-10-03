@@ -144,7 +144,9 @@ npm test
 npm run build:app
 ```
 
-The final command compiles the native SwiftUI app, enables **Open at login**, **Sync at login**, and the **menu-bar helper**, then launches it. A first install uses `~/Applications/Browser Cookie Bridge.app` without requesting administrator access. If an existing signed `/Applications/Browser Cookie Bridge.app` is present, the CLI keeps that system copy canonical and leaves app updates to the signed-DMG updater. Developers who intentionally need to replace it with a local ad-hoc build can pass `--replace-system-from-source`. Daily sync stays off until you enable it.
+The final command compiles the native SwiftUI app, enables **Open at login**, **Sync at login**, and the **menu-bar helper**. A first install uses `~/Applications/Browser Cookie Bridge.app` without requesting administrator access. The normal `install-app` command preserves an existing `/Applications/Browser Cookie Bridge.app`; `npm run build:app` intentionally replaces that canonical copy using `--replace-system-from-source`. Daily sync stays off until you enable it.
+
+Local builds reuse the installed app's signing certificate, or choose an available Developer ID Application or Apple Development identity. Set `MACOS_SIGNING_IDENTITY` to select a compatible certificate explicitly. Certificate signing keeps the app's identity stable so Full Disk Access can survive rebuilds. Changing from ad hoc signing may require granting access once. If no certificate is available, ad hoc installs warn that permissions may reset; the installer refuses to replace a certificate-signed app with an incompatible signature.
 
 ## Setup
 

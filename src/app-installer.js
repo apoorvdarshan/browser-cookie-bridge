@@ -21,6 +21,8 @@ export function installApp({ home = os.homedir(), open = true, preserveSystemApp
     return destination;
   }
 
+  const signing = localSigningIdentity(destination);
+
   const packagePath = path.join(projectRoot(), "macos-app");
   run("swift", ["build", "-c", "release", "--package-path", packagePath]);
   const binPath = run("swift", [
@@ -44,7 +46,19 @@ export function installApp({ home = os.homedir(), open = true, preserveSystemApp
   fs.copyFileSync(path.join(packagePath, "Info.plist"), path.join(contents, "Info.plist"));
   fs.cpSync(path.join(packagePath, "Resources"), resources, { recursive: true, force: true });
 
-  run("codesign", ["--force", "--deep", "--sign", "-", staging]);
+  console.log(signing.identity === "-"
+    ? "No local signing certificate found. Ad hoc builds may require Full Disk Access again after each rebuild."
+    : `Signing local app with ${signing.name || signing.identity}`);
+  run("/usr/bin/codesign", ["--force", "--deep", "--timestamp=none", "--sign", signing.identity, staging]);
+  run("/usr/bin/codesign", ["--verify", "--deep", "--strict", staging]);
+  if (signing.previousRequirement) {
+    // TCC grants belong to the installed app's designated requirement. Verify
+    // compatibility before replacing it so a missing or changed certificate
+    // cannot silently discard the app's existing privacy permissions.
+    run("/usr/bin/codesign", ["--verify", "--strict", "-R", `=${signing.previousRequirement}`, staging]);
+  } else if (signing.identity !== "-" && fs.existsSync(destination)) {
+    console.log("Switched to a stable signing identity. Full Disk Access may need to be granted once for this identity.");
+  }
 
   fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o755 });
   fs.rmSync(destination, { recursive: true, force: true });
@@ -56,6 +70,40 @@ export function installApp({ home = os.homedir(), open = true, preserveSystemApp
   run("xattr", ["-dr", "com.apple.quarantine", destination], { allowFailure: true });
   if (open) run("open", [destination]);
   return destination;
+}
+
+function localSigningIdentity(destination) {
+  const installed = fs.existsSync(destination)
+    ? spawnSync("/usr/bin/codesign", ["-d", "-r-", "-vv", destination], { encoding: "utf8" })
+    : null;
+  const details = installed?.status === 0 ? `${installed.stdout || ""}\n${installed.stderr || ""}` : "";
+  const authority = details.match(/^Authority=(.+)$/m)?.[1];
+  const previousRequirement = authority
+    ? details.match(/^(?:# )?designated => (.+)$/m)?.[1]
+    : undefined;
+  if (authority && !previousRequirement) {
+    throw new Error("Could not read the installed app's signing requirement. The installed app was preserved.");
+  }
+
+  const identities = run("/usr/bin/security", ["find-identity", "-v", "-p", "codesigning"]);
+  const available = [...identities.matchAll(/^\s*\d+\) ([A-Fa-f0-9]{40}) "([^"]+)"\s*$/gm)]
+    .map((match) => ({ identity: match[1], name: match[2] }));
+  const requested = process.env.MACOS_SIGNING_IDENTITY?.trim();
+  let selected;
+  if (requested) {
+    selected = available.find(({ identity, name }) => identity.toLowerCase() === requested.toLowerCase() || name === requested)
+      || { identity: requested };
+  } else if (authority) {
+    selected = available.find(({ name }) => name === authority);
+    if (!selected) {
+      throw new Error(`The installed app uses ${authority}, but that signing identity is unavailable. Restore its certificate and private key, or set MACOS_SIGNING_IDENTITY to a compatible identity. The installed app was preserved.`);
+    }
+  } else {
+    selected = available.find(({ name }) => name.startsWith("Developer ID Application:"))
+      || available.find(({ name }) => name.startsWith("Apple Development:"))
+      || { identity: "-" };
+  }
+  return { ...selected, previousRequirement };
 }
 
 function run(command, args, { allowFailure = false } = {}) {
