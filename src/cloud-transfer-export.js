@@ -20,14 +20,22 @@ export function cloudTransferTarget(target = "grok-bot") {
 export function cloudTransferPrompt(target = "grok-bot") {
   const { bundleName } = cloudTransferTarget(target);
   if (target === "grok-bot") return GROK_BOT_PROMPT;
-  return `On your Dots cloud computer only — do not access my local Mac and do not print cookie names, values, or keys.
+  return `Manual import — on your Dots cloud computer only.
 
-1. Save the attached ${bundleName} to your cloud computer, then unzip it into a new private folder: umask 077; unzip ${bundleName} -d dots-bcb-import
-2. Use your existing managed cloud browser, the same one shown under Open computer. Do not launch a separate browser or change its launch settings.
-3. Run: cd dots-bcb-import && node import.mjs --bundle ../${bundleName}
-4. The importer needs Node.js 22+ and a local Chrome DevTools endpoint. If discovery fails, find the existing managed browser's endpoint and pass --cdp-url http://127.0.0.1:PORT (or its loopback browser WebSocket URL). If that endpoint is unavailable, stop and report that import is unsupported in this environment.
-5. If the importer reports separate browser contexts, identify the context of your managed browser and pass --browser-context-id with that ID (use default only for the default context). Stop if you cannot identify it.
-6. Report only the imported cookie count. After success, the importer deletes its extracted files and the supplied bundle copy; remove any other copies. Never paste decrypted cookies into chat.`;
+Import authentication cookies yourself. These instructions are for you to follow in takeover mode.
+
+1. Open your dot's profile, choose Computers / Open computer, then Take over.
+2. If the cloud computer offers a file-upload method and a terminal, transfer ${bundleName} there yourself. If either is unavailable, use the website's private sign-in flow instead.
+3. Use your existing managed cloud browser, the same one shown under Open computer. In the cloud terminal, open the folder containing the bundle and run:
+   umask 077
+   unzip ${bundleName} -d dots-bcb-import
+   cd dots-bcb-import && node import.mjs --bundle ../${bundleName}
+4. This experimental importer needs Node.js 22+ and the existing browser's local Chrome DevTools endpoint. If you know its endpoint, pass --cdp-url with its loopback HTTP or browser WebSocket URL. If separate contexts are reported, pass --browser-context-id for the managed browser's confirmed context. If you cannot identify an accessible endpoint and context, stop and sign in privately instead. Leave the managed browser's launch settings alone.
+5. After success, the importer removes its extracted files and the supplied bundle copy. Remove any remaining copies, then Return control.
+
+The bundle includes its decryption key. Anyone with the file can read your cookies. Never paste cookie names, values, or keys into chat.
+
+Supported alternative: ask your dot to open the website and let you sign in privately, or use Take over to sign in yourself. Manual cookie import has not been verified in a live dot.`;
 }
 export const BUNDLE_FORMAT_VERSION = 2;
 export const EMBEDDED_KEY_FILENAME = "decryption.key";
@@ -191,7 +199,10 @@ export function cloudTransferSummary(result, target = "grok-bot") {
   const skipped = result.sourceCookieSkipped
     ? ` ${result.sourceCookieSkipped} source cookie${result.sourceCookieSkipped === 1 ? " was" : "s were"} unreadable or unsupported.`
     : "";
-  return `${name} transfer file created: ${result.cookieCount} cookies across ${domainNote} from ${result.sourceBrowser}.${skipped} Attach ${path.basename(result.outputPath)} to ${target === "dots" ? "your dot" : "any Grok Bot"} and paste the prompt. The bundle includes the decryption key—treat the file as credentials and do not share it.`;
+  const nextStep = target === "dots"
+    ? `Import ${path.basename(result.outputPath)} yourself using the manual takeover instructions; automated Dots authentication-cookie import was refused in the live test.`
+    : `Attach ${path.basename(result.outputPath)} to any Grok Bot and paste the prompt.`;
+  return `${name} transfer file created: ${result.cookieCount} cookies across ${domainNote} from ${result.sourceBrowser}.${skipped} ${nextStep} The bundle includes the decryption key—treat the file as credentials and do not share it.`;
 }
 
 /** Machine-readable sync result for the macOS app (keep small — no domain lists). */

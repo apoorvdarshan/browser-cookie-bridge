@@ -21,7 +21,7 @@ function temporary(t) {
   return directory;
 }
 
-test("Dots bundle filters and encrypts cookies with its own manifest and cloud prompt", () => {
+test("Dots bundle filters and encrypts cookies with its own manifest and manual instructions", () => {
   const bundle = buildCloudTransferBundle({ target: "dots", cookies, sourceBrowser: "brave", onlyDomains: ["example.test"] });
   const parsed = parseCloudTransferBundle(bundle.archive);
   validateManifest(parsed.manifest);
@@ -30,6 +30,10 @@ test("Dots bundle filters and encrypts cookies with its own manifest and cloud p
   assert.equal(decryptPayload({ manifest: parsed.manifest, encrypted: parsed.payload, passphrase: parsed.embeddedKey }).length, 45);
   assert.equal(bundle.archive.includes(Buffer.from(cookies[0].value)), false);
   assert.match(parsed.prompt, /Dots cloud computer only/);
+  assert.match(parsed.prompt, /Import authentication cookies yourself/);
+  assert.match(parsed.prompt, /Take over/);
+  assert.match(parsed.prompt, /sign.in privately|private sign-in/);
+  assert.doesNotMatch(parsed.prompt, /Save the attached|paste the prompt/);
   assert.match(parsed.prompt, /existing managed cloud browser/);
   assert.match(parsed.prompt, /--bundle ..\/Dots-Import.bcbx/);
   assert.doesNotMatch(parsed.prompt, /Grok/);

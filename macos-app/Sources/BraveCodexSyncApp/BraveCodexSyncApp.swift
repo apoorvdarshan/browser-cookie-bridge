@@ -253,7 +253,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         self.pendingCloudTransferResult = nil
         self.showCloudTransferResultAlert(
           payload: pending,
-          detail: "Your \(pending.targetName) transfer file is ready. The prompt is on your clipboard."
+          detail: pending.targetID == "dots"
+            ? "Your transfer file is ready. The manual instructions are on your clipboard; follow them yourself in cloud takeover mode."
+            : "Your Grok Bot transfer file is ready. The prompt is on your clipboard."
         )
       }
       return
@@ -301,7 +303,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.orderOut(nil)
         self.showCloudTransferResultAlert(
           payload: payload,
-          detail: "The transfer file is ready. The prompt is on your clipboard."
+          detail: payload.targetID == "dots"
+            ? "The transfer file is ready. Follow the copied instructions yourself in cloud takeover mode."
+            : "The transfer file is ready. The prompt is on your clipboard."
         )
       } else {
         AppDiagnostics.log("cloud-transfer: result panel is visible and key")
@@ -327,7 +331,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     alert.informativeText = "\(detail)\n\nFile: \(fileName)"
     alert.alertStyle = .informational
     alert.addButton(withTitle: "OK")
-    alert.addButton(withTitle: "Copy prompt")
+    alert.addButton(withTitle: payload.targetID == "dots" ? "Copy instructions" : "Copy prompt")
     if !payload.outputPath.isEmpty {
       alert.addButton(withTitle: "Reveal in Finder")
     }
@@ -768,7 +772,7 @@ struct PreferencesPanel: View {
             icon: "network",
             color: Theme.accent,
             title: "Cookies",
-            detail: model.isDotsTarget ? "Experimental cookie import into your dot’s cloud browser" : "Encrypted cookie sessions for Grok Bot’s shared cloud browser"
+            detail: model.isDotsTarget ? "Import yourself in cloud takeover mode; unverified" : "Encrypted cookie sessions for Grok Bot’s shared cloud browser"
           ) {
             Toggle("", isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }))
               .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
@@ -1130,7 +1134,9 @@ struct ExtensionSetupSheet: View {
       Text(model.isDirectTarget
         ? "\(model.targetName) uses a direct local merge, so no extension is required. Quit \(model.targetName) before syncing. Password access is never requested."
         : model.isCloudTransferTarget
-          ? "\(model.targetName) uses an encrypted transfer file with an embedded decryption key, so no extension is required. Create the .bcbx bundle, attach it to \(model.isDotsTarget ? "your dot" : "any Grok Bot"), and paste the prompt."
+          ? (model.isDotsTarget
+            ? "Dots authentication-cookie import must be performed by you in takeover mode. The experimental bundle requires file upload, a terminal, and an accessible managed-browser endpoint. Private website sign-in is the supported alternative."
+            : "Grok Bot uses an encrypted transfer file with an embedded decryption key, so no extension is required. Create the .bcbx bundle, attach it to any Grok Bot, and paste the prompt.")
         : "In both endpoints, enable Developer mode and choose Load unpacked. Password access is never requested.")
         .font(.system(size: 10.5))
         .foregroundStyle(.secondary)
@@ -1398,7 +1404,7 @@ struct CloudTransferResultSheet: View {
       }
 
       VStack(alignment: .leading, spacing: 8) {
-        Text("Prompt for \(payload.targetName)")
+        Text(payload.targetID == "dots" ? "Manual import instructions for you" : "Prompt for \(payload.targetName)")
           .font(.system(size: 11, weight: .semibold))
           .foregroundStyle(.secondary)
         ScrollView {
@@ -1417,7 +1423,7 @@ struct CloudTransferResultSheet: View {
           let url = URL(fileURLWithPath: payload.outputPath)
           NSWorkspace.shared.activateFileViewerSelecting([url])
         }
-        Button("Copy prompt") {
+        Button(payload.targetID == "dots" ? "Copy instructions" : "Copy prompt") {
           NSPasteboard.general.clearContents()
           NSPasteboard.general.setString(payload.prompt, forType: .string)
         }

@@ -273,7 +273,9 @@ function setup(args) {
   } else if (isCloudTransferTarget(config.targetBrowser)) {
     const destination = cloudTransferTarget(config.targetBrowser);
     console.log(`Source browser: ${config.sourceBrowser} (read locally; no extension required)`);
-    console.log(`Target integration: encrypted ${destination.name} transfer file (.bcbx); attach it to ${config.targetBrowser === "dots" ? "your dot" : "any Grok Bot"} and run the bundled importer.`);
+    console.log(config.targetBrowser === "dots"
+      ? "Target integration: experimental manual Dots transfer file (.bcbx); import yourself in cloud takeover mode."
+      : `Target integration: encrypted ${destination.name} transfer file (.bcbx); attach it to any Grok Bot and run the bundled importer.`);
   } else {
     console.log(`Source extension (${config.sourceBrowser}): ${installedExtensionDir(undefined, config.sourceBrowser)}`);
     console.log(`Target extension (${config.targetBrowser}): ${installedExtensionDir(undefined, config.targetBrowser)}`);

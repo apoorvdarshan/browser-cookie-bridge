@@ -444,14 +444,22 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   private var cloudTransferFallbackPrompt: String {
     if !isDotsTarget { return Self.grokBotFallbackPrompt }
     return """
-On your Dots cloud computer only — do not access my local Mac and do not print cookie names, values, or keys.
+Manual import — on your Dots cloud computer only.
 
-1. Save Dots-Import.bcbx to your cloud computer, then unzip it into a new private folder: umask 077; unzip Dots-Import.bcbx -d dots-bcb-import
-2. Use your existing managed cloud browser, the same one shown under Open computer. Do not launch a separate browser or change its launch settings.
-3. Run: cd dots-bcb-import && node import.mjs --bundle ../Dots-Import.bcbx
-4. The importer needs Node.js 22+ and a local Chrome DevTools endpoint. If discovery fails, pass --cdp-url with the existing browser's loopback endpoint. If unavailable, stop and report that import is unsupported.
-5. If separate browser contexts are reported, identify your managed browser context and pass --browser-context-id with that ID (or default for the default context). Stop if you cannot identify it.
-6. Report only the imported cookie count. After success, remove any remaining copies of the bundle. Never paste decrypted cookies into chat.
+Import authentication cookies yourself. These instructions are for you to follow in takeover mode.
+
+1. Open your dot's profile, choose Computers / Open computer, then Take over.
+2. If the cloud computer offers a file-upload method and a terminal, transfer Dots-Import.bcbx there yourself. If either is unavailable, use the website's private sign-in flow instead.
+3. Use your existing managed cloud browser, the same one shown under Open computer. In the cloud terminal, open the folder containing the bundle and run:
+   umask 077
+   unzip Dots-Import.bcbx -d dots-bcb-import
+   cd dots-bcb-import && node import.mjs --bundle ../Dots-Import.bcbx
+4. This experimental importer needs Node.js 22+ and the existing browser's local Chrome DevTools endpoint. If you know its endpoint, pass --cdp-url with its loopback HTTP or browser WebSocket URL. If separate contexts are reported, pass --browser-context-id for the managed browser's confirmed context. If you cannot identify an accessible endpoint and context, stop and sign in privately instead. Leave the managed browser's launch settings alone.
+5. After success, the importer removes its extracted files and the supplied bundle copy. Remove any remaining copies, then Return control.
+
+The bundle includes its decryption key. Anyone with the file can read your cookies. Never paste cookie names, values, or keys into chat.
+
+Supported alternative: ask your dot to open the website and let you sign in privately, or use Take over to sign in yourself. Manual cookie import has not been verified in a live dot.
 """
   }
   var isDirectTarget: Bool { selectedTargetID == "codex" || selectedTargetID == "cursor" }
@@ -1292,7 +1300,9 @@ On your Dots cloud computer only — do not access my local Mac and do not print
       showResult(
         partial ? .warning : .success,
         partial ? "\(targetName) transfer created with warnings" : "\(targetName) transfer file ready",
-        lastMeaningfulLine(output) ?? "Attach \(fileName) to \(isDotsTarget ? "your dot" : "any Grok Bot") and paste the prompt"
+        lastMeaningfulLine(output) ?? (isDotsTarget
+          ? "Import \(fileName) yourself using the manual takeover instructions"
+          : "Attach \(fileName) to any Grok Bot and paste the prompt")
       )
       updateEndpointRunningStatus()
       presentCloudTransferResultSheet(prompt: parsed?.prompt ?? cloudTransferFallbackPrompt, outputPath: outputPath)
@@ -1856,7 +1866,7 @@ On your Dots cloud computer only — do not access my local Mac and do not print
         state = .ready
         primaryStatus = "Ready to create a \(targetName) transfer file"
         secondaryStatus = isDotsTarget
-          ? "Experimental cloud import: create a bundle, attach it to your dot, and paste the prompt"
+          ? "Experimental manual import: use Take over and follow the instructions yourself"
           : "Creates an encrypted .bcbx bundle with an embedded decryption key and bundled importer"
       }
     } else if isBrowserlessTarget {
