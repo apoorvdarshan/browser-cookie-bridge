@@ -66,7 +66,7 @@ Browser Cookie Bridge currently ships for macOS. A separate Windows app is being
 - 🗃️ **Optional full site data for Codex** — replace Codex's compatible Local Storage, IndexedDB, Session Storage, service-worker, and related origin stores from a closed source profile, with backup and rollback. Off by default.
 - 🌐 **Seven Chromium browsers** — Brave, Chrome, Edge, Arc, Vivaldi, Opera, and Perplexity Comet can be sources or destinations.
 - ✨ **ChatGPT Codex and experimental Cursor import** — merge cookie sessions into either app's built-in browser; Codex also supports optional history and full site data. Both are destination-only. Cursor import is experimental: it writes only to Cursor's dedicated `Partitions/cursor-browser` profile and refuses unknown schemas.
-- 🤖 **Encrypted cloud transfer (`.bcbx`)** — export cookie sessions for Grok Bot or experimental OpenAI Dots into a local encrypted bundle with an embedded decryption key and bundled importer. Grok Bot uses an attachment and prompt. Dots provides instructions for you to attempt import yourself in cloud takeover mode; automated authentication-cookie import was refused in the live test.
+- 🤖 **Encrypted Grok Bot transfer (`.bcbx`)** — export cookie sessions into a local encrypted bundle with an embedded decryption key and bundled importer. The destination tile uses the official Grok Bot app icon. Attach the file to any Grok Bot; the importer runs on the cloud computer only. Manual only.
 - 🔁 **Optional Codex restart** — manual Sync can force quit a running Codex instance and reopen it only after a successful local transfer; off by default.
 - 🔄 **Optional two-app restart** — Full site data can force quit the selected source browser and Codex, then reopen only the apps that were running after a successful transfer; off by default.
 - ☁️ **Optional Browserless upload** — create or refresh a Browserless authenticated profile with cookies, local storage, and IndexedDB; see a local size preflight, live progress, cancellation, and post-upload verification.
@@ -83,7 +83,6 @@ Browser Cookie Bridge currently ships for macOS. A separate Windows app is being
 | **Cookies and sessions** | ✅ Default | Transfers supported cookie values and attributes |
 | **Full site data → Codex** | Optional | Replaces compatible origin storage from a closed Chromium profile; backs up Codex first |
 | **Encrypted Grok Bot export** | Manual | Cookie sessions only, written to a local `.bcbx` file; history and full site data are excluded |
-| **OpenAI Dots export** | Experimental, manual | Cookie sessions only; import requires access to the existing cloud browser's local DevTools endpoint |
 | **History URLs** | ◐ Optional | Supported for browser and Codex targets; excluded for Cursor and Grok Bot. Original visit times and page titles cannot be preserved |
 | **Local storage and IndexedDB** | ◐ Optional | Full site data into Codex, or an explicit Browserless authenticated-profile upload |
 | **Passwords** | — Never | Chromium extensions cannot read the browser password store |
@@ -186,29 +185,6 @@ On the Grok Bot cloud computer the bundled importer:
 2. Reads the embedded decryption key and decrypts the payload automatically. Do not print cookie names or values.
 3. Injects cookies into the cloud browser and reports only how many cookies were imported.
 4. Deletes the unzipped files and the bundle copy.
-
-### Browser → OpenAI Dots (experimental `.bcbx`)
-
-Dots has its own persistent cloud computer and browser, separate from your Mac's signed-in browser sessions. See [OpenAI's computers and apps guide](https://learn.chatgpt.com/docs/dots/computers-and-apps).
-
-1. Select a source browser and **Dots** as the destination. Keep **Cookies** on; history and full site data are excluded.
-2. Optionally enter **Only these domains**. Dots and Grok Bot keep separate domain filters.
-3. Press **Create transfer file** and save `Dots-Import.bcbx`. The source browser can stay open; the app snapshots its cookie database. Full Disk Access may be required.
-4. The app's result screen opens on **Consent prompt** and copies it to your clipboard. Attach the bundle to your dot and paste the prompt, which asks it to proceed only if its rules permit importing your own sessions. Dots may still require private sign-in. For a manual attempt, choose **Manual instructions**, open your dot's cloud computer, and choose **Take over**. If the cloud computer offers file upload and a terminal, move the bundle there and run the bundled importer using the existing managed browser.
-5. The result reports only cookie counts. After a successful import, the importer removes the extracted transfer files and the bundle copy passed with `--bundle`; remove any other copies yourself.
-
-The export uses the same private (`0600`) bundle format as Grok Bot, including its decryption key. **Anyone with the bundle can read the cookies.** Transfer it only to the intended cloud computer and never paste decrypted cookies into chat.
-
-**Live-test limitation:** Dots refused to execute authentication-cookie import on the user's behalf and reported that no cookies were imported. The consent prompt clarifies ownership and authorization; it does not override that restriction or guarantee acceptance. Neither the new prompt nor manual cookie import has been verified in a live dot. The CLI and bundled `PROMPT.txt` retain manual instructions.
-
-This is an experimental integration, not an official OpenAI cookie import interface. The importer needs Node.js 22+ and a loopback Chrome DevTools browser endpoint. It probes common ports or accepts the existing endpoint with `--cdp-url`; multiple detected browsers or separate browser contexts require explicit selection (`--cdp-url` and `--browser-context-id`). If file upload, a terminal, or the existing managed-browser endpoint is unavailable, use Dots' documented private website sign-in flow or take over its browser to sign in yourself. Leave the managed browser's launch settings alone. Daily sync and Sync at login never create Dots bundles.
-
-For CLI export after setup:
-
-```bash
-browser-cookie-bridge preferences --source brave --target dots --cookies on --dots-domains example.com
-browser-cookie-bridge sync --output "$PWD/Dots-Import.bcbx"
-```
 
 ### Browser → browser
 

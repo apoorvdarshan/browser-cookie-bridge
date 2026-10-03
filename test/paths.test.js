@@ -4,7 +4,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  SOURCE_BROWSERS,
   braveCookiePaths,
   codexCookiePaths,
   cursorCookiePaths,
@@ -28,8 +27,6 @@ test("profile discovery includes current and legacy Chromium cookie locations", 
 test("Browserless is destination-only", () => {
   assert(TARGET_BROWSERS.includes("browserless"));
   assert(TARGET_BROWSERS.includes("grok-bot"));
-  assert(TARGET_BROWSERS.includes("dots"));
-  assert(!SOURCE_BROWSERS.includes("dots"));
   assert(TARGET_BROWSERS.includes("cursor"));
 });
 

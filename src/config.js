@@ -36,9 +36,9 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
   const configuredTarget = TARGET_BROWSERS.includes(existing.targetBrowser) ? existing.targetBrowser : "codex";
   const rememberedImports = {
     history: existing.rememberedImports?.history === true
-      || (!isCookieOnlyTarget(configuredTarget) && existing.imports?.history === true),
+      || (configuredTarget !== "cursor" && existing.imports?.history === true),
     siteStorage: existing.rememberedImports?.siteStorage === true
-      || (!isCookieOnlyTarget(configuredTarget) && existing.imports?.siteStorage === true),
+      || (configuredTarget !== "cursor" && existing.imports?.siteStorage === true),
   };
   const config = {
     version: 2,
@@ -50,8 +50,8 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
     imports: {
       cookies: existing.imports?.cookies !== false,
       passwords: false,
-      history: !isCookieOnlyTarget(configuredTarget) && existing.imports?.history === true,
-      siteStorage: !isCookieOnlyTarget(configuredTarget) && existing.imports?.siteStorage === true,
+      history: configuredTarget !== "cursor" && configuredTarget !== "grok-bot" && existing.imports?.history === true,
+      siteStorage: configuredTarget !== "cursor" && configuredTarget !== "grok-bot" && existing.imports?.siteStorage === true,
     },
     rememberedImports,
     ui: {
@@ -69,7 +69,6 @@ export function installConfig({ home, hour = 9, minute = 0, nodePath = process.e
     grokBot: {
       onlyDomains: cleanDomains(existing.grokBot?.onlyDomains),
     },
-    dots: { onlyDomains: cleanDomains(existing.dots?.onlyDomains) },
     schedule: { hour, minute },
     createdAt: existing.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -99,7 +98,6 @@ export function updatePreferences({
   browserlessRegion,
   browserlessOnlyDomains,
   grokBotOnlyDomains,
-  dotsOnlyDomains,
 }) {
   const config = readConfig(home);
   if (!SOURCE_BROWSERS.includes(sourceBrowser)) {
@@ -116,22 +114,22 @@ export function updatePreferences({
     history: config.rememberedImports?.history === true,
     siteStorage: config.rememberedImports?.siteStorage === true,
   };
-  if (!isCookieOnlyTarget(previousTarget) && isCookieOnlyTarget(targetBrowser)) {
+  if (previousTarget !== "cursor" && targetBrowser === "cursor") {
     rememberedImports.history = config.imports?.history === true;
     rememberedImports.siteStorage = config.imports?.siteStorage === true;
   }
-  const leavingCookieOnly = isCookieOnlyTarget(previousTarget) && !isCookieOnlyTarget(targetBrowser);
-  const effectiveHistory = leavingCookieOnly ? rememberedImports.history : Boolean(history);
-  const effectiveSiteStorage = leavingCookieOnly ? rememberedImports.siteStorage : Boolean(siteStorage);
+  const leavingCursor = previousTarget === "cursor" && targetBrowser !== "cursor";
+  const effectiveHistory = leavingCursor ? rememberedImports.history : Boolean(history);
+  const effectiveSiteStorage = leavingCursor ? rememberedImports.siteStorage : Boolean(siteStorage);
   config.sourceBrowser = sourceBrowser;
   config.targetBrowser = targetBrowser;
   config.imports = {
     cookies: Boolean(cookies),
     passwords: false,
-    history: !isCookieOnlyTarget(targetBrowser) && effectiveHistory,
-    siteStorage: !isCookieOnlyTarget(targetBrowser) && effectiveSiteStorage,
+    history: targetBrowser !== "cursor" && targetBrowser !== "grok-bot" && effectiveHistory,
+    siteStorage: targetBrowser !== "cursor" && targetBrowser !== "grok-bot" && effectiveSiteStorage,
   };
-  config.rememberedImports = isCookieOnlyTarget(targetBrowser)
+  config.rememberedImports = targetBrowser === "cursor"
     ? rememberedImports
     : { history: effectiveHistory, siteStorage: effectiveSiteStorage };
   config.ui = {
@@ -151,7 +149,6 @@ export function updatePreferences({
   config.grokBot = {
     onlyDomains: cleanDomains(grokBotOnlyDomains ?? config.grokBot?.onlyDomains),
   };
-  config.dots = { onlyDomains: cleanDomains(dotsOnlyDomains ?? config.dots?.onlyDomains) };
   config.updatedAt = new Date().toISOString();
   writePrivateJson(configPath(home), config);
   return config;
@@ -184,10 +181,6 @@ export function installRuntime(home, source = projectRoot()) {
   }
   fs.chmodSync(path.join(target, "bin", "brave-codex-cookie-sync.js"), 0o700);
   return target;
-}
-
-function isCookieOnlyTarget(target) {
-  return ["cursor", "grok-bot", "dots"].includes(target);
 }
 
 function cleanProfileName(value) {

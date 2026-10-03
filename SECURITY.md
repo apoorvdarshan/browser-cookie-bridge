@@ -41,7 +41,7 @@ Examples include:
 
 - Cookie or history data leaving the local Mac unexpectedly
 - A Browserless upload occurring without the explicit manual cloud-upload action, or leaking its API token
-- A Grok Bot or Dots `.bcbx` export occurring from Daily sync or Sync at login, or cookie values being logged or printed by the bundled importer
+- A Grok Bot `.bcbx` export occurring from Daily sync or Sync at login, or cookie values being logged or printed by the bundled importer
 - Cookie values, history URLs, broker tokens, or Grok Bot decryption keys appearing in logs
 - Authentication or origin-validation bypasses in the local broker
 - Another local user being able to read generated configuration, backups, or transferred data
@@ -76,7 +76,6 @@ Timelines may vary with severity and complexity. Please allow a reasonable remed
 - Download release DMGs only from this repository's GitHub Releases page and verify the published checksum.
 - Codex and Cursor imports create a consistent SQLite backup, modify a working copy, run integrity checks, and replace the destination only after validation. Cursor import is experimental and limited to its dedicated browser-partition cookie database.
 - Grok Bot export writes a local `.bcbx` bundle with AES-256-GCM-encrypted cookie payloads and an embedded decryption key (`decryption.key`, manifest version 2). The path is manual-only and includes cookie sessions only. The bundled importer must run on the Grok Bot cloud computer, decrypts automatically from the embedded key, must not log cookie names or values, and deletes the unzipped files and bundle copy after a successful import. Treat the entire bundle as credentials—anyone with the file can read the cookies. Never paste cookie values into chat. Legacy v1 bundles without an embedded key still prompt for a separate passphrase.
-- Experimental Dots export uses the same encrypted bundle and embedded-key handling. Dots refused automated authentication-cookie import in the live test, so the app provides instructions for the user to attempt import themselves in cloud takeover mode. This manual path remains unverified and requires file upload, a terminal, and a loopback DevTools endpoint for the existing managed browser. The importer refuses ambiguous discovery, does not launch browsers, and retains transfer files on failure for retry. On success it removes the extracted files and the bundle copy explicitly supplied with `--bundle`. Dots bundles and their keys must never be shared in bug reports or logs. Private website sign-in is the documented alternative.
 - The newest 14 backups per direct destination are retained under `~/Library/Application Support/BraveCodexCookieSync/backups/codex` or `backups/cursor`.
 - Direct imports store imported cookie values in SQLite's plaintext `value` column with an empty `encrypted_value`; they may remain readable to software running as the same macOS user until the website refreshes them.
 - Anyone controlling the signed-in macOS account can potentially access browser sessions, generated extensions, local backups, or Grok Bot transfer files and keys stored on that Mac.

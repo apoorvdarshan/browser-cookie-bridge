@@ -13,11 +13,10 @@ import { isChromiumBrowserRunning, probeCookieDatabaseAccess, readChromiumProfil
 import { uploadBrowserlessProfile } from "./browserless.js";
 import { inspectBrowserlessProfile } from "./browserless-preflight.js";
 import {
-  cloudTransferTarget,
-  formatCloudTransferResultLine,
-  cloudTransferSummary,
-  writeCloudTransferBundle,
-} from "./cloud-transfer-export.js";
+  formatGrokBotResultLine,
+  grokBotSummary,
+  writeGrokBotBundle,
+} from "./grok-bot-export.js";
 import { installConfig, installRuntime, readConfig, updatePreferences } from "./config.js";
 import {
   braveCookiePaths,
@@ -55,8 +54,7 @@ Commands:
   install-app [--no-open] [--replace-system-from-source]
   bootstrap-bundled --app-path /Applications/Browser Cookie Bridge.app
   preferences --source brave --target codex --cookies on --history off --site-storage off --menu-bar on --auto-check-updates on --auto-restart-codex off --auto-restart-both off
-  sync [--timeout 300] [--allow-cloud-upload] [--output /path/Transfer.bcbx]
-  Cookie file destinations: --target grok-bot or --target dots (experimental); --grok-bot-domains / --dots-domains
+  sync [--timeout 300] [--allow-cloud-upload] [--output /path/GrokBot-Import.bcbx]
   browserless-preflight
   doctor
   enable-login-sync
@@ -145,7 +143,6 @@ function preferences(args) {
     browserlessRegion: stringFlag(args, "--browserless-region", existing.browserless?.region || "sfo"),
     browserlessOnlyDomains: optionalStringFlag(args, "--browserless-domains", (existing.browserless?.onlyDomains || []).join(",")),
     grokBotOnlyDomains: optionalStringFlag(args, "--grok-bot-domains", (existing.grokBot?.onlyDomains || []).join(",")),
-    dotsOnlyDomains: optionalStringFlag(args, "--dots-domains", (existing.dots?.onlyDomains || []).join(",")),
   });
   console.log(
     `Saved: source=${config.sourceBrowser}, target=${config.targetBrowser}, cookies=${config.imports.cookies ? "on" : "off"}, history=${config.imports.history ? "on" : "off"}, site-storage=${config.imports.siteStorage ? "on" : "off"}, menu-bar=${config.ui.menuBar ? "on" : "off"}, open-at-login=${config.ui.openAtLogin ? "on" : "off"}, auto-check-updates=${config.ui.autoCheckUpdates ? "on" : "off"}, auto-restart-codex=${config.ui.autoRestartCodex ? "on" : "off"}, auto-restart-both=${config.ui.autoRestartBoth ? "on" : "off"}`,
@@ -270,12 +267,9 @@ function setup(args) {
     console.log(`Source browser: ${config.sourceBrowser} (captured locally by the Browserless CLI)`);
     console.log(`Cloud destination: Browserless ${config.browserless?.region || "sfo"} / ${config.browserless?.profileName || "browser-cookie-bridge"}`);
     console.log("Browserless uploads are manual-only and require --allow-cloud-upload.");
-  } else if (isCloudTransferTarget(config.targetBrowser)) {
-    const destination = cloudTransferTarget(config.targetBrowser);
+  } else if (config.targetBrowser === "grok-bot") {
     console.log(`Source browser: ${config.sourceBrowser} (read locally; no extension required)`);
-    console.log(config.targetBrowser === "dots"
-      ? "Target integration: experimental manual Dots transfer file (.bcbx); import yourself in cloud takeover mode."
-      : `Target integration: encrypted ${destination.name} transfer file (.bcbx); attach it to any Grok Bot and run the bundled importer.`);
+    console.log("Target integration: encrypted Grok Bot transfer file (.bcbx); attach it to any Grok Bot and run the bundled importer.");
   } else {
     console.log(`Source extension (${config.sourceBrowser}): ${installedExtensionDir(undefined, config.sourceBrowser)}`);
     console.log(`Target extension (${config.targetBrowser}): ${installedExtensionDir(undefined, config.targetBrowser)}`);
@@ -294,16 +288,15 @@ async function sync(args, { signal } = {}) {
   const target = config.targetBrowser || "codex";
   const seconds = integerFlag(args, "--timeout", target === "browserless" ? 900 : 300, 5, 3600);
   const directTarget = isDirectTarget(target);
-  if (isCloudTransferTarget(target)) {
-    const destination = cloudTransferTarget(target);
+  if (target === "grok-bot") {
     if (config.imports?.cookies === false) {
-      throw new Error(`${destination.name} export requires cookies. Turn on Cookies and try again.`);
+      throw new Error("Grok Bot export requires cookies. Turn on Cookies and try again.");
     }
     if (config.imports?.history === true || config.imports?.siteStorage === true) {
-      throw new Error(`${destination.name} export supports cookie sessions only.`);
+      throw new Error("Grok Bot export supports cookie sessions only.");
     }
     const outputPath = stringFlag(args, "--output", "");
-    if (!outputPath) throw new Error(`${destination.name} export requires --output /path/${destination.bundleName}`);
+    if (!outputPath) throw new Error("Grok Bot export requires --output /path/GrokBot-Import.bcbx");
     const source = config.sourceBrowser || "brave";
     const payload = readChromiumProfile({
       browser: source,
@@ -312,20 +305,19 @@ async function sync(args, { signal } = {}) {
     console.log(
       `Read ${payload.cookies.length} of ${payload.cookieStats.total} cookies (${payload.cookieStats.skipped} unavailable) from ${source}${payload.snapshot?.cookies ? " via the app's snapshot" : ""}.`,
     );
-    console.log(`Writing ${destination.name} transfer file to ${path.resolve(outputPath)}…`);
-    const result = writeCloudTransferBundle({
-      target,
+    console.log(`Writing Grok Bot transfer file to ${path.resolve(outputPath)}…`);
+    const result = writeGrokBotBundle({
       outputPath,
       cookies: payload.cookies,
       sourceBrowser: source,
-      onlyDomains: config[destination.configKey]?.onlyDomains || [],
+      onlyDomains: config.grokBot?.onlyDomains || [],
     });
     result.sourceCookieSkipped = payload.cookieStats.skipped;
-    console.log(cloudTransferSummary(result, target));
-    console.log(formatCloudTransferResultLine({
+    console.log(grokBotSummary(result));
+    console.log(formatGrokBotResultLine({
       outputPath: result.outputPath,
       prompt: result.prompt,
-    }, target));
+    }));
     return result;
   }
   if (target === "browserless") {
@@ -503,8 +495,8 @@ function doctor() {
       ? `Target integration: direct local ${directTargetName(target)} browser merge (${directTargetName(target)} must be closed)`
       : target === "browserless"
         ? `Target integration: optional Browserless cloud upload (${config?.browserless?.region || "sfo"}); manual only`
-        : isCloudTransferTarget(target)
-          ? `Target integration: encrypted ${cloudTransferTarget(target).name} transfer file (.bcbx); manual only`
+        : target === "grok-bot"
+          ? "Target integration: encrypted Grok Bot transfer file (.bcbx); manual only"
       : `Target extension: ${status(installedExtensionDir(home, target))}`,
   );
   console.log(`Daily schedule: ${status(launchAgentPath(home))}`);
@@ -549,8 +541,8 @@ function enableLoginSync() {
     ? `A sync starts when you sign in and updates ${directTargetName(config.targetBrowser)} only when it is closed.`
     : config.targetBrowser === "browserless"
       ? "Browserless uploads remain manual-only; login sync will not send data to the cloud."
-      : isCloudTransferTarget(config.targetBrowser)
-        ? `${cloudTransferTarget(config.targetBrowser).name} transfer files remain manual-only; login sync will not create cloud bundles.`
+      : config.targetBrowser === "grok-bot"
+        ? "Grok Bot transfer files remain manual-only; login sync will not create cloud bundles."
     : "A sync starts when you sign in and waits up to five minutes for both browser extensions.");
 }
 
@@ -574,7 +566,6 @@ function setAppLogin(enabled) {
     browserlessRegion: existing.browserless?.region,
     browserlessOnlyDomains: existing.browserless?.onlyDomains,
     grokBotOnlyDomains: existing.grokBot?.onlyDomains,
-    dotsOnlyDomains: existing.dots?.onlyDomains,
   });
   if (enabled) {
     const appPath = installedAppPath();
@@ -588,10 +579,6 @@ function setAppLogin(enabled) {
 
 function remove() {
   console.log(removeSchedule() ? "Daily schedule removed." : "No daily schedule was installed.");
-}
-
-function isCloudTransferTarget(target) {
-  return target === "grok-bot" || target === "dots";
 }
 
 function isDirectTarget(target) {

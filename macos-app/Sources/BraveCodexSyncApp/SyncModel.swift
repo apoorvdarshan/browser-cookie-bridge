@@ -9,7 +9,7 @@ extension Notification.Name {
   static let updateStateChanged = Notification.Name("BraveCodexSync.updateStateChanged")
   static let syncStateChanged = Notification.Name("BraveCodexSync.syncStateChanged")
   static let showMainWindow = Notification.Name("BraveCodexSync.showMainWindow")
-  static let presentCloudTransferResult = Notification.Name("BraveCodexSync.presentCloudTransferResult")
+  static let presentGrokBotResult = Notification.Name("BraveCodexSync.presentGrokBotResult")
 }
 
 struct NativeAlert {
@@ -143,12 +143,9 @@ enum FullDiskAccess {
   }
 }
 
-struct CloudTransferResultPresentation: Sendable {
-  let targetID: String
-  var targetName: String { targetID == "dots" ? "Dots" : "Grok Bot" }
+struct GrokBotResultPresentation: Sendable {
   let prompt: String
   let outputPath: String
-  var chatPrompt: String { targetID == "dots" ? DotsTransferPrompt.text : prompt }
 }
 
 /// Append-only diagnostics shared by the model and the app delegate.
@@ -212,7 +209,7 @@ enum AppDiagnostics {
 /// install on local `npm run build:app` builds) is a *different* TCC client and is denied when it opens or
 /// copies another app's Cookies database, even though the app was granted access. Copying with FileManager
 /// here and handing the CLI the copy (via `BCB_SOURCE_SNAPSHOT_DIR`) sidesteps that, and — because the copy
-/// includes the WAL/journal sidecars — also lets the source browser stay open during a cloud transfer export.
+/// includes the WAL/journal sidecars — also lets the source browser stay open during a Grok Bot Create.
 struct SourceSnapshot: Sendable {
   static let environmentKey = "BCB_SOURCE_SNAPSHOT_DIR"
   static let sidecarSuffixes = ["-journal", "-wal", "-shm"]
@@ -381,10 +378,9 @@ final class SyncModel: ObservableObject {
   @Published var browserlessRegion = "sfo"
   @Published var browserlessOnlyDomains = ""
   @Published var grokBotOnlyDomains = ""
-  @Published var dotsOnlyDomains = ""
   @Published var showingBrowserlessSetup = false
-  @Published var cloudTransferPrompt = ""
-  @Published var cloudTransferOutputPath = ""
+  @Published var grokBotPrompt = ""
+  @Published var grokBotOutputPath = ""
   @Published var browserlessAssessment: BrowserlessProfileAssessment?
   @Published var isInspectingBrowserlessProfile = false
   @Published var uploadProgress = 0.0
@@ -401,7 +397,7 @@ final class SyncModel: ObservableObject {
   private var appLoginAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.app-login.plist") }
   private var endpointStatusTimer: Timer?
   private var updateTimer: Timer?
-  private var activeCloudTransferOutputPath: String?
+  private var activeGrokBotOutputPath: String?
 
   private static let grokBotFallbackPrompt = """
 On your Grok Bot cloud computer only — do not access my local Mac and do not print cookie values.
@@ -438,35 +434,11 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   }
 
   var isBrowserlessTarget: Bool { selectedTargetID == "browserless" }
-  var isDotsTarget: Bool { selectedTargetID == "dots" }
-  var isCloudTransferTarget: Bool { selectedTargetID == "grok-bot" || isDotsTarget }
-  var cloudTransferOnlyDomains: String { isDotsTarget ? dotsOnlyDomains : grokBotOnlyDomains }
-  var cloudTransferBundleBaseName: String { isDotsTarget ? "Dots-Import" : "GrokBot-Import" }
-  private var cloudTransferFallbackPrompt: String {
-    if !isDotsTarget { return Self.grokBotFallbackPrompt }
-    return """
-Manual import — on your Dots cloud computer only.
-
-Import authentication cookies yourself. These instructions are for you to follow in takeover mode.
-
-1. Open your dot's profile, choose Computers / Open computer, then Take over.
-2. If the cloud computer offers a file-upload method and a terminal, transfer Dots-Import.bcbx there yourself. If either is unavailable, use the website's private sign-in flow instead.
-3. Use your existing managed cloud browser, the same one shown under Open computer. In the cloud terminal, open the folder containing the bundle and run:
-   umask 077
-   unzip Dots-Import.bcbx -d dots-bcb-import
-   cd dots-bcb-import && node import.mjs --bundle ../Dots-Import.bcbx
-4. This experimental importer needs Node.js 22+ and the existing browser's local Chrome DevTools endpoint. If you know its endpoint, pass --cdp-url with its loopback HTTP or browser WebSocket URL. If separate contexts are reported, pass --browser-context-id for the managed browser's confirmed context. If you cannot identify an accessible endpoint and context, stop and sign in privately instead. Leave the managed browser's launch settings alone.
-5. After success, the importer removes its extracted files and the supplied bundle copy. Remove any remaining copies, then Return control.
-
-The bundle includes its decryption key. Anyone with the file can read your cookies. Never paste cookie names, values, or keys into chat.
-
-Supported alternative: ask your dot to open the website and let you sign in privately, or use Take over to sign in yourself. Manual cookie import has not been verified in a live dot.
-"""
-  }
+  var isGrokBotTarget: Bool { selectedTargetID == "grok-bot" }
   var isDirectTarget: Bool { selectedTargetID == "codex" || selectedTargetID == "cursor" }
   var targetName: String {
     if isBrowserlessTarget { return "Browserless Cloud" }
-    if isCloudTransferTarget { return isDotsTarget ? "Dots" : "Grok Bot" }
+    if isGrokBotTarget { return "Grok Bot" }
     if selectedTargetID == "cursor" { return "Cursor" }
     return selectedTargetBrowser?.name ?? "ChatGPT Codex"
   }
@@ -485,14 +457,14 @@ Supported alternative: ask your dot to open the website and let you sign in priv
     isBrowserlessTarget && (!browserlessConfigured || sourceBrowserRunning || selectedSourceID == "comet")
   }
   var cursorHasNoDataSelected: Bool { selectedTargetID == "cursor" && !cookiesEnabled }
-  var cloudTransferHasNoDataSelected: Bool { isCloudTransferTarget && !cookiesEnabled }
+  var grokBotHasNoDataSelected: Bool { isGrokBotTarget && !cookiesEnabled }
   /// macOS refuses to let this app read the source browser's cookie store (TCC). The source browser may stay
-  /// open for cloud transfers — the app snapshots the database itself — so only a Full Disk Access denial blocks
+  /// open for Grok Bot — the app snapshots the database itself — so only a Full Disk Access denial blocks
   /// Create, and the button becomes a shortcut to System Settings.
-  var cloudTransferSourceAccessBlocked: Bool { isCloudTransferTarget && sourceCookieAccessDenied }
-  var cloudTransferBlocked: Bool { cloudTransferHasNoDataSelected || cloudTransferSourceAccessBlocked }
+  var grokBotSourceAccessBlocked: Bool { isGrokBotTarget && sourceCookieAccessDenied }
+  var grokBotBlocked: Bool { grokBotHasNoDataSelected || grokBotSourceAccessBlocked }
   var syncBlocked: Bool {
-    !runtimeReady || directTargetBlocked || sourceSiteDataBlocked || browserlessBlocked || cursorHasNoDataSelected || cloudTransferBlocked
+    !runtimeReady || directTargetBlocked || sourceSiteDataBlocked || browserlessBlocked || cursorHasNoDataSelected || grokBotBlocked
   }
   var formattedUploadElapsed: String {
     let minutes = uploadElapsedSeconds / 60
@@ -502,19 +474,9 @@ Supported alternative: ask your dot to open the website and let you sign in priv
   var sourceIcon: NSImage { browserIcon(selectedBrowser) }
   var targetIcon: NSImage {
     if isBrowserlessTarget { return browserlessIcon }
-    if isCloudTransferTarget { return cloudTransferIcon(for: selectedTargetID) }
+    if isGrokBotTarget { return grokBotIcon }
     if selectedTargetID == "cursor" { return cursorIcon }
     return selectedTargetBrowser.map(browserIcon) ?? codexIcon
-  }
-  var dotsIcon: NSImage {
-    if let url = Bundle.main.url(forResource: "dots", withExtension: "png", subdirectory: "BrowserIcons"),
-       let image = NSImage(contentsOf: url) {
-      return image
-    }
-    return NSImage(systemSymbolName: "circle.dotted", accessibilityDescription: "Dots by OpenAI") ?? NSImage()
-  }
-  func cloudTransferIcon(for targetID: String) -> NSImage {
-    targetID == "dots" ? dotsIcon : grokBotIcon
   }
   var grokBotIcon: NSImage {
     if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anysphere.sand") {
@@ -647,7 +609,7 @@ Supported alternative: ask your dot to open the website and let you sign in priv
       let configuredSource = config.sourceBrowser ?? "brave"
       selectedSourceID = browsers.contains(where: { $0.id == configuredSource }) ? configuredSource : "brave"
       let configuredTarget = config.targetBrowser ?? "codex"
-      selectedTargetID = configuredTarget == "codex" || configuredTarget == "cursor" || configuredTarget == "browserless" || configuredTarget == "grok-bot" || configuredTarget == "dots" || browsers.contains(where: { $0.id == configuredTarget })
+      selectedTargetID = configuredTarget == "codex" || configuredTarget == "cursor" || configuredTarget == "browserless" || configuredTarget == "grok-bot" || browsers.contains(where: { $0.id == configuredTarget })
         ? configuredTarget
         : "codex"
       if selectedTargetID == selectedSourceID { selectedTargetID = "codex" }
@@ -658,7 +620,7 @@ Supported alternative: ask your dot to open the website and let you sign in priv
       rememberedSiteStorageEnabled = config.rememberedImports?.siteStorage ?? loadedSiteStorageEnabled
       historyEnabled = loadedHistoryEnabled
       siteStorageEnabled = loadedSiteStorageEnabled
-      if selectedTargetID == "cursor" || isCloudTransferTarget {
+      if selectedTargetID == "cursor" || selectedTargetID == "grok-bot" {
         historyEnabled = false
         siteStorageEnabled = false
       }
@@ -670,7 +632,6 @@ Supported alternative: ask your dot to open the website and let you sign in priv
       browserlessRegion = config.browserless?.region ?? "sfo"
       browserlessOnlyDomains = (config.browserless?.onlyDomains ?? []).joined(separator: ", ")
       grokBotOnlyDomains = (config.grokBot?.onlyDomains ?? []).joined(separator: ", ")
-      dotsOnlyDomains = (config.dots?.onlyDomains ?? []).joined(separator: ", ")
     }
     browserlessConfigured = BrowserlessCredentialStore.read() != nil
     NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: menuBarEnabled)
@@ -695,18 +656,18 @@ Supported alternative: ask your dot to open the website and let you sign in priv
   }
 
   func selectTarget(_ id: String) {
-    let validTarget = id == "codex" || id == "cursor" || id == "browserless" || id == "grok-bot" || id == "dots" || browsers.contains(where: { $0.id == id })
+    let validTarget = id == "codex" || id == "cursor" || id == "browserless" || id == "grok-bot" || browsers.contains(where: { $0.id == id })
     guard validTarget, id != selectedTargetID, id != selectedSourceID else { return }
-    let wasCookieOnly = selectedTargetID == "cursor" || isCloudTransferTarget
-    if (id == "cursor" || id == "grok-bot" || id == "dots") && !wasCookieOnly {
+    let wasCursor = selectedTargetID == "cursor"
+    if id == "cursor" && !wasCursor {
       rememberedHistoryEnabled = historyEnabled
       rememberedSiteStorageEnabled = siteStorageEnabled
     }
     selectedTargetID = id
-    if id == "cursor" || isCloudTransferTarget {
+    if id == "cursor" || id == "grok-bot" {
       historyEnabled = false
       siteStorageEnabled = false
-    } else if wasCookieOnly {
+    } else if wasCursor {
       historyEnabled = rememberedHistoryEnabled
       siteStorageEnabled = rememberedSiteStorageEnabled
     }
@@ -722,14 +683,14 @@ Supported alternative: ask your dot to open the website and let you sign in priv
   }
 
   func setHistoryEnabled(_ enabled: Bool) {
-    guard selectedTargetID != "cursor", !isCloudTransferTarget else { return }
+    guard selectedTargetID != "cursor", selectedTargetID != "grok-bot" else { return }
     historyEnabled = enabled
     rememberedHistoryEnabled = enabled
     persistPreferences(successMessage: enabled ? "History URL import enabled" : "History import disabled")
   }
 
   func setSiteStorageEnabled(_ enabled: Bool) {
-    guard selectedTargetID != "cursor", !isCloudTransferTarget else { return }
+    guard selectedTargetID != "cursor", selectedTargetID != "grok-bot" else { return }
     siteStorageEnabled = enabled
     rememberedSiteStorageEnabled = enabled
     persistPreferences(successMessage: enabled ? "Full site-data import enabled" : "Full site-data import disabled")
@@ -867,9 +828,9 @@ Supported alternative: ask your dot to open the website and let you sign in priv
     }
   }
 
-  func setCloudTransferOnlyDomains(_ value: String) {
-    if isDotsTarget { dotsOnlyDomains = value } else { grokBotOnlyDomains = value }
-    persistPreferences(successMessage: "\(targetName) domain filter updated")
+  func setGrokBotOnlyDomains(_ value: String) {
+    grokBotOnlyDomains = value
+    persistPreferences(successMessage: "Grok Bot domain filter updated")
   }
 
   func openFullDiskAccessSettings() {
@@ -899,13 +860,13 @@ Supported alternative: ask your dot to open the website and let you sign in priv
           title: primaryStatus,
           message: secondaryStatus,
           kind: .warning,
-          secondaryButton: cloudTransferSourceAccessBlocked ? .openFullDiskAccessSettings : nil
+          secondaryButton: grokBotSourceAccessBlocked ? .openFullDiskAccessSettings : nil
         )
       }
       return
     }
-    if isCloudTransferTarget {
-      startCloudTransferExport(showMenuBarAlert: showMenuBarAlert)
+    if isGrokBotTarget {
+      startGrokBotExport(showMenuBarAlert: showMenuBarAlert)
       return
     }
     if selectedTargetID == "codex" && siteStorageEnabled && autoRestartBoth && (sourceBrowserRunning || codexRunning) {
@@ -1042,11 +1003,11 @@ Supported alternative: ask your dot to open the website and let you sign in priv
     }
   }
 
-  private func startCloudTransferExport(showMenuBarAlert: Bool) {
+  private func startGrokBotExport(showMenuBarAlert: Bool) {
     let panel = NSSavePanel()
-    panel.title = "Save \(targetName) transfer file"
+    panel.title = "Save Grok Bot transfer file"
     // Base name only: including ".bcbx" here plus allowedContentTypes often makes macOS append a second extension (GrokBot-Import.bcbx.bcbx) and breaks Replace on an existing file.
-    panel.nameFieldStringValue = cloudTransferBundleBaseName
+    panel.nameFieldStringValue = "GrokBot-Import"
     panel.canCreateDirectories = true
     panel.isExtensionHidden = false
     panel.allowsOtherFileTypes = false
@@ -1055,33 +1016,33 @@ Supported alternative: ask your dot to open the website and let you sign in priv
     } else {
       panel.allowedFileTypes = ["bcbx"]
     }
-    AppDiagnostics.log("cloud-transfer: presenting save panel")
+    AppDiagnostics.log("grok-bot: presenting save panel")
     panel.begin { [weak self] response in
       guard let self else { return }
       guard response == .OK else {
-        AppDiagnostics.log("cloud-transfer: save panel dismissed without saving (response \(response.rawValue))")
+        AppDiagnostics.log("grok-bot: save panel dismissed without saving (response \(response.rawValue))")
         return
       }
       guard let chosen = panel.url else {
-        AppDiagnostics.log("cloud-transfer: save panel returned OK without a URL")
+        AppDiagnostics.log("grok-bot: save panel returned OK without a URL")
         self.showResult(
           .error,
-          "Could not create the \(self.targetName) transfer file",
+          "Could not create the Grok Bot transfer file",
           "macOS did not return a save location. Try again and choose a folder such as Downloads."
         )
         self.postNativeAlert(title: self.primaryStatus, message: self.secondaryStatus, kind: .error)
         return
       }
-      let url = Self.normalizedCloudTransferOutputURL(chosen)
-      AppDiagnostics.log("cloud-transfer: save panel OK → \(url.path)\(url.path == chosen.path ? "" : " (normalized from \(chosen.path))")")
-      self.startSync(showMenuBarAlert: showMenuBarAlert, reopenCodexOnSuccess: false, cloudTransferOutputPath: url.path)
+      let url = Self.normalizedGrokBotOutputURL(chosen)
+      AppDiagnostics.log("grok-bot: save panel OK → \(url.path)\(url.path == chosen.path ? "" : " (normalized from \(chosen.path))")")
+      self.startSync(showMenuBarAlert: showMenuBarAlert, reopenCodexOnSuccess: false, grokBotOutputPath: url.path)
     }
   }
 
   /// The save panel is fed a base name plus a dynamic `.bcbx` UTType; depending on the macOS release it has
   /// returned `Name.bcbx`, `Name.bcbx.bcbx`, or `Name`. The CLI rejects anything that is not exactly `.bcbx`,
   /// so normalize here instead of letting the export fail after the user already confirmed Replace.
-  static func normalizedCloudTransferOutputURL(_ url: URL) -> URL {
+  static func normalizedGrokBotOutputURL(_ url: URL) -> URL {
     var path = url.path
     while path.lowercased().hasSuffix(".bcbx.bcbx") { path.removeLast(5) }
     if !path.lowercased().hasSuffix(".bcbx") { path += ".bcbx" }
@@ -1102,15 +1063,15 @@ Supported alternative: ask your dot to open the website and let you sign in priv
     showingOperationResult = true
   }
 
-  private func startSync(showMenuBarAlert: Bool, reopenCodexOnSuccess: Bool, reopenSourceOnSuccess: Bool = false, cloudTransferOutputPath: String? = nil) {
+  private func startSync(showMenuBarAlert: Bool, reopenCodexOnSuccess: Bool, reopenSourceOnSuccess: Bool = false, grokBotOutputPath: String? = nil) {
     isSyncing = true
     uploadCanceling = false
     showingOperationResult = false
     state = .syncing
-    primaryStatus = isCloudTransferTarget
-      ? "Creating \(targetName) transfer file"
+    primaryStatus = isGrokBotTarget
+      ? "Creating Grok Bot transfer file"
       : isBrowserlessTarget ? "Uploading authenticated state" : "Transferring selected data"
-    secondaryStatus = isCloudTransferTarget
+    secondaryStatus = isGrokBotTarget
       ? "Encrypting selected cookie sessions from \(selectedBrowser.name)…"
       : isDirectTarget
       ? "Backing up \(targetName) and merging \(selectedBrowser.name) locally…"
@@ -1119,11 +1080,11 @@ Supported alternative: ask your dot to open the website and let you sign in priv
         : "Waiting for \(selectedBrowser.name) and \(targetName)…"
     var environment: [String: String] = [:]
     var arguments = ["sync", "--timeout", isBrowserlessTarget ? "900" : "300"]
-    if let cloudTransferOutputPath {
-      activeCloudTransferOutputPath = cloudTransferOutputPath
-      arguments.append(contentsOf: ["--output", cloudTransferOutputPath])
+    if let grokBotOutputPath {
+      activeGrokBotOutputPath = grokBotOutputPath
+      arguments.append(contentsOf: ["--output", grokBotOutputPath])
     } else {
-      activeCloudTransferOutputPath = nil
+      activeGrokBotOutputPath = nil
     }
     if isBrowserlessTarget {
       guard let token = BrowserlessCredentialStore.read() else {
@@ -1139,7 +1100,7 @@ Supported alternative: ask your dot to open the website and let you sign in priv
       beginUploadTracking()
     }
     let sourceSnapshot: SourceSnapshot?
-    if isCloudTransferTarget || isDirectTarget {
+    if isGrokBotTarget || isDirectTarget {
       switch takeSourceSnapshot() {
       case .taken(let snapshot):
         sourceSnapshot = snapshot
@@ -1148,7 +1109,7 @@ Supported alternative: ask your dot to open the website and let you sign in priv
         sourceSnapshot = nil
       case .denied(let detail):
         isSyncing = false
-        activeCloudTransferOutputPath = nil
+        activeGrokBotOutputPath = nil
         showResult(.error, FullDiskAccess.statusTitle(browserName: selectedBrowser.name), detail)
         updateEndpointRunningStatus()
         postNativeAlert(
@@ -1179,12 +1140,12 @@ Supported alternative: ask your dot to open the website and let you sign in priv
           || output.contains("omitted to fit")
           || output.contains("could not be captured")
       )
-      if let cloudTransferOutputPath {
-        self.finishCloudTransferExport(
+      if let grokBotOutputPath {
+        self.finishGrokBotExport(
           success: success,
           partial: partial,
           output: output,
-          requestedPath: cloudTransferOutputPath,
+          requestedPath: grokBotOutputPath,
           startedAt: startedAt,
           arguments: launchArguments
         )
@@ -1258,10 +1219,10 @@ Supported alternative: ask your dot to open the website and let you sign in priv
     }
   }
 
-  /// Completes a cloud transfer export. Presentation is driven by whether the `.bcbx` file was actually (re)written,
+  /// Completes a Grok Bot export. Presentation is driven by whether the `.bcbx` file was actually (re)written,
   /// not only by the exit status, so the result panel can never be skipped after a successful write and a
   /// failure can never end with just a status-line change.
-  private func finishCloudTransferExport(
+  private func finishGrokBotExport(
     success: Bool,
     partial: Bool,
     output: String,
@@ -1269,14 +1230,14 @@ Supported alternative: ask your dot to open the website and let you sign in priv
     startedAt: Date,
     arguments: [String]
   ) {
-    let parsed = parseCloudTransferResult(from: output)
+    let parsed = parseGrokBotResult(from: output)
     let outputPath = parsed?.outputPath ?? requestedPath
     let bundleWritten = Self.fileWasWritten(atPath: outputPath, since: startedAt)
     let fileName = URL(fileURLWithPath: outputPath).lastPathComponent
     let cliExit = lastCLIExit
-    activeCloudTransferOutputPath = nil
+    activeGrokBotOutputPath = nil
     AppDiagnostics.log(
-      "cloud-transfer: CLI finished success=\(success) exit=\(cliExit.map { String($0.status) } ?? "nil") "
+      "grok-bot: CLI finished success=\(success) exit=\(cliExit.map { String($0.status) } ?? "nil") "
         + "signaled=\(cliExit?.signaled ?? false) resultLine=\(parsed != nil) bundleWritten=\(bundleWritten) path=\(outputPath)"
     )
 
@@ -1284,7 +1245,7 @@ Supported alternative: ask your dot to open the website and let you sign in priv
     AppDiagnostics.writeLastSyncResult(SyncResultRecord(
       startedAt: startedAt,
       finishedAt: Date(),
-      target: selectedTargetID,
+      target: "grok-bot",
       arguments: arguments,
       exitStatus: cliExit?.status,
       terminatedBySignal: cliExit?.signaled ?? false,
@@ -1296,19 +1257,18 @@ Supported alternative: ask your dot to open the website and let you sign in priv
     ))
     if treatAsSuccess {
       if !success {
-        AppDiagnostics.log("cloud-transfer: exit status was non-zero but \(fileName) was rewritten — presenting the result anyway")
+        AppDiagnostics.log("grok-bot: exit status was non-zero but \(fileName) was rewritten — presenting the result anyway")
       }
       showResult(
         partial ? .warning : .success,
-        partial ? "\(targetName) transfer created with warnings" : "\(targetName) transfer file ready",
-        lastMeaningfulLine(output) ?? (isDotsTarget
-          ? "Import \(fileName) yourself using the manual takeover instructions"
-          : "Attach \(fileName) to any Grok Bot and paste the prompt")
+        partial ? "Grok Bot transfer created with warnings" : "Grok Bot transfer file ready",
+        lastMeaningfulLine(output) ?? "Attach \(fileName) to any Grok Bot and paste the prompt"
       )
       updateEndpointRunningStatus()
-      presentCloudTransferResultSheet(prompt: parsed?.prompt ?? cloudTransferFallbackPrompt, outputPath: outputPath)
+      presentGrokBotResultSheet(prompt: parsed?.prompt ?? Self.grokBotFallbackPrompt, outputPath: outputPath)
     } else if noteFullDiskAccessDenial(in: output) {
-      // EPERM here is TCC: point to Full Disk Access so the app can snapshot the cookie store.
+      // EPERM here is TCC, not a lock: the browser is already closed (the quit-browser gate ran before Create),
+      // so telling the user to close it again would be wrong. Point at Full Disk Access instead.
       let detail = lastMeaningfulLine(output) ?? FullDiskAccess.statusDetail(browserName: selectedBrowser.name)
       showResult(.error, FullDiskAccess.statusTitle(browserName: selectedBrowser.name), detail)
       updateEndpointRunningStatus()
@@ -1321,7 +1281,7 @@ Supported alternative: ask your dot to open the website and let you sign in priv
     } else {
       let detail = lastMeaningfulLine(output)
         ?? "The local sync runtime exited (status \(cliExit.map { String($0.status) } ?? "unknown")) without writing \(fileName)."
-      showResult(.error, "Could not create the \(targetName) transfer file", detail)
+      showResult(.error, "Could not create the Grok Bot transfer file", detail)
       updateEndpointRunningStatus()
       postNativeAlert(
         title: primaryStatus,
@@ -1554,7 +1514,6 @@ Supported alternative: ask your dot to open the website and let you sign in priv
       "--browserless-region", browserlessRegion,
       "--browserless-domains", browserlessOnlyDomains,
       "--grok-bot-domains", grokBotOnlyDomains,
-      "--dots-domains", dotsOnlyDomains,
     ]
     runCLI(arguments) { [weak self] success, output in
       guard let self else { return }
@@ -1565,7 +1524,7 @@ Supported alternative: ask your dot to open the website and let you sign in priv
           successMessage,
           self.isBrowserlessTarget
             ? "Cloud uploads run only after you click Upload"
-            : self.isCloudTransferTarget
+            : self.isGrokBotTarget
               ? "Transfer files are created only when you click Create transfer file"
             : "This choice is saved for manual and daily syncs"
         )
@@ -1773,35 +1732,34 @@ Supported alternative: ask your dot to open the website and let you sign in priv
   }
 
   private var requiredExtensionIDs: [String] {
-    isDirectTarget || selectedTargetID == "browserless" || isCloudTransferTarget ? [] : [selectedSourceID, selectedTargetID]
+    isDirectTarget || selectedTargetID == "browserless" || isGrokBotTarget ? [] : [selectedSourceID, selectedTargetID]
   }
 
-  private struct CloudTransferResultPayload: Decodable {
+  private struct GrokBotResultPayload: Decodable {
     let outputPath: String
     let prompt: String
   }
 
-  private func parseCloudTransferResult(from output: String) -> CloudTransferResultPayload? {
-    let prefix = isDotsTarget ? "BCB_DOTS_RESULT " : "BCB_GROK_RESULT "
-    guard let line = output.split(separator: "\n").map(String.init).last(where: { $0.hasPrefix(prefix) }) else {
+  private func parseGrokBotResult(from output: String) -> GrokBotResultPayload? {
+    guard let line = output.split(separator: "\n").map(String.init).last(where: { $0.hasPrefix("BCB_GROK_RESULT ") }) else {
       return nil
     }
-    let json = String(line.dropFirst(prefix.count))
+    let json = line.replacingOccurrences(of: "BCB_GROK_RESULT ", with: "")
     guard let data = json.data(using: .utf8) else { return nil }
-    return try? JSONDecoder().decode(CloudTransferResultPayload.self, from: data)
+    return try? JSONDecoder().decode(GrokBotResultPayload.self, from: data)
   }
 
-  private func presentCloudTransferResultSheet(prompt: String, outputPath: String) {
-    cloudTransferPrompt = prompt
-    cloudTransferOutputPath = outputPath
-    let payload = CloudTransferResultPresentation(targetID: selectedTargetID, prompt: prompt, outputPath: outputPath)
-    Self.copyCloudTransferPromptToPasteboard(payload.chatPrompt)
-    AppDiagnostics.log("cloud-transfer: prompt copied to pasteboard; posting presentCloudTransferResult for \(outputPath)")
+  private func presentGrokBotResultSheet(prompt: String, outputPath: String) {
+    grokBotPrompt = prompt
+    grokBotOutputPath = outputPath
+    Self.copyGrokBotPromptToPasteboard(prompt)
+    AppDiagnostics.log("grok-bot: prompt copied to pasteboard; posting presentGrokBotResult for \(outputPath)")
+    let payload = GrokBotResultPresentation(prompt: prompt, outputPath: outputPath)
     NotificationCenter.default.post(name: .showMainWindow, object: nil)
-    NotificationCenter.default.post(name: .presentCloudTransferResult, object: payload)
+    NotificationCenter.default.post(name: .presentGrokBotResult, object: payload)
   }
 
-  static func copyCloudTransferPromptToPasteboard(_ prompt: String) {
+  static func copyGrokBotPromptToPasteboard(_ prompt: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(prompt, forType: .string)
   }
@@ -1849,26 +1807,24 @@ Supported alternative: ask your dot to open the website and let you sign in priv
       state = .ready
       primaryStatus = "Ready to sync directly"
       secondaryStatus = "\(targetName) is closed — a backup will be created before anything changes"
-    } else if isCloudTransferTarget {
+    } else if isGrokBotTarget {
       // This runs after every sync completion and again every 2 seconds from the status timer. Before 1.5.8 the
       // idle text below unconditionally replaced whatever the last Create transfer file attempt had reported, so a
       // failed export looked like nothing happened. Blocking conditions still win; results are kept otherwise.
-      if cloudTransferHasNoDataSelected {
+      if grokBotHasNoDataSelected {
         showingOperationResult = false
         state = .warning
-        primaryStatus = "Turn on Cookies to export for \(targetName)"
-        secondaryStatus = "\(targetName) transfer files include cookie sessions only"
-      } else if cloudTransferSourceAccessBlocked {
+        primaryStatus = "Turn on Cookies to export for Grok Bot"
+        secondaryStatus = "Grok Bot transfer files include cookie sessions only"
+      } else if grokBotSourceAccessBlocked {
         showingOperationResult = false
         state = .warning
         primaryStatus = FullDiskAccess.statusTitle(browserName: selectedBrowser.name)
         secondaryStatus = FullDiskAccess.gateDetail(browserName: selectedBrowser.name)
       } else if !showingOperationResult {
         state = .ready
-        primaryStatus = "Ready to create a \(targetName) transfer file"
-        secondaryStatus = isDotsTarget
-          ? "Experimental manual import: use Take over and follow the instructions yourself"
-          : "Creates an encrypted .bcbx bundle with an embedded decryption key and bundled importer"
+        primaryStatus = "Ready to create a Grok Bot transfer file"
+        secondaryStatus = "Creates an encrypted .bcbx bundle with an embedded decryption key and bundled importer"
       }
     } else if isBrowserlessTarget {
       if selectedSourceID == "comet" {
@@ -1894,11 +1850,11 @@ Supported alternative: ask your dot to open the website and let you sign in priv
     }
   }
 
-  /// Runs from the 2-second status timer while a cloud transfer destination is selected. The probe is a single open(2) on the
+  /// Runs from the 2-second status timer while Grok Bot is selected. The probe is a single open(2) on the
   /// cookie file (no SQLite, no child process), so it is cheap enough to poll and reflects a TCC change
   /// as soon as the relaunched app can read the file again.
   private func refreshSourceCookieAccess() {
-    guard isCloudTransferTarget else {
+    guard isGrokBotTarget else {
       sourceCookieAccessDenied = false
       cliReportedAccessDenied = false
       return
@@ -1994,8 +1950,7 @@ private struct AppConfig: Decodable {
   let rememberedImports: RememberedImports?
   let ui: UISettings?
   let browserless: BrowserlessSettings?
-  let grokBot: CloudTransferSettings?
-  let dots: CloudTransferSettings?
+  let grokBot: GrokBotSettings?
 
   struct Schedule: Decodable {
     let hour: Int
@@ -2027,7 +1982,7 @@ private struct AppConfig: Decodable {
     let onlyDomains: [String]?
   }
 
-  struct CloudTransferSettings: Decodable {
+  struct GrokBotSettings: Decodable {
     let onlyDomains: [String]?
   }
 }

@@ -75,7 +75,7 @@ export function readZipArchive(buffer) {
     const signature = source.readUInt32LE(offset);
     if (signature === END_OF_CENTRAL_DIRECTORY_SIGNATURE || signature === CENTRAL_DIRECTORY_SIGNATURE) break;
     if (signature !== LOCAL_HEADER_SIGNATURE) {
-      throw new Error("Unsupported zip archive for cloud transfer bundle.");
+      throw new Error("Unsupported zip archive for Grok Bot bundle.");
     }
     const compressedSize = source.readUInt32LE(offset + 18);
     const nameLength = source.readUInt16LE(offset + 26);
@@ -87,6 +87,6 @@ export function readZipArchive(buffer) {
     offset = dataEnd;
   }
 
-  if (entries.size === 0) throw new Error("Cloud transfer bundle archive was empty.");
+  if (entries.size === 0) throw new Error("Grok Bot bundle archive was empty.");
   return entries;
 }
