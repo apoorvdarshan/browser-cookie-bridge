@@ -665,7 +665,10 @@ struct TargetPicker: View {
             icon: model.dotsIcon,
             name: "Dots",
             selected: model.selectedTargetID == "dots",
-            disabled: model.isWorking || model.isSyncing
+            disabled: model.isWorking || model.isSyncing,
+            buttonWidth: 56,
+            iconWidth: 54,
+            iconHeight: 32
           ) { model.selectTarget("dots") }
             .help("OpenAI Dots — experimental cloud cookie import")
         }
@@ -1368,8 +1371,8 @@ struct CloudTransferResultSheet: View {
         Image(nsImage: icon)
           .resizable()
           .scaledToFit()
-          .frame(width: 24, height: 24)
-          .frame(width: 40, height: 40)
+          .frame(width: payload.targetID == "dots" ? 64 : 24, height: payload.targetID == "dots" ? 36 : 24)
+          .frame(width: payload.targetID == "dots" ? 76 : 40, height: 40)
           .background(Theme.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
         VStack(alignment: .leading, spacing: 3) {
           Text("\(payload.targetName) transfer ready")

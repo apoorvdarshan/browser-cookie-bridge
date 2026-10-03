@@ -498,7 +498,11 @@ On your Dots cloud computer only — do not access my local Mac and do not print
     return selectedTargetBrowser.map(browserIcon) ?? codexIcon
   }
   var dotsIcon: NSImage {
-    NSImage(systemSymbolName: "circle.dotted", accessibilityDescription: "Dots by OpenAI") ?? NSImage()
+    if let url = Bundle.main.url(forResource: "dots", withExtension: "png", subdirectory: "BrowserIcons"),
+       let image = NSImage(contentsOf: url) {
+      return image
+    }
+    return NSImage(systemSymbolName: "circle.dotted", accessibilityDescription: "Dots by OpenAI") ?? NSImage()
   }
   func cloudTransferIcon(for targetID: String) -> NSImage {
     targetID == "dots" ? dotsIcon : grokBotIcon
