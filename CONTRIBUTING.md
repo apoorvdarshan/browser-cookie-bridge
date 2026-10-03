@@ -85,7 +85,7 @@ Use `--arch x64` for the Intel artifact. The builder downloads the pinned offici
 
 Check the UI in both light and dark appearances where relevant. Verify labels, keyboard focus, VoiceOver descriptions, disabled states, progress states, and error messages. Include a screenshot or short recording in the pull request for visible UI changes, but remove all private browser data first.
 
-For transfer changes, use disposable test profiles and non-sensitive test accounts. Verify the source and destination combination you changed, plus one unaffected path. Codex or Cursor must be completely closed before testing its direct import. Grok Bot tests should create a temporary `.bcbx` file and never commit the bundle or cookie values.
+For transfer changes, use disposable test profiles and non-sensitive test accounts. Verify the source and destination combination you changed, plus one unaffected path. Codex or Cursor must be completely closed before testing its direct import. Grok Bot and Dots tests should create temporary `.bcbx` files and never commit bundles or cookie values. Dots cloud import remains experimental until verified against a live managed cloud browser; fixture tests cannot establish endpoint availability there.
 
 ### Manual check: Grok Bot prompt UI from menu-bar mode
 

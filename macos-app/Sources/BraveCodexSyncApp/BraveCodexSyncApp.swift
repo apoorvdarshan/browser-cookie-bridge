@@ -35,9 +35,9 @@ struct BraveCodexSyncApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   weak var model: SyncModel?
   private weak var mainWindow: NSWindow?
-  private var grokBotResultPanel: NSPanel?
-  private var pendingGrokBotResult: GrokBotResultPresentation?
-  private var grokBotPanelFallbackToken = UUID()
+  private var cloudTransferResultPanel: NSPanel?
+  private var pendingCloudTransferResult: CloudTransferResultPresentation?
+  private var cloudTransferPanelFallbackToken = UUID()
   private var statusItem: NSStatusItem?
   private var syncMenuItem: NSMenuItem?
   private var updateMenuItem: NSMenuItem?
@@ -75,8 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     )
     NotificationCenter.default.addObserver(
       self,
-      selector: #selector(presentGrokBotResultNotification(_:)),
-      name: .presentGrokBotResult,
+      selector: #selector(presentCloudTransferResultNotification(_:)),
+      name: .presentCloudTransferResult,
       object: nil
     )
   }
@@ -101,9 +101,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       let candidate = NSApp.windows.first(where: { $0.canBecomeMain }) ?? NSApp.windows.first
       self.mainWindow = candidate
       candidate?.delegate = self
-      if let pending = self.pendingGrokBotResult {
-        self.pendingGrokBotResult = nil
-        self.presentGrokBotResultUI(pending)
+      if let pending = self.pendingCloudTransferResult {
+        self.pendingCloudTransferResult = nil
+        self.presentCloudTransferResultUI(pending)
       }
     }
   }
@@ -219,27 +219,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     showMainWindow()
   }
 
-  @objc private func presentGrokBotResultNotification(_ notification: Notification) {
-    let payload: GrokBotResultPresentation
-    if let posted = notification.object as? GrokBotResultPresentation {
+  @objc private func presentCloudTransferResultNotification(_ notification: Notification) {
+    let payload: CloudTransferResultPresentation
+    if let posted = notification.object as? CloudTransferResultPresentation {
       payload = posted
     } else if let model {
-      payload = GrokBotResultPresentation(prompt: model.grokBotPrompt, outputPath: model.grokBotOutputPath)
+      payload = CloudTransferResultPresentation(targetID: model.selectedTargetID, prompt: model.cloudTransferPrompt, outputPath: model.cloudTransferOutputPath)
     } else {
       return
     }
     DispatchQueue.main.async { [weak self] in
-      self?.presentGrokBotResultUI(payload)
+      self?.presentCloudTransferResultUI(payload)
     }
   }
 
-  private func presentGrokBotResultUI(_ payload: GrokBotResultPresentation) {
-    AppDiagnostics.log("grok-bot: presentGrokBotResultUI reached (model attached: \(model != nil), path: \(payload.outputPath))")
-    SyncModel.copyGrokBotPromptToPasteboard(payload.prompt)
+  private func presentCloudTransferResultUI(_ payload: CloudTransferResultPresentation) {
+    AppDiagnostics.log("cloud-transfer: presentCloudTransferResultUI reached (model attached: \(model != nil), path: \(payload.outputPath))")
+    SyncModel.copyCloudTransferPromptToPasteboard(payload.prompt)
     activateForUserAttention()
 
     guard !payload.outputPath.isEmpty else {
-      showGrokBotResultAlert(
+      showCloudTransferResultAlert(
         payload: payload,
         detail: "The transfer finished, but the app could not determine where the .bcbx file was saved. Check the status message in the main window or run Create transfer file again."
       )
@@ -247,24 +247,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     guard let model else {
-      pendingGrokBotResult = payload
+      pendingCloudTransferResult = payload
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-        guard let self, let pending = self.pendingGrokBotResult else { return }
-        self.pendingGrokBotResult = nil
-        self.showGrokBotResultAlert(
+        guard let self, let pending = self.pendingCloudTransferResult else { return }
+        self.pendingCloudTransferResult = nil
+        self.showCloudTransferResultAlert(
           payload: pending,
-          detail: "Your Grok Bot transfer file is ready. The prompt is on your clipboard."
+          detail: "Your \(pending.targetName) transfer file is ready. The prompt is on your clipboard."
         )
       }
       return
     }
 
-    grokBotResultPanel?.close()
-    grokBotResultPanel = nil
+    cloudTransferResultPanel?.close()
+    cloudTransferResultPanel = nil
     showMainWindow()
 
     let fallbackToken = UUID()
-    grokBotPanelFallbackToken = fallbackToken
+    cloudTransferPanelFallbackToken = fallbackToken
 
     let panel = NSPanel(
       contentRect: NSRect(x: 0, y: 0, width: 520, height: 520),
@@ -272,7 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       backing: .buffered,
       defer: false
     )
-    panel.title = "Grok Bot transfer ready"
+    panel.title = "\(payload.targetName) transfer ready"
     panel.isFloatingPanel = true
     panel.level = .floating
     // Avoid custom collectionBehavior: macOS 27 validates combinations and aborts on
@@ -281,30 +281,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     panel.hidesOnDeactivate = false
     panel.center()
     let dismissPanel = { [weak self] in
-      self?.grokBotResultPanel?.close()
-      self?.grokBotResultPanel = nil
+      self?.cloudTransferResultPanel?.close()
+      self?.cloudTransferResultPanel = nil
     }
     panel.contentView = NSHostingView(
-      rootView: GrokBotResultSheet(onDone: dismissPanel).environmentObject(model)
+      rootView: CloudTransferResultSheet(payload: payload, icon: model.cloudTransferIcon(for: payload.targetID), onDone: dismissPanel)
     )
-    grokBotResultPanel = panel
+    cloudTransferResultPanel = panel
     panel.orderFrontRegardless()
     panel.makeKey()
     activateForUserAttention()
 
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
-      guard let self, self.grokBotPanelFallbackToken == fallbackToken else { return }
-      guard self.grokBotResultPanel === panel else { return }
+      guard let self, self.cloudTransferPanelFallbackToken == fallbackToken else { return }
+      guard self.cloudTransferResultPanel === panel else { return }
       if !panel.isVisible || !panel.isKeyWindow {
-        AppDiagnostics.log("grok-bot: result panel not visible/key (visible=\(panel.isVisible) key=\(panel.isKeyWindow)); falling back to NSAlert")
-        self.grokBotResultPanel = nil
+        AppDiagnostics.log("cloud-transfer: result panel not visible/key (visible=\(panel.isVisible) key=\(panel.isKeyWindow)); falling back to NSAlert")
+        self.cloudTransferResultPanel = nil
         panel.orderOut(nil)
-        self.showGrokBotResultAlert(
+        self.showCloudTransferResultAlert(
           payload: payload,
           detail: "The transfer file is ready. The prompt is on your clipboard."
         )
       } else {
-        AppDiagnostics.log("grok-bot: result panel is visible and key")
+        AppDiagnostics.log("cloud-transfer: result panel is visible and key")
       }
     }
   }
@@ -314,16 +314,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     NSApp.activate(ignoringOtherApps: true)
   }
 
-  private func showGrokBotResultAlert(payload: GrokBotResultPresentation, detail: String) {
-    AppDiagnostics.log("grok-bot: showing NSAlert result fallback")
+  private func showCloudTransferResultAlert(payload: CloudTransferResultPresentation, detail: String) {
+    AppDiagnostics.log("cloud-transfer: showing NSAlert result fallback")
     activateForUserAttention()
-    SyncModel.copyGrokBotPromptToPasteboard(payload.prompt)
+    SyncModel.copyCloudTransferPromptToPasteboard(payload.prompt)
 
     let fileName = payload.outputPath.isEmpty
-      ? "GrokBot-Import.bcbx"
+      ? (payload.targetID == "dots" ? "Dots-Import.bcbx" : "GrokBot-Import.bcbx")
       : URL(fileURLWithPath: payload.outputPath).lastPathComponent
     let alert = NSAlert()
-    alert.messageText = "Grok Bot transfer ready"
+    alert.messageText = "\(payload.targetName) transfer ready"
     alert.informativeText = "\(detail)\n\nFile: \(fileName)"
     alert.alertStyle = .informational
     alert.addButton(withTitle: "OK")
@@ -335,7 +335,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let response = alert.runModal()
     switch response {
     case .alertSecondButtonReturn:
-      SyncModel.copyGrokBotPromptToPasteboard(payload.prompt)
+      SyncModel.copyCloudTransferPromptToPasteboard(payload.prompt)
     case .alertThirdButtonReturn where !payload.outputPath.isEmpty:
       let url = URL(fileURLWithPath: payload.outputPath)
       NSWorkspace.shared.activateFileViewerSelecting([url])
@@ -458,7 +458,7 @@ struct ContentView: View {
       .buttonStyle(.plain)
       .foregroundStyle(.secondary)
       .help("Refresh status")
-      if !model.isDirectTarget && !model.isBrowserlessTarget && !model.isGrokBotTarget {
+      if !model.isDirectTarget && !model.isBrowserlessTarget && !model.isCloudTransferTarget {
         Button("Extension setup…") { showingSetup = true }
           .controlSize(.small)
       }
@@ -497,7 +497,7 @@ struct SyncPanel: View {
                 model.cancelSync()
               } else if model.isBrowserlessTarget && !model.browserlessConfigured {
                 model.showingBrowserlessSetup = true
-              } else if model.grokBotSourceAccessBlocked {
+              } else if model.cloudTransferSourceAccessBlocked {
                 model.openFullDiskAccessSettings()
               } else {
                 model.syncNow()
@@ -517,7 +517,7 @@ struct SyncPanel: View {
                 || (model.isSyncing && !model.isBrowserlessTarget)
                 || (!model.isSyncing && model.syncBlocked
                     && !(model.isBrowserlessTarget && !model.browserlessConfigured)
-                    && !model.grokBotSourceAccessBlocked)
+                    && !model.cloudTransferSourceAccessBlocked)
             )
             .keyboardShortcut(.return, modifiers: .command)
           }
@@ -555,20 +555,20 @@ struct SyncPanel: View {
     if model.isBrowserlessTarget && model.uploadCanceling { return "Canceling…" }
     if model.isBrowserlessTarget && model.isSyncing { return "Cancel upload" }
     if model.isSyncing { return "Syncing…" }
-    if model.cursorHasNoDataSelected || model.grokBotHasNoDataSelected { return "Turn on Cookies" }
+    if model.cursorHasNoDataSelected || model.cloudTransferHasNoDataSelected { return "Turn on Cookies" }
     if model.directTargetBlocked { return "Close \(model.targetName) first" }
     if model.isBrowserlessTarget && !model.browserlessConfigured { return "Connect Browserless" }
     if model.isBrowserlessTarget && model.selectedSourceID == "comet" { return "Choose another browser" }
     if model.isBrowserlessTarget && model.sourceBrowserRunning { return "Close \(model.selectedBrowser.name) first" }
-    if model.grokBotSourceAccessBlocked { return "Open Full Disk Access settings" }
-    return model.isGrokBotTarget ? "Create transfer file" : model.isBrowserlessTarget ? "Upload now" : "Sync now"
+    if model.cloudTransferSourceAccessBlocked { return "Open Full Disk Access settings" }
+    return model.isCloudTransferTarget ? "Create transfer file" : model.isBrowserlessTarget ? "Upload now" : "Sync now"
   }
 
   private var syncButtonIcon: String {
     if model.isBrowserlessTarget && model.isSyncing { return "xmark.circle.fill" }
-    if model.grokBotSourceAccessBlocked { return "lock.shield.fill" }
+    if model.cloudTransferSourceAccessBlocked { return "lock.shield.fill" }
     if model.syncBlocked { return model.isBrowserlessTarget && !model.browserlessConfigured ? "key.fill" : "xmark.circle.fill" }
-    return model.isBrowserlessTarget ? "icloud.and.arrow.up.fill" : model.isGrokBotTarget ? "arrow.up.doc.fill" : "arrow.triangle.2.circlepath"
+    return model.isBrowserlessTarget ? "icloud.and.arrow.up.fill" : model.isCloudTransferTarget ? "arrow.up.doc.fill" : "arrow.triangle.2.circlepath"
   }
 
 }
@@ -661,6 +661,13 @@ struct TargetPicker: View {
             selected: model.selectedTargetID == "grok-bot",
             disabled: model.isWorking || model.isSyncing
           ) { model.selectTarget("grok-bot") }
+          EndpointButton(
+            icon: model.dotsIcon,
+            name: "Dots",
+            selected: model.selectedTargetID == "dots",
+            disabled: model.isWorking || model.isSyncing
+          ) { model.selectTarget("dots") }
+            .help("OpenAI Dots — experimental cloud cookie import")
         }
       }
     }
@@ -753,29 +760,29 @@ struct PreferencesPanel: View {
               .help("Rescan local profile size")
             }
           }
-        } else if model.isGrokBotTarget {
+        } else if model.isCloudTransferTarget {
           PreferenceRow(
             icon: "network",
             color: Theme.accent,
             title: "Cookies",
-            detail: "Encrypted cookie sessions for Grok Bot's shared cloud browser"
+            detail: model.isDotsTarget ? "Experimental cookie import into your dot’s cloud browser" : "Encrypted cookie sessions for Grok Bot’s shared cloud browser"
           ) {
             Toggle("", isOn: Binding(get: { model.cookiesEnabled }, set: { model.setCookiesEnabled($0) }))
               .labelsHidden().toggleStyle(.switch).tint(Theme.active).disabled(model.isWorking)
           }
           RowDivider()
-          PreferenceRow(icon: "externaldrive.badge.plus", color: .secondary, title: "Full site data", detail: "Not included in Grok Bot transfer files", muted: true) {
+          PreferenceRow(icon: "externaldrive.badge.plus", color: .secondary, title: "Full site data", detail: "Not included in \(model.targetName) transfer files", muted: true) {
             FixedBadge("Excluded")
           }
           RowDivider()
-          PreferenceRow(icon: "clock.arrow.circlepath", color: .secondary, title: "History URLs", detail: "Not included in Grok Bot transfer files", muted: true) {
+          PreferenceRow(icon: "clock.arrow.circlepath", color: .secondary, title: "History URLs", detail: "Not included in \(model.targetName) transfer files", muted: true) {
             FixedBadge("Excluded")
           }
           RowDivider()
           PreferenceRow(icon: "line.3.horizontal.decrease.circle", color: Theme.accent, title: "Only these domains", detail: "Leave blank to export every readable cookie") {
             TextField("example.com, app.example.com", text: Binding(
-              get: { model.grokBotOnlyDomains },
-              set: { model.setGrokBotOnlyDomains($0) }
+              get: { model.cloudTransferOnlyDomains },
+              set: { model.setCloudTransferOnlyDomains($0) }
             ))
             .textFieldStyle(.roundedBorder)
             .frame(width: 220)
@@ -856,8 +863,8 @@ struct PreferencesPanel: View {
         }
 
         SectionLabel(title: "Automation", detail: "Runs in the background", separated: true)
-        PreferenceRow(icon: "clock.badge.checkmark", color: Theme.accent, title: "Daily sync", detail: model.isBrowserlessTarget || model.isGrokBotTarget ? "Unavailable for this destination" : (model.dailyEnabled ? "At the selected local time" : "Off")) {
-          if model.isBrowserlessTarget || model.isGrokBotTarget {
+        PreferenceRow(icon: "clock.badge.checkmark", color: Theme.accent, title: "Daily sync", detail: model.isBrowserlessTarget || model.isCloudTransferTarget ? "Unavailable for this destination" : (model.dailyEnabled ? "At the selected local time" : "Off")) {
+          if model.isBrowserlessTarget || model.isCloudTransferTarget {
             FixedBadge("Manual only")
           } else {
             HStack(spacing: 8) {
@@ -876,8 +883,8 @@ struct PreferencesPanel: View {
           }
         }
         RowDivider()
-        PreferenceRow(icon: "sunrise.fill", color: Theme.accent, title: "Sync at login", detail: model.isBrowserlessTarget || model.isGrokBotTarget ? "Unavailable for this destination" : (model.loginSyncEnabled ? "Once whenever you sign in" : "Off")) {
-          if model.isBrowserlessTarget || model.isGrokBotTarget {
+        PreferenceRow(icon: "sunrise.fill", color: Theme.accent, title: "Sync at login", detail: model.isBrowserlessTarget || model.isCloudTransferTarget ? "Unavailable for this destination" : (model.loginSyncEnabled ? "Once whenever you sign in" : "Off")) {
+          if model.isBrowserlessTarget || model.isCloudTransferTarget {
             FixedBadge("Manual only")
           } else {
             Toggle("", isOn: Binding(get: { model.loginSyncEnabled }, set: { model.setLoginSyncEnabled($0) }))
@@ -1106,7 +1113,7 @@ struct ExtensionSetupSheet: View {
           Button("Open page") { model.openExtensions(for: model.selectedSourceID) }
           Button("Show folder") { model.revealExtension(model.selectedSourceID) }
         }
-        if !model.isDirectTarget && !model.isGrokBotTarget {
+        if !model.isDirectTarget && !model.isCloudTransferTarget {
           Divider().padding(.leading, 58)
           SetupEndpointRow(icon: model.targetIcon, title: model.targetName, detail: "Load the destination extension") {
             Button("Open page") { model.openExtensions(for: model.selectedTargetID) }
@@ -1119,8 +1126,8 @@ struct ExtensionSetupSheet: View {
 
       Text(model.isDirectTarget
         ? "\(model.targetName) uses a direct local merge, so no extension is required. Quit \(model.targetName) before syncing. Password access is never requested."
-        : model.isGrokBotTarget
-          ? "Grok Bot uses an encrypted transfer file with an embedded decryption key, so no extension is required. Create the .bcbx bundle, attach it to any Grok Bot, and paste the prompt."
+        : model.isCloudTransferTarget
+          ? "\(model.targetName) uses an encrypted transfer file with an embedded decryption key, so no extension is required. Create the .bcbx bundle, attach it to \(model.isDotsTarget ? "your dot" : "any Grok Bot"), and paste the prompt."
         : "In both endpoints, enable Developer mode and choose Load unpacked. Password access is never requested.")
         .font(.system(size: 10.5))
         .foregroundStyle(.secondary)
@@ -1349,24 +1356,25 @@ private struct SyncModelAttachment: NSViewRepresentable {
   func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
-struct GrokBotResultSheet: View {
-  @EnvironmentObject private var model: SyncModel
+struct CloudTransferResultSheet: View {
+  let payload: CloudTransferResultPresentation
+  let icon: NSImage
   @Environment(\.dismiss) private var dismiss
   var onDone: (() -> Void)?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       HStack(alignment: .top, spacing: 12) {
-        Image(nsImage: model.grokBotIcon)
+        Image(nsImage: icon)
           .resizable()
           .scaledToFit()
           .frame(width: 24, height: 24)
           .frame(width: 40, height: 40)
           .background(Theme.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
         VStack(alignment: .leading, spacing: 3) {
-          Text("Grok Bot transfer ready")
+          Text("\(payload.targetName) transfer ready")
             .font(.system(size: 18, weight: .bold, design: .rounded))
-          Text(URL(fileURLWithPath: model.grokBotOutputPath).lastPathComponent)
+          Text(URL(fileURLWithPath: payload.outputPath).lastPathComponent)
             .font(.system(size: 11.5))
             .foregroundStyle(.secondary)
         }
@@ -1387,11 +1395,11 @@ struct GrokBotResultSheet: View {
       }
 
       VStack(alignment: .leading, spacing: 8) {
-        Text("Prompt for Grok Bot")
+        Text("Prompt for \(payload.targetName)")
           .font(.system(size: 11, weight: .semibold))
           .foregroundStyle(.secondary)
         ScrollView {
-          Text(model.grokBotPrompt)
+          Text(payload.prompt)
             .font(.system(size: 11))
             .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
@@ -1403,12 +1411,12 @@ struct GrokBotResultSheet: View {
 
       HStack {
         Button("Reveal file") {
-          let url = URL(fileURLWithPath: model.grokBotOutputPath)
+          let url = URL(fileURLWithPath: payload.outputPath)
           NSWorkspace.shared.activateFileViewerSelecting([url])
         }
         Button("Copy prompt") {
           NSPasteboard.general.clearContents()
-          NSPasteboard.general.setString(model.grokBotPrompt, forType: .string)
+          NSPasteboard.general.setString(payload.prompt, forType: .string)
         }
         Spacer()
         Button("Done") {

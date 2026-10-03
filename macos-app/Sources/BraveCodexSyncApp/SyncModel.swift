@@ -9,7 +9,7 @@ extension Notification.Name {
   static let updateStateChanged = Notification.Name("BraveCodexSync.updateStateChanged")
   static let syncStateChanged = Notification.Name("BraveCodexSync.syncStateChanged")
   static let showMainWindow = Notification.Name("BraveCodexSync.showMainWindow")
-  static let presentGrokBotResult = Notification.Name("BraveCodexSync.presentGrokBotResult")
+  static let presentCloudTransferResult = Notification.Name("BraveCodexSync.presentCloudTransferResult")
 }
 
 struct NativeAlert {
@@ -143,7 +143,9 @@ enum FullDiskAccess {
   }
 }
 
-struct GrokBotResultPresentation: Sendable {
+struct CloudTransferResultPresentation: Sendable {
+  let targetID: String
+  var targetName: String { targetID == "dots" ? "Dots" : "Grok Bot" }
   let prompt: String
   let outputPath: String
 }
@@ -209,7 +211,7 @@ enum AppDiagnostics {
 /// install on local `npm run build:app` builds) is a *different* TCC client and is denied when it opens or
 /// copies another app's Cookies database, even though the app was granted access. Copying with FileManager
 /// here and handing the CLI the copy (via `BCB_SOURCE_SNAPSHOT_DIR`) sidesteps that, and — because the copy
-/// includes the WAL/journal sidecars — also lets the source browser stay open during a Grok Bot Create.
+/// includes the WAL/journal sidecars — also lets the source browser stay open during a cloud transfer export.
 struct SourceSnapshot: Sendable {
   static let environmentKey = "BCB_SOURCE_SNAPSHOT_DIR"
   static let sidecarSuffixes = ["-journal", "-wal", "-shm"]
@@ -378,9 +380,10 @@ final class SyncModel: ObservableObject {
   @Published var browserlessRegion = "sfo"
   @Published var browserlessOnlyDomains = ""
   @Published var grokBotOnlyDomains = ""
+  @Published var dotsOnlyDomains = ""
   @Published var showingBrowserlessSetup = false
-  @Published var grokBotPrompt = ""
-  @Published var grokBotOutputPath = ""
+  @Published var cloudTransferPrompt = ""
+  @Published var cloudTransferOutputPath = ""
   @Published var browserlessAssessment: BrowserlessProfileAssessment?
   @Published var isInspectingBrowserlessProfile = false
   @Published var uploadProgress = 0.0
@@ -397,7 +400,7 @@ final class SyncModel: ObservableObject {
   private var appLoginAgent: URL { home.appending(path: "Library/LaunchAgents/com.apoorvdarshan.brave-codex-cookie-sync.app-login.plist") }
   private var endpointStatusTimer: Timer?
   private var updateTimer: Timer?
-  private var activeGrokBotOutputPath: String?
+  private var activeCloudTransferOutputPath: String?
 
   private static let grokBotFallbackPrompt = """
 On your Grok Bot cloud computer only — do not access my local Mac and do not print cookie values.
@@ -434,11 +437,27 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   }
 
   var isBrowserlessTarget: Bool { selectedTargetID == "browserless" }
-  var isGrokBotTarget: Bool { selectedTargetID == "grok-bot" }
+  var isDotsTarget: Bool { selectedTargetID == "dots" }
+  var isCloudTransferTarget: Bool { selectedTargetID == "grok-bot" || isDotsTarget }
+  var cloudTransferOnlyDomains: String { isDotsTarget ? dotsOnlyDomains : grokBotOnlyDomains }
+  var cloudTransferBundleBaseName: String { isDotsTarget ? "Dots-Import" : "GrokBot-Import" }
+  private var cloudTransferFallbackPrompt: String {
+    if !isDotsTarget { return Self.grokBotFallbackPrompt }
+    return """
+On your Dots cloud computer only — do not access my local Mac and do not print cookie names, values, or keys.
+
+1. Save Dots-Import.bcbx to your cloud computer, then unzip it into a new private folder: umask 077; unzip Dots-Import.bcbx -d dots-bcb-import
+2. Use your existing managed cloud browser, the same one shown under Open computer. Do not launch a separate browser or change its launch settings.
+3. Run: cd dots-bcb-import && node import.mjs --bundle ../Dots-Import.bcbx
+4. The importer needs Node.js 22+ and a local Chrome DevTools endpoint. If discovery fails, pass --cdp-url with the existing browser's loopback endpoint. If unavailable, stop and report that import is unsupported.
+5. If separate browser contexts are reported, identify your managed browser context and pass --browser-context-id with that ID (or default for the default context). Stop if you cannot identify it.
+6. Report only the imported cookie count. After success, remove any remaining copies of the bundle. Never paste decrypted cookies into chat.
+"""
+  }
   var isDirectTarget: Bool { selectedTargetID == "codex" || selectedTargetID == "cursor" }
   var targetName: String {
     if isBrowserlessTarget { return "Browserless Cloud" }
-    if isGrokBotTarget { return "Grok Bot" }
+    if isCloudTransferTarget { return isDotsTarget ? "Dots" : "Grok Bot" }
     if selectedTargetID == "cursor" { return "Cursor" }
     return selectedTargetBrowser?.name ?? "ChatGPT Codex"
   }
@@ -457,14 +476,14 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     isBrowserlessTarget && (!browserlessConfigured || sourceBrowserRunning || selectedSourceID == "comet")
   }
   var cursorHasNoDataSelected: Bool { selectedTargetID == "cursor" && !cookiesEnabled }
-  var grokBotHasNoDataSelected: Bool { isGrokBotTarget && !cookiesEnabled }
+  var cloudTransferHasNoDataSelected: Bool { isCloudTransferTarget && !cookiesEnabled }
   /// macOS refuses to let this app read the source browser's cookie store (TCC). The source browser may stay
-  /// open for Grok Bot — the app snapshots the database itself — so only a Full Disk Access denial blocks
+  /// open for cloud transfers — the app snapshots the database itself — so only a Full Disk Access denial blocks
   /// Create, and the button becomes a shortcut to System Settings.
-  var grokBotSourceAccessBlocked: Bool { isGrokBotTarget && sourceCookieAccessDenied }
-  var grokBotBlocked: Bool { grokBotHasNoDataSelected || grokBotSourceAccessBlocked }
+  var cloudTransferSourceAccessBlocked: Bool { isCloudTransferTarget && sourceCookieAccessDenied }
+  var cloudTransferBlocked: Bool { cloudTransferHasNoDataSelected || cloudTransferSourceAccessBlocked }
   var syncBlocked: Bool {
-    !runtimeReady || directTargetBlocked || sourceSiteDataBlocked || browserlessBlocked || cursorHasNoDataSelected || grokBotBlocked
+    !runtimeReady || directTargetBlocked || sourceSiteDataBlocked || browserlessBlocked || cursorHasNoDataSelected || cloudTransferBlocked
   }
   var formattedUploadElapsed: String {
     let minutes = uploadElapsedSeconds / 60
@@ -474,9 +493,15 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   var sourceIcon: NSImage { browserIcon(selectedBrowser) }
   var targetIcon: NSImage {
     if isBrowserlessTarget { return browserlessIcon }
-    if isGrokBotTarget { return grokBotIcon }
+    if isCloudTransferTarget { return cloudTransferIcon(for: selectedTargetID) }
     if selectedTargetID == "cursor" { return cursorIcon }
     return selectedTargetBrowser.map(browserIcon) ?? codexIcon
+  }
+  var dotsIcon: NSImage {
+    NSImage(systemSymbolName: "circle.dotted", accessibilityDescription: "Dots by OpenAI") ?? NSImage()
+  }
+  func cloudTransferIcon(for targetID: String) -> NSImage {
+    targetID == "dots" ? dotsIcon : grokBotIcon
   }
   var grokBotIcon: NSImage {
     if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anysphere.sand") {
@@ -609,7 +634,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       let configuredSource = config.sourceBrowser ?? "brave"
       selectedSourceID = browsers.contains(where: { $0.id == configuredSource }) ? configuredSource : "brave"
       let configuredTarget = config.targetBrowser ?? "codex"
-      selectedTargetID = configuredTarget == "codex" || configuredTarget == "cursor" || configuredTarget == "browserless" || configuredTarget == "grok-bot" || browsers.contains(where: { $0.id == configuredTarget })
+      selectedTargetID = configuredTarget == "codex" || configuredTarget == "cursor" || configuredTarget == "browserless" || configuredTarget == "grok-bot" || configuredTarget == "dots" || browsers.contains(where: { $0.id == configuredTarget })
         ? configuredTarget
         : "codex"
       if selectedTargetID == selectedSourceID { selectedTargetID = "codex" }
@@ -620,7 +645,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       rememberedSiteStorageEnabled = config.rememberedImports?.siteStorage ?? loadedSiteStorageEnabled
       historyEnabled = loadedHistoryEnabled
       siteStorageEnabled = loadedSiteStorageEnabled
-      if selectedTargetID == "cursor" || selectedTargetID == "grok-bot" {
+      if selectedTargetID == "cursor" || isCloudTransferTarget {
         historyEnabled = false
         siteStorageEnabled = false
       }
@@ -632,6 +657,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       browserlessRegion = config.browserless?.region ?? "sfo"
       browserlessOnlyDomains = (config.browserless?.onlyDomains ?? []).joined(separator: ", ")
       grokBotOnlyDomains = (config.grokBot?.onlyDomains ?? []).joined(separator: ", ")
+      dotsOnlyDomains = (config.dots?.onlyDomains ?? []).joined(separator: ", ")
     }
     browserlessConfigured = BrowserlessCredentialStore.read() != nil
     NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: menuBarEnabled)
@@ -656,18 +682,18 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   }
 
   func selectTarget(_ id: String) {
-    let validTarget = id == "codex" || id == "cursor" || id == "browserless" || id == "grok-bot" || browsers.contains(where: { $0.id == id })
+    let validTarget = id == "codex" || id == "cursor" || id == "browserless" || id == "grok-bot" || id == "dots" || browsers.contains(where: { $0.id == id })
     guard validTarget, id != selectedTargetID, id != selectedSourceID else { return }
-    let wasCursor = selectedTargetID == "cursor"
-    if id == "cursor" && !wasCursor {
+    let wasCookieOnly = selectedTargetID == "cursor" || isCloudTransferTarget
+    if (id == "cursor" || id == "grok-bot" || id == "dots") && !wasCookieOnly {
       rememberedHistoryEnabled = historyEnabled
       rememberedSiteStorageEnabled = siteStorageEnabled
     }
     selectedTargetID = id
-    if id == "cursor" || id == "grok-bot" {
+    if id == "cursor" || isCloudTransferTarget {
       historyEnabled = false
       siteStorageEnabled = false
-    } else if wasCursor {
+    } else if wasCookieOnly {
       historyEnabled = rememberedHistoryEnabled
       siteStorageEnabled = rememberedSiteStorageEnabled
     }
@@ -683,14 +709,14 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   }
 
   func setHistoryEnabled(_ enabled: Bool) {
-    guard selectedTargetID != "cursor", selectedTargetID != "grok-bot" else { return }
+    guard selectedTargetID != "cursor", !isCloudTransferTarget else { return }
     historyEnabled = enabled
     rememberedHistoryEnabled = enabled
     persistPreferences(successMessage: enabled ? "History URL import enabled" : "History import disabled")
   }
 
   func setSiteStorageEnabled(_ enabled: Bool) {
-    guard selectedTargetID != "cursor", selectedTargetID != "grok-bot" else { return }
+    guard selectedTargetID != "cursor", !isCloudTransferTarget else { return }
     siteStorageEnabled = enabled
     rememberedSiteStorageEnabled = enabled
     persistPreferences(successMessage: enabled ? "Full site-data import enabled" : "Full site-data import disabled")
@@ -828,9 +854,9 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     }
   }
 
-  func setGrokBotOnlyDomains(_ value: String) {
-    grokBotOnlyDomains = value
-    persistPreferences(successMessage: "Grok Bot domain filter updated")
+  func setCloudTransferOnlyDomains(_ value: String) {
+    if isDotsTarget { dotsOnlyDomains = value } else { grokBotOnlyDomains = value }
+    persistPreferences(successMessage: "\(targetName) domain filter updated")
   }
 
   func openFullDiskAccessSettings() {
@@ -860,13 +886,13 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
           title: primaryStatus,
           message: secondaryStatus,
           kind: .warning,
-          secondaryButton: grokBotSourceAccessBlocked ? .openFullDiskAccessSettings : nil
+          secondaryButton: cloudTransferSourceAccessBlocked ? .openFullDiskAccessSettings : nil
         )
       }
       return
     }
-    if isGrokBotTarget {
-      startGrokBotExport(showMenuBarAlert: showMenuBarAlert)
+    if isCloudTransferTarget {
+      startCloudTransferExport(showMenuBarAlert: showMenuBarAlert)
       return
     }
     if selectedTargetID == "codex" && siteStorageEnabled && autoRestartBoth && (sourceBrowserRunning || codexRunning) {
@@ -1003,11 +1029,11 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     }
   }
 
-  private func startGrokBotExport(showMenuBarAlert: Bool) {
+  private func startCloudTransferExport(showMenuBarAlert: Bool) {
     let panel = NSSavePanel()
-    panel.title = "Save Grok Bot transfer file"
+    panel.title = "Save \(targetName) transfer file"
     // Base name only: including ".bcbx" here plus allowedContentTypes often makes macOS append a second extension (GrokBot-Import.bcbx.bcbx) and breaks Replace on an existing file.
-    panel.nameFieldStringValue = "GrokBot-Import"
+    panel.nameFieldStringValue = cloudTransferBundleBaseName
     panel.canCreateDirectories = true
     panel.isExtensionHidden = false
     panel.allowsOtherFileTypes = false
@@ -1016,33 +1042,33 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     } else {
       panel.allowedFileTypes = ["bcbx"]
     }
-    AppDiagnostics.log("grok-bot: presenting save panel")
+    AppDiagnostics.log("cloud-transfer: presenting save panel")
     panel.begin { [weak self] response in
       guard let self else { return }
       guard response == .OK else {
-        AppDiagnostics.log("grok-bot: save panel dismissed without saving (response \(response.rawValue))")
+        AppDiagnostics.log("cloud-transfer: save panel dismissed without saving (response \(response.rawValue))")
         return
       }
       guard let chosen = panel.url else {
-        AppDiagnostics.log("grok-bot: save panel returned OK without a URL")
+        AppDiagnostics.log("cloud-transfer: save panel returned OK without a URL")
         self.showResult(
           .error,
-          "Could not create the Grok Bot transfer file",
+          "Could not create the \(self.targetName) transfer file",
           "macOS did not return a save location. Try again and choose a folder such as Downloads."
         )
         self.postNativeAlert(title: self.primaryStatus, message: self.secondaryStatus, kind: .error)
         return
       }
-      let url = Self.normalizedGrokBotOutputURL(chosen)
-      AppDiagnostics.log("grok-bot: save panel OK → \(url.path)\(url.path == chosen.path ? "" : " (normalized from \(chosen.path))")")
-      self.startSync(showMenuBarAlert: showMenuBarAlert, reopenCodexOnSuccess: false, grokBotOutputPath: url.path)
+      let url = Self.normalizedCloudTransferOutputURL(chosen)
+      AppDiagnostics.log("cloud-transfer: save panel OK → \(url.path)\(url.path == chosen.path ? "" : " (normalized from \(chosen.path))")")
+      self.startSync(showMenuBarAlert: showMenuBarAlert, reopenCodexOnSuccess: false, cloudTransferOutputPath: url.path)
     }
   }
 
   /// The save panel is fed a base name plus a dynamic `.bcbx` UTType; depending on the macOS release it has
   /// returned `Name.bcbx`, `Name.bcbx.bcbx`, or `Name`. The CLI rejects anything that is not exactly `.bcbx`,
   /// so normalize here instead of letting the export fail after the user already confirmed Replace.
-  static func normalizedGrokBotOutputURL(_ url: URL) -> URL {
+  static func normalizedCloudTransferOutputURL(_ url: URL) -> URL {
     var path = url.path
     while path.lowercased().hasSuffix(".bcbx.bcbx") { path.removeLast(5) }
     if !path.lowercased().hasSuffix(".bcbx") { path += ".bcbx" }
@@ -1063,15 +1089,15 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     showingOperationResult = true
   }
 
-  private func startSync(showMenuBarAlert: Bool, reopenCodexOnSuccess: Bool, reopenSourceOnSuccess: Bool = false, grokBotOutputPath: String? = nil) {
+  private func startSync(showMenuBarAlert: Bool, reopenCodexOnSuccess: Bool, reopenSourceOnSuccess: Bool = false, cloudTransferOutputPath: String? = nil) {
     isSyncing = true
     uploadCanceling = false
     showingOperationResult = false
     state = .syncing
-    primaryStatus = isGrokBotTarget
-      ? "Creating Grok Bot transfer file"
+    primaryStatus = isCloudTransferTarget
+      ? "Creating \(targetName) transfer file"
       : isBrowserlessTarget ? "Uploading authenticated state" : "Transferring selected data"
-    secondaryStatus = isGrokBotTarget
+    secondaryStatus = isCloudTransferTarget
       ? "Encrypting selected cookie sessions from \(selectedBrowser.name)…"
       : isDirectTarget
       ? "Backing up \(targetName) and merging \(selectedBrowser.name) locally…"
@@ -1080,11 +1106,11 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
         : "Waiting for \(selectedBrowser.name) and \(targetName)…"
     var environment: [String: String] = [:]
     var arguments = ["sync", "--timeout", isBrowserlessTarget ? "900" : "300"]
-    if let grokBotOutputPath {
-      activeGrokBotOutputPath = grokBotOutputPath
-      arguments.append(contentsOf: ["--output", grokBotOutputPath])
+    if let cloudTransferOutputPath {
+      activeCloudTransferOutputPath = cloudTransferOutputPath
+      arguments.append(contentsOf: ["--output", cloudTransferOutputPath])
     } else {
-      activeGrokBotOutputPath = nil
+      activeCloudTransferOutputPath = nil
     }
     if isBrowserlessTarget {
       guard let token = BrowserlessCredentialStore.read() else {
@@ -1100,7 +1126,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       beginUploadTracking()
     }
     let sourceSnapshot: SourceSnapshot?
-    if isGrokBotTarget || isDirectTarget {
+    if isCloudTransferTarget || isDirectTarget {
       switch takeSourceSnapshot() {
       case .taken(let snapshot):
         sourceSnapshot = snapshot
@@ -1109,7 +1135,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
         sourceSnapshot = nil
       case .denied(let detail):
         isSyncing = false
-        activeGrokBotOutputPath = nil
+        activeCloudTransferOutputPath = nil
         showResult(.error, FullDiskAccess.statusTitle(browserName: selectedBrowser.name), detail)
         updateEndpointRunningStatus()
         postNativeAlert(
@@ -1140,12 +1166,12 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
           || output.contains("omitted to fit")
           || output.contains("could not be captured")
       )
-      if let grokBotOutputPath {
-        self.finishGrokBotExport(
+      if let cloudTransferOutputPath {
+        self.finishCloudTransferExport(
           success: success,
           partial: partial,
           output: output,
-          requestedPath: grokBotOutputPath,
+          requestedPath: cloudTransferOutputPath,
           startedAt: startedAt,
           arguments: launchArguments
         )
@@ -1219,10 +1245,10 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     }
   }
 
-  /// Completes a Grok Bot export. Presentation is driven by whether the `.bcbx` file was actually (re)written,
+  /// Completes a cloud transfer export. Presentation is driven by whether the `.bcbx` file was actually (re)written,
   /// not only by the exit status, so the result panel can never be skipped after a successful write and a
   /// failure can never end with just a status-line change.
-  private func finishGrokBotExport(
+  private func finishCloudTransferExport(
     success: Bool,
     partial: Bool,
     output: String,
@@ -1230,14 +1256,14 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     startedAt: Date,
     arguments: [String]
   ) {
-    let parsed = parseGrokBotResult(from: output)
+    let parsed = parseCloudTransferResult(from: output)
     let outputPath = parsed?.outputPath ?? requestedPath
     let bundleWritten = Self.fileWasWritten(atPath: outputPath, since: startedAt)
     let fileName = URL(fileURLWithPath: outputPath).lastPathComponent
     let cliExit = lastCLIExit
-    activeGrokBotOutputPath = nil
+    activeCloudTransferOutputPath = nil
     AppDiagnostics.log(
-      "grok-bot: CLI finished success=\(success) exit=\(cliExit.map { String($0.status) } ?? "nil") "
+      "cloud-transfer: CLI finished success=\(success) exit=\(cliExit.map { String($0.status) } ?? "nil") "
         + "signaled=\(cliExit?.signaled ?? false) resultLine=\(parsed != nil) bundleWritten=\(bundleWritten) path=\(outputPath)"
     )
 
@@ -1245,7 +1271,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     AppDiagnostics.writeLastSyncResult(SyncResultRecord(
       startedAt: startedAt,
       finishedAt: Date(),
-      target: "grok-bot",
+      target: selectedTargetID,
       arguments: arguments,
       exitStatus: cliExit?.status,
       terminatedBySignal: cliExit?.signaled ?? false,
@@ -1257,18 +1283,17 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     ))
     if treatAsSuccess {
       if !success {
-        AppDiagnostics.log("grok-bot: exit status was non-zero but \(fileName) was rewritten — presenting the result anyway")
+        AppDiagnostics.log("cloud-transfer: exit status was non-zero but \(fileName) was rewritten — presenting the result anyway")
       }
       showResult(
         partial ? .warning : .success,
-        partial ? "Grok Bot transfer created with warnings" : "Grok Bot transfer file ready",
-        lastMeaningfulLine(output) ?? "Attach \(fileName) to any Grok Bot and paste the prompt"
+        partial ? "\(targetName) transfer created with warnings" : "\(targetName) transfer file ready",
+        lastMeaningfulLine(output) ?? "Attach \(fileName) to \(isDotsTarget ? "your dot" : "any Grok Bot") and paste the prompt"
       )
       updateEndpointRunningStatus()
-      presentGrokBotResultSheet(prompt: parsed?.prompt ?? Self.grokBotFallbackPrompt, outputPath: outputPath)
+      presentCloudTransferResultSheet(prompt: parsed?.prompt ?? cloudTransferFallbackPrompt, outputPath: outputPath)
     } else if noteFullDiskAccessDenial(in: output) {
-      // EPERM here is TCC, not a lock: the browser is already closed (the quit-browser gate ran before Create),
-      // so telling the user to close it again would be wrong. Point at Full Disk Access instead.
+      // EPERM here is TCC: point to Full Disk Access so the app can snapshot the cookie store.
       let detail = lastMeaningfulLine(output) ?? FullDiskAccess.statusDetail(browserName: selectedBrowser.name)
       showResult(.error, FullDiskAccess.statusTitle(browserName: selectedBrowser.name), detail)
       updateEndpointRunningStatus()
@@ -1281,7 +1306,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     } else {
       let detail = lastMeaningfulLine(output)
         ?? "The local sync runtime exited (status \(cliExit.map { String($0.status) } ?? "unknown")) without writing \(fileName)."
-      showResult(.error, "Could not create the Grok Bot transfer file", detail)
+      showResult(.error, "Could not create the \(targetName) transfer file", detail)
       updateEndpointRunningStatus()
       postNativeAlert(
         title: primaryStatus,
@@ -1514,6 +1539,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       "--browserless-region", browserlessRegion,
       "--browserless-domains", browserlessOnlyDomains,
       "--grok-bot-domains", grokBotOnlyDomains,
+      "--dots-domains", dotsOnlyDomains,
     ]
     runCLI(arguments) { [weak self] success, output in
       guard let self else { return }
@@ -1524,7 +1550,7 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
           successMessage,
           self.isBrowserlessTarget
             ? "Cloud uploads run only after you click Upload"
-            : self.isGrokBotTarget
+            : self.isCloudTransferTarget
               ? "Transfer files are created only when you click Create transfer file"
             : "This choice is saved for manual and daily syncs"
         )
@@ -1732,34 +1758,35 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
   }
 
   private var requiredExtensionIDs: [String] {
-    isDirectTarget || selectedTargetID == "browserless" || isGrokBotTarget ? [] : [selectedSourceID, selectedTargetID]
+    isDirectTarget || selectedTargetID == "browserless" || isCloudTransferTarget ? [] : [selectedSourceID, selectedTargetID]
   }
 
-  private struct GrokBotResultPayload: Decodable {
+  private struct CloudTransferResultPayload: Decodable {
     let outputPath: String
     let prompt: String
   }
 
-  private func parseGrokBotResult(from output: String) -> GrokBotResultPayload? {
-    guard let line = output.split(separator: "\n").map(String.init).last(where: { $0.hasPrefix("BCB_GROK_RESULT ") }) else {
+  private func parseCloudTransferResult(from output: String) -> CloudTransferResultPayload? {
+    let prefix = isDotsTarget ? "BCB_DOTS_RESULT " : "BCB_GROK_RESULT "
+    guard let line = output.split(separator: "\n").map(String.init).last(where: { $0.hasPrefix(prefix) }) else {
       return nil
     }
-    let json = line.replacingOccurrences(of: "BCB_GROK_RESULT ", with: "")
+    let json = String(line.dropFirst(prefix.count))
     guard let data = json.data(using: .utf8) else { return nil }
-    return try? JSONDecoder().decode(GrokBotResultPayload.self, from: data)
+    return try? JSONDecoder().decode(CloudTransferResultPayload.self, from: data)
   }
 
-  private func presentGrokBotResultSheet(prompt: String, outputPath: String) {
-    grokBotPrompt = prompt
-    grokBotOutputPath = outputPath
-    Self.copyGrokBotPromptToPasteboard(prompt)
-    AppDiagnostics.log("grok-bot: prompt copied to pasteboard; posting presentGrokBotResult for \(outputPath)")
-    let payload = GrokBotResultPresentation(prompt: prompt, outputPath: outputPath)
+  private func presentCloudTransferResultSheet(prompt: String, outputPath: String) {
+    cloudTransferPrompt = prompt
+    cloudTransferOutputPath = outputPath
+    Self.copyCloudTransferPromptToPasteboard(prompt)
+    AppDiagnostics.log("cloud-transfer: prompt copied to pasteboard; posting presentCloudTransferResult for \(outputPath)")
+    let payload = CloudTransferResultPresentation(targetID: selectedTargetID, prompt: prompt, outputPath: outputPath)
     NotificationCenter.default.post(name: .showMainWindow, object: nil)
-    NotificationCenter.default.post(name: .presentGrokBotResult, object: payload)
+    NotificationCenter.default.post(name: .presentCloudTransferResult, object: payload)
   }
 
-  static func copyGrokBotPromptToPasteboard(_ prompt: String) {
+  static func copyCloudTransferPromptToPasteboard(_ prompt: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(prompt, forType: .string)
   }
@@ -1807,24 +1834,26 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
       state = .ready
       primaryStatus = "Ready to sync directly"
       secondaryStatus = "\(targetName) is closed — a backup will be created before anything changes"
-    } else if isGrokBotTarget {
+    } else if isCloudTransferTarget {
       // This runs after every sync completion and again every 2 seconds from the status timer. Before 1.5.8 the
       // idle text below unconditionally replaced whatever the last Create transfer file attempt had reported, so a
       // failed export looked like nothing happened. Blocking conditions still win; results are kept otherwise.
-      if grokBotHasNoDataSelected {
+      if cloudTransferHasNoDataSelected {
         showingOperationResult = false
         state = .warning
-        primaryStatus = "Turn on Cookies to export for Grok Bot"
-        secondaryStatus = "Grok Bot transfer files include cookie sessions only"
-      } else if grokBotSourceAccessBlocked {
+        primaryStatus = "Turn on Cookies to export for \(targetName)"
+        secondaryStatus = "\(targetName) transfer files include cookie sessions only"
+      } else if cloudTransferSourceAccessBlocked {
         showingOperationResult = false
         state = .warning
         primaryStatus = FullDiskAccess.statusTitle(browserName: selectedBrowser.name)
         secondaryStatus = FullDiskAccess.gateDetail(browserName: selectedBrowser.name)
       } else if !showingOperationResult {
         state = .ready
-        primaryStatus = "Ready to create a Grok Bot transfer file"
-        secondaryStatus = "Creates an encrypted .bcbx bundle with an embedded decryption key and bundled importer"
+        primaryStatus = "Ready to create a \(targetName) transfer file"
+        secondaryStatus = isDotsTarget
+          ? "Experimental cloud import: create a bundle, attach it to your dot, and paste the prompt"
+          : "Creates an encrypted .bcbx bundle with an embedded decryption key and bundled importer"
       }
     } else if isBrowserlessTarget {
       if selectedSourceID == "comet" {
@@ -1850,11 +1879,11 @@ On your Grok Bot cloud computer only — do not access my local Mac and do not p
     }
   }
 
-  /// Runs from the 2-second status timer while Grok Bot is selected. The probe is a single open(2) on the
+  /// Runs from the 2-second status timer while a cloud transfer destination is selected. The probe is a single open(2) on the
   /// cookie file (no SQLite, no child process), so it is cheap enough to poll and reflects a TCC change
   /// as soon as the relaunched app can read the file again.
   private func refreshSourceCookieAccess() {
-    guard isGrokBotTarget else {
+    guard isCloudTransferTarget else {
       sourceCookieAccessDenied = false
       cliReportedAccessDenied = false
       return
@@ -1950,7 +1979,8 @@ private struct AppConfig: Decodable {
   let rememberedImports: RememberedImports?
   let ui: UISettings?
   let browserless: BrowserlessSettings?
-  let grokBot: GrokBotSettings?
+  let grokBot: CloudTransferSettings?
+  let dots: CloudTransferSettings?
 
   struct Schedule: Decodable {
     let hour: Int
@@ -1982,7 +2012,7 @@ private struct AppConfig: Decodable {
     let onlyDomains: [String]?
   }
 
-  struct GrokBotSettings: Decodable {
+  struct CloudTransferSettings: Decodable {
     let onlyDomains: [String]?
   }
 }
