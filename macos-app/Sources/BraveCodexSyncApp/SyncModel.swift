@@ -148,6 +148,7 @@ struct CloudTransferResultPresentation: Sendable {
   var targetName: String { targetID == "dots" ? "Dots" : "Grok Bot" }
   let prompt: String
   let outputPath: String
+  var chatPrompt: String { targetID == "dots" ? DotsTransferPrompt.text : prompt }
 }
 
 /// Append-only diagnostics shared by the model and the app delegate.
@@ -1793,9 +1794,9 @@ Supported alternative: ask your dot to open the website and let you sign in priv
   private func presentCloudTransferResultSheet(prompt: String, outputPath: String) {
     cloudTransferPrompt = prompt
     cloudTransferOutputPath = outputPath
-    Self.copyCloudTransferPromptToPasteboard(prompt)
-    AppDiagnostics.log("cloud-transfer: prompt copied to pasteboard; posting presentCloudTransferResult for \(outputPath)")
     let payload = CloudTransferResultPresentation(targetID: selectedTargetID, prompt: prompt, outputPath: outputPath)
+    Self.copyCloudTransferPromptToPasteboard(payload.chatPrompt)
+    AppDiagnostics.log("cloud-transfer: prompt copied to pasteboard; posting presentCloudTransferResult for \(outputPath)")
     NotificationCenter.default.post(name: .showMainWindow, object: nil)
     NotificationCenter.default.post(name: .presentCloudTransferResult, object: payload)
   }

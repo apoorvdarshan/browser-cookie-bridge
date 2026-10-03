@@ -235,7 +235,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
   private func presentCloudTransferResultUI(_ payload: CloudTransferResultPresentation) {
     AppDiagnostics.log("cloud-transfer: presentCloudTransferResultUI reached (model attached: \(model != nil), path: \(payload.outputPath))")
-    SyncModel.copyCloudTransferPromptToPasteboard(payload.prompt)
+    SyncModel.copyCloudTransferPromptToPasteboard(payload.chatPrompt)
     activateForUserAttention()
 
     guard !payload.outputPath.isEmpty else {
@@ -254,7 +254,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         self.showCloudTransferResultAlert(
           payload: pending,
           detail: pending.targetID == "dots"
-            ? "Your transfer file is ready. The manual instructions are on your clipboard; follow them yourself in cloud takeover mode."
+            ? "Your transfer file is ready. Attach it to your dot and paste the copied consent prompt. Dots may still require private sign-in."
             : "Your Grok Bot transfer file is ready. The prompt is on your clipboard."
         )
       }
@@ -304,7 +304,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         self.showCloudTransferResultAlert(
           payload: payload,
           detail: payload.targetID == "dots"
-            ? "The transfer file is ready. Follow the copied instructions yourself in cloud takeover mode."
+            ? "The transfer file is ready. Attach it to your dot and paste the copied consent prompt. Dots may still require private sign-in."
             : "The transfer file is ready. The prompt is on your clipboard."
         )
       } else {
@@ -321,7 +321,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   private func showCloudTransferResultAlert(payload: CloudTransferResultPresentation, detail: String) {
     AppDiagnostics.log("cloud-transfer: showing NSAlert result fallback")
     activateForUserAttention()
-    SyncModel.copyCloudTransferPromptToPasteboard(payload.prompt)
+    SyncModel.copyCloudTransferPromptToPasteboard(payload.chatPrompt)
 
     let fileName = payload.outputPath.isEmpty
       ? (payload.targetID == "dots" ? "Dots-Import.bcbx" : "GrokBot-Import.bcbx")
@@ -331,7 +331,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     alert.informativeText = "\(detail)\n\nFile: \(fileName)"
     alert.alertStyle = .informational
     alert.addButton(withTitle: "OK")
-    alert.addButton(withTitle: payload.targetID == "dots" ? "Copy instructions" : "Copy prompt")
+    alert.addButton(withTitle: payload.targetID == "dots" ? "Copy consent prompt" : "Copy prompt")
     if !payload.outputPath.isEmpty {
       alert.addButton(withTitle: "Reveal in Finder")
     }
@@ -339,7 +339,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let response = alert.runModal()
     switch response {
     case .alertSecondButtonReturn:
-      SyncModel.copyCloudTransferPromptToPasteboard(payload.prompt)
+      SyncModel.copyCloudTransferPromptToPasteboard(payload.chatPrompt)
     case .alertThirdButtonReturn where !payload.outputPath.isEmpty:
       let url = URL(fileURLWithPath: payload.outputPath)
       NSWorkspace.shared.activateFileViewerSelecting([url])
@@ -1369,7 +1369,18 @@ struct CloudTransferResultSheet: View {
   let payload: CloudTransferResultPresentation
   let icon: NSImage
   @Environment(\.dismiss) private var dismiss
+  @State private var showManualInstructions = false
   var onDone: (() -> Void)?
+
+  private var displayedText: String {
+    showManualInstructions ? payload.prompt : payload.chatPrompt
+  }
+
+  private var copyButtonTitle: String {
+    payload.targetID == "dots"
+      ? (showManualInstructions ? "Copy instructions" : "Copy consent prompt")
+      : "Copy prompt"
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -1404,11 +1415,24 @@ struct CloudTransferResultSheet: View {
       }
 
       VStack(alignment: .leading, spacing: 8) {
-        Text(payload.targetID == "dots" ? "Manual import instructions for you" : "Prompt for \(payload.targetName)")
+        Text(payload.targetID == "dots" ? "Import into Dots" : "Prompt for \(payload.targetName)")
           .font(.system(size: 11, weight: .semibold))
           .foregroundStyle(.secondary)
+        if payload.targetID == "dots" {
+          Picker("Import guidance", selection: $showManualInstructions) {
+            Text("Consent prompt").tag(false)
+            Text("Manual instructions").tag(true)
+          }
+          .pickerStyle(.segmented)
+          Text(showManualInstructions
+            ? "Follow these instructions yourself in cloud takeover mode."
+            : "Attach the transfer file to your dot and paste this prompt. Dots may still require you to sign in privately.")
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
         ScrollView {
-          Text(payload.prompt)
+          Text(displayedText)
             .font(.system(size: 11))
             .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
@@ -1423,9 +1447,9 @@ struct CloudTransferResultSheet: View {
           let url = URL(fileURLWithPath: payload.outputPath)
           NSWorkspace.shared.activateFileViewerSelecting([url])
         }
-        Button(payload.targetID == "dots" ? "Copy instructions" : "Copy prompt") {
+        Button(copyButtonTitle) {
           NSPasteboard.general.clearContents()
-          NSPasteboard.general.setString(payload.prompt, forType: .string)
+          NSPasteboard.general.setString(displayedText, forType: .string)
         }
         Spacer()
         Button("Done") {
